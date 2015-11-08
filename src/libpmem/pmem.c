@@ -166,16 +166,30 @@
  * DECISIONS MADE AT INITIALIZATION TIME
  *
  * As much as possible, all decisions described above are made at library
- * initialization time.  This is achieved using function pointers that are
- * setup by pmem_init() when the library loads.
+ * initialization time.  This is achieved using two different approaches
+ * depending on compiler features:
+ * - using function pointers which are setup by pmem_init() when the
+ *   library loads,
+ * - marking functions as indirect functions using the 'ifunc' function
+ *   attribute, this allows the resolution of the symbol value to be
+ *   determined dynamically at load time.
  *
- *	Func_predrain_fence is used by pmem_drain() to call one of:
- *		predrain_fence_empty()
- *		predrain_fence_sfence()
+ * In both approaches the pmem_init_detect() function detects availability of
+ * specified commands and assigns the following function pointers:
  *
  *	Func_drain is used by pmem_drain() to call one of:
- *		drain_no_pcommit()
- *		drain_pcommit()
+ *		drain_no_pcommit_predrain_fence_empty()
+ *		drain_no_pcommit_predrain_fence_sfence()
+ *		drain_pcommit_predrain_fence_empty()()
+ *		drain_pcommit_predrain_fence_sfence()()
+ *
+ *	Func_persist is used by pmem_persist() to call one of:
+ *		persist_clflush_no_pcommit()
+ *		persist_clflush_pcommit()
+ *		persist_clflushopt_no_pcommit()
+ *		persist_clflushopt_pcommit()
+ *		persist_clwb_no_pcommit()
+ *		persist_clwb_pcommit()
  *
  *	Func_flush is used by pmem_flush() to call one of:
  *		flush_clwb()
@@ -189,6 +203,14 @@
  *	Func_memset_nodrain is used by memset_nodrain() to call one of:
  *		memset_nodrain_normal()
  *		memset_nodrain_movnt()
+ *
+ *
+ * The function pointers in 1st approach are explicitly called by the
+ * corresponding API functions. In the 2nd approach the function pointers are
+ * returned by corresponding pmem_*_ifunc() functions which provide the
+ * value for symbol resolution at load time.
+ *
+ * The 'ifunc' approach is used after defining HAS_IFUNC value to 1.
  *
  * DEBUG LOGGING
  *
@@ -252,6 +274,52 @@ static size_t Movnt_threshold = MOVNT_THRESHOLD;
 static int Has_hw_drain;
 
 /*
+ * set of flags which determines which functions will be used by library
+ */
+#define	FF_NO_PCOMMIT		0x00U	/* no pcommit */
+#define	FF_PCOMMIT		0x01U	/* pcommit */
+#define	FF_MASK_PCOMMIT		0x01U	/* mask for pcommit */
+#define	FF_PDF_EMPTY		0x00U	/* pre-drain fence empty */
+#define	FF_PDF_SFENCE		0x02U	/* pre-drain fence using sfence */
+#define	FF_MASK_PDF		0x02U	/* mask for pre-drain fence */
+#define	FF_CLFLUSH		0x04U	/* clflush */
+#define	FF_CLFLUSHOPT		0x08U	/* clflushopt */
+#define	FF_CLWB			0x0CU	/* clwb */
+#define	FF_MASK_FLUSH		0x0CU	/* mask for flush */
+#define	FF_NO_MOVNT		0x00U	/* no movnt */
+#define	FF_MOVNT		0x10U	/* movnt */
+#define	FF_MASK_MOVNT		0x10U	/* mask for movnt */
+
+#define	FF_MASK_DRAIN		(FF_MASK_PCOMMIT | FF_MASK_PDF)
+#define	FF_MASK_PERSIST		(FF_MASK_PCOMMIT | FF_MASK_FLUSH)
+#define	FF_GET(f, m)		((f) & FF_MASK_##m)
+#define	FF_GET_PCOMMIT(f)	FF_GET(f, PCOMMIT)
+#define	FF_GET_PDF(f)		FF_GET(f, PDF)
+#define	FF_GET_DRAIN(f)		FF_GET(f, DRAIN)
+#define	FF_GET_FLUSH(f)		FF_GET(f, FLUSH)
+#define	FF_GET_PERSIST(f)	FF_GET(f, PERSIST)
+#define	FF_GET_MOVNT(f)		FF_GET(f, MOVNT)
+#define	FF_SET(f, m, v)\
+	((f) = (((f) & ~(FF_MASK_##m)) | (FF_##v)))
+/*
+ * default value for function flags:
+ * - no pcommit support
+ * - pre-drain fence empty
+ * - clflush
+ * - no movnt support
+ */
+#define	FF_DEFAULT \
+(FF_NO_PCOMMIT | FF_PDF_EMPTY | FF_CLFLUSH | FF_NO_MOVNT)
+
+/*
+ * function flags which hold information about supported instructions
+ * and are used to determine the function pointers to use
+ */
+static unsigned Func_flags = FF_DEFAULT;
+
+static void pmem_init_detect(void);
+
+/*
  * pmem_has_hw_drain -- return whether or not HW drain (PCOMMIT) was found
  */
 int
@@ -263,7 +331,7 @@ pmem_has_hw_drain(void)
 /*
  * predrain_fence_empty -- (internal) issue the pre-drain fence instruction
  */
-static void
+static inline void
 predrain_fence_empty(void)
 {
 	LOG(15, NULL);
@@ -275,7 +343,7 @@ predrain_fence_empty(void)
 /*
  * predrain_fence_sfence -- (internal) issue the pre-drain fence instruction
  */
-static void
+static inline void
 predrain_fence_sfence(void)
 {
 	LOG(15, NULL);
@@ -284,23 +352,12 @@ predrain_fence_sfence(void)
 }
 
 /*
- * pmem_drain() calls through Func_predrain_fence to do the fence.  Although
- * initialized to predrain_fence_empty(), once the existence of the CLWB or
- * CLFLUSHOPT feature is confirmed by pmem_init() at library initialization
- * time, Func_predrain_fence is set to predrain_fence_sfence().  That's the
- * most common case on modern hardware that supports persistent memory.
- */
-static void (*Func_predrain_fence)(void) = predrain_fence_empty;
-
-/*
  * drain_no_pcommit -- (internal) wait for PM stores to drain, empty version
  */
-static void
+static inline void
 drain_no_pcommit(void)
 {
 	LOG(15, NULL);
-
-	Func_predrain_fence();
 
 	VALGRIND_DO_COMMIT;
 	VALGRIND_DO_FENCE;
@@ -310,25 +367,99 @@ drain_no_pcommit(void)
 /*
  * drain_pcommit -- (internal) wait for PM stores to drain, pcommit version
  */
-static void
+static inline void
 drain_pcommit(void)
 {
 	LOG(15, NULL);
 
-	Func_predrain_fence();
 	_mm_pcommit();
 	_mm_sfence();
 }
 
 /*
- * pmem_drain() calls through Func_drain to do the work.  Although
- * initialized to drain_no_pcommit(), once the existence of the pcommit
- * feature is confirmed by pmem_init() at library initialization time,
- * Func_drain is set to drain_pcommit().  That's the most common case
- * on modern hardware that supports persistent memory.
+ * drain_no_pcommit_predrain_fence_empty -- (internal) wait for PM stores to
+ * drain, empty version with empty pre-drain fence
  */
-static void (*Func_drain)(void) = drain_no_pcommit;
+static void
+drain_no_pcommit_predrain_fence_empty(void)
+{
+	LOG(15, NULL);
 
+	predrain_fence_empty();
+
+	drain_no_pcommit();
+}
+
+/*
+ * drain_pcommit_predrain_fence_empty -- (internal) wait for PM stores to
+ * drain, pcommit version with empty pre-drain fence
+ */
+static void
+drain_pcommit_predrain_fence_empty(void)
+{
+	LOG(15, NULL);
+
+	predrain_fence_empty();
+
+	drain_pcommit();
+}
+
+/*
+ * drain_no_pcommit_predrain_fence_sfence -- (internal) wait for PM stores to
+ * drain, empty version with pre-drain sfence
+ */
+static void
+drain_no_pcommit_predrain_fence_sfence(void)
+{
+	LOG(15, NULL);
+
+	predrain_fence_sfence();
+
+	drain_no_pcommit();
+}
+
+/*
+ * drain_pcommit_predrain_fence_sfence -- (internal) wait for PM stores to
+ * drain, pcommit version with pre-drain sfence
+ */
+static void
+drain_pcommit_predrain_fence_sfence(void)
+{
+	LOG(15, NULL);
+
+	predrain_fence_sfence();
+
+	drain_pcommit();
+}
+
+/*
+ * pmem_drain() calls through Func_drain to do the work.  Although
+ * initialized to drain_no_pcommit_predrain_fence_empty(), once the
+ * existence of the pcommit feature is confirmed by pmem_init() at
+ * library initialization time, Func_drain is set to one of drain_pcommit_*()
+ * functions depending on existence of flushing instructions supported by hw.
+ * That's the most common case on modern hardware that supports persistent
+ * memory.
+ */
+static void (*Func_drain)(void);
+
+#if HAS_IFUNC
+/*
+ * pmem_drain_ifunc -- (internal) return pointer to pmem_drain function
+ */
+static void *
+pmem_drain_ifunc(void)
+{
+	if (!Func_drain)
+		pmem_init_detect();
+
+	ASSERT(Func_drain != NULL);
+
+	return Func_drain;
+}
+
+void pmem_drain(void) __attribute__((ifunc("pmem_drain_ifunc")));
+#else
 /*
  * pmem_drain -- wait for any PM stores to drain from HW buffers
  */
@@ -339,14 +470,17 @@ pmem_drain(void)
 
 	Func_drain();
 }
+#endif
 
 /*
  * flush_clflush -- (internal) flush the CPU cache, using clflush
  */
-static void
+static inline void
 flush_clflush(const void *addr, size_t len)
 {
-	LOG(15, "addr %p len %zu", addr, len);
+	LOG(10, "addr %p len %zu", addr, len);
+
+	VALGRIND_DO_CHECK_MEM_IS_ADDRESSABLE(addr, len);
 
 	uintptr_t uptr;
 
@@ -362,10 +496,12 @@ flush_clflush(const void *addr, size_t len)
 /*
  * flush_clwb -- (internal) flush the CPU cache, using clwb
  */
-static void
+static inline void
 flush_clwb(const void *addr, size_t len)
 {
-	LOG(15, "addr %p len %zu", addr, len);
+	LOG(10, "addr %p len %zu", addr, len);
+
+	VALGRIND_DO_CHECK_MEM_IS_ADDRESSABLE(addr, len);
 
 	uintptr_t uptr;
 
@@ -382,10 +518,12 @@ flush_clwb(const void *addr, size_t len)
 /*
  * flush_clflushopt -- (internal) flush the CPU cache, using clflushopt
  */
-static void
+static inline void
 flush_clflushopt(const void *addr, size_t len)
 {
-	LOG(15, "addr %p len %zu", addr, len);
+	LOG(10, "addr %p len %zu", addr, len);
+
+	VALGRIND_DO_CHECK_MEM_IS_ADDRESSABLE(addr, len);
 
 	uintptr_t uptr;
 
@@ -406,8 +544,27 @@ flush_clflushopt(const void *addr, size_t len)
  * Func_flush is set to flush_clflushopt().  That's the most common case
  * on modern hardware that supports persistent memory.
  */
-static void (*Func_flush)(const void *, size_t) = flush_clflush;
+static void (*Func_flush)(const void *, size_t);
 
+#if HAS_IFUNC
+/*
+ * pmem_flush_ifunc -- (internal) return pointer to pmem_flush function
+ */
+static void *
+pmem_flush_ifunc(void)
+{
+	if (!Func_flush)
+		pmem_init_detect();
+
+	ASSERT(Func_flush != NULL);
+
+	return Func_flush;
+}
+
+void
+pmem_flush(const void *addr, size_t len)
+__attribute__((ifunc("pmem_flush_ifunc")));
+#else
 /*
  * pmem_flush -- flush processor cache for the given range
  */
@@ -416,11 +573,116 @@ pmem_flush(const void *addr, size_t len)
 {
 	LOG(10, "addr %p len %zu", addr, len);
 
-	VALGRIND_DO_CHECK_MEM_IS_ADDRESSABLE(addr, len);
-
 	Func_flush(addr, len);
 }
+#endif
 
+/*
+ * persist_clflush_no_pcommit -- (internal) persist function version
+ * with clflush and no pcommit
+ */
+static void
+persist_clflush_no_pcommit(void *addr, size_t len)
+{
+	LOG(15, "addr %p len %zu", addr, len);
+
+	flush_clflush(addr, len);
+	drain_no_pcommit_predrain_fence_empty();
+}
+
+/*
+ * persist_clflush_pcommit -- (internal) persist function version
+ * with clflush and pcommit
+ */
+static void
+persist_clflush_pcommit(void *addr, size_t len)
+{
+	LOG(15, "addr %p len %zu", addr, len);
+
+	flush_clflush(addr, len);
+	drain_pcommit_predrain_fence_empty();
+}
+
+/*
+ * persist_clflushopt_no_pcommit -- (internal) persist function version
+ * with clflushopt and no pcommit
+ */
+static void
+persist_clflushopt_no_pcommit(void *addr, size_t len)
+{
+	LOG(15, "addr %p len %zu", addr, len);
+
+	flush_clflushopt(addr, len);
+	drain_no_pcommit_predrain_fence_sfence();
+}
+
+/*
+ * persist_clflushopt_pcommit -- (internal) persist function version
+ * with clflushopt and pcommit
+ */
+static void
+persist_clflushopt_pcommit(void *addr, size_t len)
+{
+	LOG(15, "addr %p len %zu", addr, len);
+
+	flush_clflushopt(addr, len);
+	drain_pcommit_predrain_fence_sfence();
+}
+
+/*
+ * persist_clwb_no_pcommit -- (internal) persist function version
+ * with clwb and no pcommit
+ */
+static void
+persist_clwb_no_pcommit(void *addr, size_t len)
+{
+	LOG(15, "addr %p len %zu", addr, len);
+
+	flush_clwb(addr, len);
+	drain_no_pcommit_predrain_fence_sfence();
+}
+
+/*
+ * persist_clwb_pcommit -- (internal) persist function version
+ * with clwb and pcommit
+ */
+static void
+persist_clwb_pcommit(void *addr, size_t len)
+{
+	LOG(15, "addr %p len %zu", addr, len);
+
+	flush_clwb(addr, len);
+	drain_pcommit_predrain_fence_sfence();
+}
+
+/*
+ * pmem_flush() calls through Func_flush to do the work.  Although
+ * initialized to flush_clflush(), once the existence of the clflushopt
+ * feature is confirmed by pmem_init() at library initialization time,
+ * Func_flush is set to flush_clflushopt().  That's the most common case
+ * on modern hardware that supports persistent memory.
+ */
+static void (*Func_persist)(void *, size_t);
+
+#if HAS_IFUNC
+/*
+ * pmem_persist_ifunc -- (internal) return pointer to pmem_persist function
+ */
+static void *
+pmem_persist_ifunc(void)
+{
+	if (!Func_persist)
+		pmem_init_detect();
+
+	ASSERT(Func_persist != NULL);
+
+	return Func_persist;
+}
+
+void
+pmem_persist(const void *addr, size_t len)
+__attribute__((ifunc("pmem_persist_ifunc")));
+#else
 /*
  * pmem_persist -- make any cached changes to a range of pmem persistent
  */
@@ -429,9 +691,9 @@ pmem_persist(const void *addr, size_t len)
 {
 	LOG(15, "addr %p len %zu", addr, len);
 
-	pmem_flush(addr, len);
-	pmem_drain();
+	Func_persist(addr, len);
 }
+#endif
 
 /*
  * pmem_msync -- flush to persistence via msync
@@ -1015,6 +1277,26 @@ memmove_nodrain_movnt(void *pmemdest, const void *src, size_t len)
 static void *(*Func_memmove_nodrain)
 	(void *pmemdest, const void *src, size_t len) = memmove_nodrain_normal;
 
+#if HAS_IFUNC
+/*
+ * pmem_memmove_nodrain_ifunc -- (internal) return pointer to
+ * pmem_memmove_nodrain function
+ */
+static void *
+pmem_memmove_nodrain_ifunc(void)
+{
+	if (!Func_memmove_nodrain)
+		pmem_init_detect();
+
+	ASSERT(Func_memmove_nodrain != NULL);
+
+	return Func_memmove_nodrain;
+}
+
+void *
+pmem_memmove_nodrain(void *pmemdest, const void *src, size_t len)
+__attribute__((ifunc("pmem_memmove_nodrain_ifunc")));
+#else
 /*
  * pmem_memmove_nodrain -- memmove to pmem without hw drain
  */
@@ -1023,7 +1305,28 @@ pmem_memmove_nodrain(void *pmemdest, const void *src, size_t len)
 {
 	return Func_memmove_nodrain(pmemdest, src, len);
 }
+#endif
 
+#if HAS_IFUNC
+/*
+ * pmem_memcpy_nodrain_ifunc -- (internal) return pointer to
+ * pmem_memcpy_nodrain function
+ */
+static void *
+pmem_memcpy_nodrain_ifunc(void)
+{
+	if (!Func_memmove_nodrain)
+		pmem_init_detect();
+
+	ASSERT(Func_memmove_nodrain != NULL);
+
+	return Func_memmove_nodrain;
+}
+
+void *
+pmem_memcpy_nodrain(void *pmemdest, const void *src, size_t len)
+__attribute__((ifunc("pmem_memcpy_nodrain_ifunc")));
+#else
 /*
  * pmem_memcpy_nodrain -- memcpy to pmem without hw drain
  */
@@ -1032,8 +1335,9 @@ pmem_memcpy_nodrain(void *pmemdest, const void *src, size_t len)
 {
 	LOG(15, "pmemdest %p src %p len %zu", pmemdest, src, len);
 
-	return pmem_memmove_nodrain(pmemdest, src, len);
+	return Func_memmove_nodrain(pmemdest, src, len);
 }
+#endif
 
 /*
  * pmem_memmove_persist -- memmove to pmem
@@ -1173,8 +1477,28 @@ memset_nodrain_movnt(void *pmemdest, int c, size_t len)
  * common case on modern hardware that supports persistent memory.
  */
 static void *(*Func_memset_nodrain)
-	(void *pmemdest, int c, size_t len) = memset_nodrain_normal;
+	(void *pmemdest, int c, size_t len);
 
+#if HAS_IFUNC
+/*
+ * pmem_memset_nodrain_ifunc -- (internal) return pointer to
+ * pmem_memset_nodrain function
+ */
+static void *
+pmem_memset_nodrain_ifunc(void)
+{
+	if (!Func_memset_nodrain)
+		pmem_init_detect();
+
+	ASSERT(Func_memset_nodrain != NULL);
+
+	return Func_memset_nodrain;
+}
+
+void *
+pmem_memset_nodrain(void *pmemdest, int c, size_t len)
+__attribute__((ifunc("pmem_memset_nodrain_ifunc")));
+#else
 /*
  * pmem_memset_nodrain -- memset to pmem without hw drain
  */
@@ -1183,6 +1507,7 @@ pmem_memset_nodrain(void *pmemdest, int c, size_t len)
 {
 	return Func_memset_nodrain(pmemdest, c, len);
 }
+#endif
 
 /*
  * pmem_memset_persist -- memset to pmem
@@ -1215,8 +1540,8 @@ pmem_get_cpuinfo(void)
 		if (e && strcmp(e, "1") == 0)
 			LOG(3, "PMEM_NO_CLFLUSHOPT forced no clflushopt");
 		else {
-			Func_flush = flush_clflushopt;
-			Func_predrain_fence = predrain_fence_sfence;
+			FF_SET(Func_flags, FLUSH, CLFLUSHOPT);
+			FF_SET(Func_flags, PDF, PDF_SFENCE);
 		}
 	}
 
@@ -1227,19 +1552,10 @@ pmem_get_cpuinfo(void)
 		if (e && strcmp(e, "1") == 0)
 			LOG(3, "PMEM_NO_CLWB forced no clwb");
 		else {
-			Func_flush = flush_clwb;
-			Func_predrain_fence = predrain_fence_sfence;
+			FF_SET(Func_flags, FLUSH, CLWB);
+			FF_SET(Func_flags, PDF, PDF_SFENCE);
 		}
 	}
-
-	if (Func_flush == flush_clwb)
-		LOG(3, "using clwb");
-	else if (Func_flush == flush_clflushopt)
-		LOG(3, "using clflushopt");
-	else if (Func_flush == flush_clflush)
-		LOG(3, "using clflush");
-	else
-		ASSERT(0);
 
 	if (is_cpu_pcommit_present()) {
 		LOG(3, "pcommit supported");
@@ -1248,17 +1564,10 @@ pmem_get_cpuinfo(void)
 		if (e && strcmp(e, "1") == 0)
 			LOG(3, "PMEM_NO_PCOMMIT forced no pcommit");
 		else {
-			Func_drain = drain_pcommit;
+			FF_SET(Func_flags, PCOMMIT, PCOMMIT);
 			Has_hw_drain = 1;
 		}
 	}
-
-	if (Func_drain == drain_pcommit)
-		LOG(3, "using pcommit");
-	else if (Func_drain == drain_no_pcommit)
-		LOG(3, "not using pcommit");
-	else
-		ASSERT(0);
 
 	if (is_cpu_sse2_present()) {
 		LOG(3, "movnt supported");
@@ -1267,27 +1576,129 @@ pmem_get_cpuinfo(void)
 		if (e && strcmp(e, "1") == 0)
 			LOG(3, "PMEM_NO_MOVNT forced no movnt");
 		else {
-			Func_memmove_nodrain = memmove_nodrain_movnt;
-			Func_memset_nodrain = memset_nodrain_movnt;
+			FF_SET(Func_flags, MOVNT, MOVNT);
 		}
 	}
-
-	if (Func_memmove_nodrain == memmove_nodrain_movnt)
-		LOG(3, "using movnt");
-	else if (Func_memmove_nodrain == memmove_nodrain_normal)
-		LOG(3, "not using movnt");
-	else
-		ASSERT(0);
 }
 
 /*
- * pmem_init -- load-time initialization for pmem.c
+ * pmem_assign_func -- (internal) assigns required function pointers based
+ * on values from Func_flags.
  */
-void
-pmem_init(void)
+static void
+pmem_assign_func(void)
 {
-	LOG(3, NULL);
+	/* check and report pcommit support */
+	switch (FF_GET_PCOMMIT(Func_flags)) {
+	case FF_NO_PCOMMIT:
+		LOG(3, "not using pcommit");
+		break;
+	case FF_PCOMMIT:
+		LOG(3, "using pcommit");
+		break;
+	default:
+		ASSERT(0);
+	}
 
+	/* check and report pre-drain fence */
+	switch (FF_GET_PDF(Func_flags)) {
+	case FF_PDF_EMPTY:
+		LOG(3, "not using pre-drain fence");
+		break;
+	case FF_PDF_SFENCE:
+		LOG(3, "using pre-drain sfence");
+		break;
+	default:
+		ASSERT(0);
+	}
+
+	/* check, report and assign flush function */
+	switch (FF_GET_FLUSH(Func_flags)) {
+	case FF_CLFLUSH:
+		LOG(3, "using clflush");
+		Func_flush = flush_clflush;
+		break;
+	case FF_CLFLUSHOPT:
+		LOG(3, "using clflushopt");
+		Func_flush = flush_clflushopt;
+		break;
+	case FF_CLWB:
+		LOG(3, "using clwb");
+		Func_flush = flush_clwb;
+		break;
+	default:
+		ASSERT(0);
+	}
+
+	/* check and assign drain function */
+	switch (FF_GET_DRAIN(Func_flags)) {
+	case (FF_NO_PCOMMIT | FF_PDF_EMPTY):
+		Func_drain = drain_no_pcommit_predrain_fence_empty;
+		break;
+	case (FF_NO_PCOMMIT | FF_PDF_SFENCE):
+		Func_drain = drain_no_pcommit_predrain_fence_sfence;
+		break;
+	case (FF_PCOMMIT | FF_PDF_EMPTY):
+		Func_drain = drain_pcommit_predrain_fence_empty;
+		break;
+	case (FF_PCOMMIT | FF_PDF_SFENCE):
+		Func_drain = drain_pcommit_predrain_fence_sfence;
+		break;
+	default:
+		ASSERT(0);
+	}
+
+	/* check and assign persist function */
+	switch (FF_GET_PERSIST(Func_flags)) {
+	case (FF_CLFLUSH | FF_NO_PCOMMIT):
+		Func_persist = persist_clflush_no_pcommit;
+		break;
+	case (FF_CLFLUSH | FF_PCOMMIT):
+		Func_persist = persist_clflush_pcommit;
+		break;
+	case (FF_CLFLUSHOPT | FF_NO_PCOMMIT):
+		Func_persist = persist_clflushopt_no_pcommit;
+		break;
+	case (FF_CLFLUSHOPT | FF_PCOMMIT):
+		Func_persist = persist_clflushopt_pcommit;
+		break;
+	case (FF_CLWB | FF_NO_PCOMMIT):
+		Func_persist = persist_clwb_no_pcommit;
+		break;
+	case (FF_CLWB | FF_PCOMMIT):
+		Func_persist = persist_clwb_pcommit;
+		break;
+	default:
+		ASSERT(0);
+	}
+
+	/*
+	 * check, report and assign memmove_nodrain and memset_nodrain
+	 * functions
+	 */
+	switch (FF_GET_MOVNT(Func_flags)) {
+	case FF_NO_MOVNT:
+		LOG(3, "not using movnt");
+		Func_memmove_nodrain = memmove_nodrain_normal;
+		Func_memset_nodrain = memset_nodrain_normal;
+		break;
+	case FF_MOVNT:
+		LOG(3, "using movnt");
+		Func_memmove_nodrain = memmove_nodrain_movnt;
+		Func_memset_nodrain = memset_nodrain_movnt;
+		break;
+	default:
+		ASSERT(0);
+	}
+}
+
+/*
+ * pmem_init_detect -- detect supported instructions by hw
+ */
+static void
+pmem_init_detect(void)
+{
+	/* detect supported cache flush features */
 	pmem_get_cpuinfo();
 
 	/*
@@ -1327,4 +1738,20 @@ pmem_init(void)
 		else if (val == 1)
 			Func_is_pmem = is_pmem_always;
 	}
+
+	pmem_assign_func();
+}
+
+/*
+ * pmem_init -- load-time initialization for pmem.c
+ */
+void
+pmem_init(void)
+{
+	out_init(PMEM_LOG_PREFIX, PMEM_LOG_LEVEL_VAR, PMEM_LOG_FILE_VAR,
+			PMEM_MAJOR_VERSION, PMEM_MINOR_VERSION);
+	LOG(3, NULL);
+	util_init();
+
+	pmem_init_detect();
 }

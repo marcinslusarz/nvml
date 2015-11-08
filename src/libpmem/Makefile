@@ -39,4 +39,14 @@ SOURCE = libpmem.c pmem.c $(COMMON)/util.c $(COMMON)/out.c $(COMMON)/cpu.c
 
 include ../Makefile.inc
 
+IFUNC_TEST_PROG="static void *func_ifunc() { return 0; }\nvoid func() __attribute((ifunc(\"func_ifunc\")));"
+IFUNC_SUPPORT := $(shell printf $(IFUNC_TEST_PROG) |\
+	$(CC) $(CFLAGS) -x c -c -o /dev/null - 2>/dev/null && echo y || echo n)
+
+ifeq ($(IFUNC_SUPPORT), y)
+CFLAGS += -DHAS_IFUNC=1
+else
+CFLAGS += -DHAS_IFUNC=0
+endif
+
 CFLAGS += -DNO_LIBPTHREAD
