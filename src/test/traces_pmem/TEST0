@@ -56,10 +56,27 @@ export PMEMOBJ_LOG_FILE=./trace_pmemobj$UNITTEST_NUM.log
 
 expect_normal_exit ./traces_pmem$EXESUFFIX
 
+#
+# grep_trace <libname> <trace file> -- check if each line from trace file
+# has valid format
+#
+function grep_trace()
+{
+	cat $2 | while read line
+	do
+		echo $line | grep -q "<$1>: <[0-9]\+> \[.*\]"
+		if [ $? != 0 ]
+		then
+			echo "Invalid trace for '$1' found in '$2' -- '$line'" > err0.log
+			return 1
+		fi
+	done
+}
+
 # check results
-../match trace_pmem$UNITTEST_NUM.log.match
-../match trace_pmemblk$UNITTEST_NUM.log.match
-../match trace_pmemlog$UNITTEST_NUM.log.match
-../match trace_pmemobj$UNITTEST_NUM.log.match
+expect_normal_exit grep_trace libpmem trace_pmem$UNITTEST_NUM.log
+expect_normal_exit grep_trace libpmemblk trace_pmemblk$UNITTEST_NUM.log
+expect_normal_exit grep_trace libpmemlog trace_pmemlog$UNITTEST_NUM.log
+expect_normal_exit grep_trace libpmemobj trace_pmemobj$UNITTEST_NUM.log
 
 pass
