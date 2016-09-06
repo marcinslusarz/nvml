@@ -50,6 +50,13 @@ BLK_TESTS = \
 	blk_recovery\
 	blk_rw\
 	blk_rw_mt
+
+FILE_TESTS = \
+	file_core_basic\
+	file_core_crash\
+	file_core_mt\
+	file_core_rw
+
 LOG_TESTS = \
 	log_basic\
 	log_pool\
@@ -271,6 +278,7 @@ LIBPMEMPOOL_MOD_TESTS = \
 LOCAL_TESTS = \
 	$(OBJ_TESTS)\
 	$(BLK_TESTS)\
+	$(FILE_TESTS)\
 	$(LOG_TESTS)\
 	$(OTHER_TESTS)\
 	$(PMEM_TESTS)\
@@ -392,6 +400,10 @@ pcheck-blk: TARGET = pcheck
 pcheck-blk: $(BLK_TESTS)
 	@echo "No failures."
 
+pcheck-file: TARGET = pcheck
+pcheck-file: $(FILE_TESTS)
+	@echo "No failures."
+
 pcheck-log: TARGET = pcheck
 pcheck-log: $(LOG_TESTS)
 	@echo "No failures."
@@ -469,4 +481,5 @@ endif
 .PHONY: all check clean clobber cstyle pcheck pcheck-blk pcheck-log pcheck-obj\
 	 pcheck-other pcheck-pmem pcheck-pmempool pcheck-vmem pcheck-vmmalloc\
 	 test unittest tools check-remote format pcheck-libpmempool\
-	 pcheck-rpmem pcheck-local pcheck-remote sync-remotes $(TESTS_BUILD)
+	 pcheck-rpmem pcheck-local pcheck-remote pcheck-file sync-remotes\
+	 $(TESTS_BUILD)

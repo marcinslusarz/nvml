@@ -80,6 +80,12 @@ STATIC_DEBUG_LIBS += $(LIBS_DIR)/debug/libpmemblk.a
 STATIC_NONDEBUG_LIBS += $(LIBS_DIR)/nondebug/libpmemblk.a
 endif
 
+ifeq ($(LIBPMEMFILE), y)
+DYNAMIC_LIBS += -lpmemfile-core
+STATIC_DEBUG_LIBS += $(LIBS_DIR)/debug/libpmemfile-core.a
+STATIC_NONDEBUG_LIBS += $(LIBS_DIR)/nondebug/libpmemfile-core.a
+endif
+
 ifeq ($(LIBPMEMLOG), y)
 DYNAMIC_LIBS += -lpmemlog
 STATIC_DEBUG_LIBS += $(LIBS_DIR)/debug/libpmemlog.a

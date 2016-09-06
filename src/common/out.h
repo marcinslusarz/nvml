@@ -54,6 +54,10 @@
 #endif
 
 #ifdef DEBUG
+#define OUT_ENABLED
+#endif
+
+#ifdef OUT_ENABLED
 
 #define OUT_LOG out_log
 #define OUT_NONL out_nonl

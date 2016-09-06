@@ -1,0 +1,67 @@
+inodes 1 dirs 1 block_arrays 0 inode_arrays 0 blocks 0
+START no files
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+STOP  no files
+START /file1 0
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   3 0x$(X)     2      0 0040777 .
+*   3 0x$(X)     2      0 0040777 ..
+*   2 0x$(X)     1      0 0100644 file1
+STOP  /file1 0
+START /file1 9
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   3 0x$(X)     2      0 0040777 .
+*   3 0x$(X)     2      0 0040777 ..
+*   2 0x$(X)     1      9 0100644 file1
+STOP  /file1 9
+START /file1 9
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1      9 0100644 file1
+STOP  /file1 9
+START /file1 9+100+4=113
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1    113 0100644 file1
+STOP  /file1 9+100+4=113
+inodes 2 dirs 1 block_arrays 1 inode_arrays 1 blocks 1
+inodes 1 dirs 1 block_arrays 0 inode_arrays 1 blocks 0
+START /file1 8192
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1   8192 0100644 file1
+STOP  /file1 8192
+inodes 2 dirs 1 block_arrays 1 inode_arrays 1 blocks 1
+START no files
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+STOP  no files
+inodes 1 dirs 1 block_arrays 0 inode_arrays 1 blocks 0
+START /file1 ~800MB
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1 838858752 0100644 file1
+STOP  /file1 ~800MB
+inodes 2 dirs 1 block_arrays 4 inode_arrays 1 blocks 356
+START no files
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+STOP  no files
+inodes 1 dirs 1 block_arrays 0 inode_arrays 1 blocks 0
