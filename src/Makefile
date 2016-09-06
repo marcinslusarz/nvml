@@ -37,10 +37,10 @@ include $(TOP)/src/common.inc
 
 TARGETS = libpmem libvmem libpmemblk libpmemlog libpmemobj libpmempool\
 	libvmmalloc tools
-ALL_TARGETS = $(TARGETS) common librpmem examples benchmarks
+ALL_TARGETS = $(TARGETS) common librpmem examples benchmarks libpmemfile
 
 DEBUG_RELEASE_TARGETS = common libpmem libvmem libpmemblk libpmemlog libpmemobj\
-	libpmempool libvmmalloc librpmem
+	libpmempool libvmmalloc librpmem libpmemfile
 RELEASE_TARGETS = tools examples benchmarks
 
 CLEAN_NO_JE_TARGETS = $(ALL_TARGETS) test
@@ -57,6 +57,9 @@ HEADERS_INSTALL = include/libpmem.h include/libvmem.h\
 		include/libvmmalloc.h
 
 OBJ_HEADERS_INSTALL = include/libpmemobj/*.h
+
+# XXX
+#HEADERS_INSTALL += include/libpmemfile-core.h
 
 CPP_HEADERS_DESTDIR = $(DESTDIR)$(includedir)/libpmemobj++
 
@@ -102,6 +105,7 @@ libvmmalloc libvmem: jemalloc
 tools: libpmem libpmemblk libpmemlog libpmemobj
 libpmemblk libpmemlog libpmemobj: libpmem
 benchmarks test tools: common
+libpmemfile: libpmemobj
 
 pkg-config:
 	@$(MAKE_PKG_CONFIG) "$(prefix)" "$(libdir)" "$(SRCVERSION)"

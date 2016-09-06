@@ -233,6 +233,19 @@ Depends: libpmemblk (=\${binary:Version}), \${shlibs:Depends}, \${misc:Depends}
 Description: Development files for libpmemblk
  Development files for libpmemblk library.
 
+# XXX
+#Package: libpmemfile-dev
+#Architecture: any
+#Depends: \${shlibs:Depends}, \${misc:Depends}
+#Description: Development files for libpmemfile
+# Development files for libpmemfile library.
+
+# XXX
+#Package: libpmemfile
+#Architecture: any
+#Depends: \${shlibs:Depends}, \${misc:Depends}
+#Description: NVML library for Persistent Memory support - file API
+
 Package: libpmemlog
 Architecture: any
 Depends: libpmem (=\${binary:Version}), \${shlibs:Depends}, \${misc:Depends}
@@ -485,6 +498,20 @@ usr/include/libpmemobj.h
 usr/include/libpmemobj/*.h
 usr/share/man/man3/libpmemobj.3.gz
 EOF
+
+# XXX
+#cat << EOF > debian/libpmemfile-dev.install
+#usr/lib/nvml_debug/libpmemfile-core.a usr/lib/nvml_dbg/
+#usr/lib/nvml_debug/libpmemfile-core.so usr/lib/nvml_dbg/
+#usr/lib/nvml_debug/libpmemfile-core.so.* usr/lib/nvml_dbg/
+#usr/lib/libpmemfile-core.so
+#usr/include/libpmemfile-core.h
+#EOF
+
+# XXX
+#cat << EOF > debian/libpmemfile.install
+#usr/lib/libpmemfile-core.so.*
+#EOF
 
 cat << EOF > debian/libpmemobj-dev.triggers
 interest man-db

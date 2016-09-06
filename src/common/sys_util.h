@@ -101,6 +101,51 @@ util_mutex_unlock(pthread_mutex_t *m)
 }
 
 /*
+ * util_rwlock_init -- pthread_rwlock_init variant that never fails from
+ * caller perspective. If pthread_rwlock_init failed, this function aborts
+ * the program.
+ */
+static inline void
+util_rwlock_init(pthread_rwlock_t *m)
+{
+	int tmp = pthread_rwlock_init(m, NULL);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_rwlock_init");
+	}
+}
+
+/*
+ * util_rwlock_rdlock -- pthread_rwlock_rdlock variant that never fails from
+ * caller perspective. If pthread_rwlock_rdlock failed, this function aborts
+ * the program.
+ */
+static inline void
+util_rwlock_rdlock(pthread_rwlock_t *m)
+{
+	int tmp = pthread_rwlock_rdlock(m);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_rwlock_rdlock");
+	}
+}
+
+/*
+ * util_rwlock_wrlock -- pthread_rwlock_wrlock variant that never fails from
+ * caller perspective. If pthread_rwlock_wrlock failed, this function aborts
+ * the program.
+ */
+static inline void
+util_rwlock_wrlock(pthread_rwlock_t *m)
+{
+	int tmp = pthread_rwlock_wrlock(m);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_rwlock_wrlock");
+	}
+}
+
+/*
  * util_rwlock_unlock -- pthread_rwlock_unlock variant that never fails from
  * caller perspective. If pthread_rwlock_unlock failed, this function aborts
  * the program.
@@ -112,6 +157,99 @@ util_rwlock_unlock(pthread_rwlock_t *m)
 	if (tmp) {
 		errno = tmp;
 		FATAL("!pthread_rwlock_unlock");
+	}
+}
+
+/*
+ * util_rwlock_destroy -- pthread_rwlock_destroy variant that never fails from
+ * caller perspective. If pthread_rwlock_destroy failed, this function aborts
+ * the program.
+ */
+static inline void
+util_rwlock_destroy(pthread_rwlock_t *m)
+{
+	int tmp = pthread_rwlock_destroy(m);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_rwlock_destroy");
+	}
+}
+
+/*
+ * util_spin_init -- pthread_spin_init variant that never fails from
+ * caller perspective. If pthread_spin_init failed, this function aborts
+ * the program.
+ */
+static inline void
+util_spin_init(pthread_spinlock_t *m, int pshared)
+{
+	int tmp = pthread_spin_init(m, pshared ?
+			PTHREAD_PROCESS_SHARED : PTHREAD_PROCESS_PRIVATE);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_spin_init");
+	}
+}
+
+/*
+ * util_spin_destroy -- pthread_spin_destroy variant that never fails from
+ * caller perspective. If pthread_spin_destroy failed, this function aborts
+ * the program.
+ */
+static inline void
+util_spin_destroy(pthread_spinlock_t *m)
+{
+	int tmp = pthread_spin_destroy(m);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_spin_destroy");
+	}
+}
+
+/*
+ * util_spin_lock -- pthread_spin_lock variant that never fails from
+ * caller perspective. If pthread_spin_lock failed, this function aborts
+ * the program.
+ */
+static inline void
+util_spin_lock(pthread_spinlock_t *m)
+{
+	int tmp = pthread_spin_lock(m);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_spin_lock");
+	}
+}
+
+/*
+ * util_spin_trylock -- pthread_spin_trylock variant that never fails from
+ * caller perspective. If pthread_spin_trylock failed, this function aborts
+ * the program.
+ */
+static inline int
+util_spin_trylock(pthread_spinlock_t *m)
+{
+	int tmp = pthread_spin_trylock(m);
+	if (tmp && tmp != EBUSY) {
+		errno = tmp;
+		FATAL("!pthread_spin_trylock");
+	}
+
+	return tmp;
+}
+
+/*
+ * util_spin_unlock -- pthread_spin_unlock variant that never fails from
+ * caller perspective. If pthread_spin_unlock failed, this function aborts
+ * the program.
+ */
+static inline void
+util_spin_unlock(pthread_spinlock_t *m)
+{
+	int tmp = pthread_spin_unlock(m);
+	if (tmp) {
+		errno = tmp;
+		FATAL("!pthread_spin_unlock");
 	}
 }
 

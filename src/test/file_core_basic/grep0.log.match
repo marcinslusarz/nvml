@@ -1,0 +1,92 @@
+START test_open_create_close start, files: . ..
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+STOP  test_open_create_close start, files: . ..
+inodes 1 dirs 1 block_arrays 0 inode_arrays 0 blocks 0
+START test_open_create_close end, files: . .. aaa bbb
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1      0 0100666 aaa
+*   1 0x$(X)     1      0 0100666 bbb
+STOP  test_open_create_close end, files: . .. aaa bbb
+inodes 3 dirs 1 block_arrays 0 inode_arrays 1 blocks 0
+START test_open_close, files: . .. aaa bbb
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1      0 0100666 aaa
+*   1 0x$(X)     1      0 0100666 bbb
+STOP  test_open_close, files: . .. aaa bbb
+inodes 3 dirs 1 block_arrays 0 inode_arrays 1 blocks 0
+START test_link end, files: . .. aaa bbb
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1      0 0100666 aaa
+*   1 0x$(X)     1      0 0100666 bbb
+STOP  test_link end, files: . .. aaa bbb
+START test_link end, files: . .. aaa bbb aaa.link
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     2      0 0100666 aaa
+*   1 0x$(X)     1      0 0100666 bbb
+*   1 0x$(X)     2      0 0100666 aaa.link
+STOP  test_link end, files: . .. aaa bbb aaa.link
+START test_link end, files: . .. aaa bbb aaa.link
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     2      0 0100666 aaa
+*   1 0x$(X)     1      0 0100666 bbb
+*   1 0x$(X)     2      0 0100666 aaa.link
+STOP  test_link end, files: . .. aaa bbb aaa.link
+START test_link end, files: . .. aaa bbb aaa.link
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     2      0 0100666 aaa
+*   1 0x$(X)     1      0 0100666 bbb
+*   1 0x$(X)     2      0 0100666 aaa.link
+STOP  test_link end, files: . .. aaa bbb aaa.link
+START test_link end, files: . .. aaa bbb aaa.link aaa2.link
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     3      0 0100666 aaa
+*   1 0x$(X)     1      0 0100666 bbb
+*   1 0x$(X)     3      0 0100666 aaa.link
+*   1 0x$(X)     3      0 0100666 aaa2.link
+STOP  test_link end, files: . .. aaa bbb aaa.link aaa2.link
+START test_link end, files: . .. aaa bbb aaa.link aaa2.link bbb2.link
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     3      0 0100666 aaa
+*   1 0x$(X)     2      0 0100666 bbb
+*   1 0x$(X)     3      0 0100666 aaa.link
+*   1 0x$(X)     3      0 0100666 aaa2.link
+*   1 0x$(X)     2      0 0100666 bbb2.link
+STOP  test_link end, files: . .. aaa bbb aaa.link aaa2.link bbb2.link
+inodes 3 dirs 1 block_arrays 0 inode_arrays 1 blocks 0
+START test_unlink end, files: . .. aaa aaa.link aaa2.link
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     3      0 0100666 aaa
+*   1 0x$(X)     3      0 0100666 aaa.link
+*   1 0x$(X)     3      0 0100666 aaa2.link
+STOP  test_unlink end, files: . .. aaa aaa.link aaa2.link
+inodes 2 dirs 1 block_arrays 0 inode_arrays 1 blocks 0
