@@ -111,6 +111,7 @@ extern "C" {
 
 #include <libpmem.h>
 #include <libpmemblk.h>
+#include <libpmemfile-core.h>
 #include <libpmemlog.h>
 #include <libpmemobj.h>
 #include <libpmempool.h>

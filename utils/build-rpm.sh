@@ -300,6 +300,32 @@ Group: Development/Libraries
 %description -n libpmemlog-devel
 Development files for NVML libpmemlog library
 
+# XXX
+#%package -n libpmemfile
+#Summary: libpmemfile library
+#Group: %{package_group}/Libraries
+#%description -n libpmemfile
+#NVML libpmemfile library
+
+#%files -n libpmemfile
+#%defattr(-,root,root,-)
+#%{_libdir}/libpmemfile-core.so.*
+
+#%package -n libpmemfile-devel
+#Summary: libpmemfile development library
+#Group: Development/Libraries
+#%description -n libpmemfile-devel
+#Development files for NVML libpmemfile library
+
+#%files -n libpmemfile-devel
+#%defattr(-,root,root,-)
+#%{_libdir}/libpmemfile-core.so
+#%{_libdir}/libpmemfile-core.a
+#%{_libdir}/nvml_debug/libpmemfile-core.so
+#%{_libdir}/nvml_debug/libpmemfile-core.so.*
+#%{_libdir}/nvml_debug/libpmemfile-core.a
+#%{_includedir}/libpmemfile-core.h
+
 %files -n libpmemlog-devel
 %defattr(-,root,root,-)
 %{_libdir}/libpmemlog.so

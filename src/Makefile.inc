@@ -40,7 +40,7 @@ INCLUDE = $(TOP)/src/include
 COMMON = $(TOP)/src/common
 vpath %.c $(COMMON)
 
-INCS += -I../include -I../common/
+INCS += -I$(TOP)/src/include -I$(TOP)/src/common/
 
 CFLAGS += -std=gnu99
 CFLAGS += -Wall
@@ -102,13 +102,9 @@ LIBS_DESTDIR = $(DESTDIR)$(libdir)$(LIB_SUBDIR)
 
 DIRNAME = $(shell basename $(CURDIR))
 
-ifeq ($(OBJDIR),$(abspath $(OBJDIR)))
-objdir = $(OBJDIR)/$(DIRNAME)
-else
-objdir = ../$(OBJDIR)/$(DIRNAME)
-endif
+objdir = $(TOP)/src/$(OBJDIR)/$(DIRNAME)
 
-LIB_OUTDIR = $(objdir)/..
+LIB_OUTDIR = $(TOP)/src/$(OBJDIR)
 
 LDFLAGS += -L$(LIB_OUTDIR)
 
@@ -160,7 +156,7 @@ ifneq ($(LIBPMEMBLK_PRIV_FUNCS),)
 OBJS += pmemblk_priv_funcs.o
 endif
 
-MAKEFILE_DEPS=../Makefile.inc Makefile $(TOP)/src/common.inc
+MAKEFILE_DEPS=$(TOP)/src/Makefile.inc Makefile $(TOP)/src/common.inc
 
 all: $(objdir) $(LIB_OUTDIR) $(EXTRA_TARGETS) $(LIB_AR) $(LIB_SO_SONAME) $(LIB_SO_REAL) $(LIB_SO)
 
@@ -189,9 +185,6 @@ endif
 
 $(LIB_AR): $(LIB_AR_ALL) $(MAKEFILE_DEPS)
 	$(AR) rv $@ $(LIB_AR_ALL)
-
-$(PMEMBLK_PRIV_OBJ):
-	$(MAKE) -C $(LIBSDIR) libpmemblk
 
 install: all
 ifneq ($(LIBRARY_NAME),)
