@@ -96,6 +96,7 @@ struct lane_tx_runtime {
 struct tx_alloc_args {
 	type_num_t type_num;
 	uint64_t entry_offset;
+	int flags;
 };
 
 struct tx_alloc_copy_args {
@@ -103,6 +104,7 @@ struct tx_alloc_copy_args {
 	size_t size;
 	const void *ptr;
 	size_t copy_size;
+	int flags;
 };
 
 struct tx_add_range_args {
@@ -189,21 +191,8 @@ constructor_tx_alloc(void *ctx, void *ptr, size_t usable_size, void *arg)
 	/* do not report changes to the new object */
 	VALGRIND_ADD_TO_TX(ptr, usable_size);
 
-	return 0;
-}
-
-/*
- * constructor_tx_zalloc -- (internal) constructor for zalloc
- */
-static int
-constructor_tx_zalloc(void *ctx, void *ptr, size_t usable_size, void *arg)
-{
-	LOG(3, NULL);
-	PMEMobjpool *pop = ctx;
-
-	constructor_tx_alloc(pop, ptr, usable_size, arg);
-
-	memset(ptr, 0, usable_size);
+	if (args->flags & PMEMOBJ_FLAG_ZERO)
+		memset(ptr, 0, usable_size);
 
 	return 0;
 }
@@ -224,28 +213,8 @@ constructor_tx_copy(void *ctx, void *ptr, size_t usable_size, void *arg)
 	constructor_tx_alloc(pop, ptr, usable_size, &args->super);
 
 	memcpy(ptr, args->ptr, args->copy_size);
-
-	return 0;
-}
-
-/*
- * constructor_tx_copy_zero -- (internal) copy constructor which zeroes
- * the non-copied area
- */
-static int
-constructor_tx_copy_zero(void *ctx, void *ptr, size_t usable_size, void *arg)
-{
-	LOG(3, NULL);
-	PMEMobjpool *pop = ctx;
-
-	ASSERTne(ptr, NULL);
-	ASSERTne(arg, NULL);
-
-	struct tx_alloc_copy_args *args = arg;
-	constructor_tx_alloc(pop, ptr, usable_size, &args->super);
-
-	memcpy(ptr, args->ptr, args->copy_size);
-	if (usable_size > args->copy_size) {
+	if ((args->flags & PMEMOBJ_FLAG_ZERO) &&
+			usable_size > args->copy_size) {
 		void *zero_ptr = (void *)((uintptr_t)ptr + args->copy_size);
 		size_t zero_size = usable_size - args->copy_size;
 		memset(zero_ptr, 0, zero_size);
@@ -979,7 +948,8 @@ release_and_free_tx_locks(struct lane_tx_runtime *lane)
  * tx_alloc_common -- (internal) common function for alloc and zalloc
  */
 static PMEMoid
-tx_alloc_common(size_t size, type_num_t type_num, palloc_constr constructor)
+tx_alloc_common(size_t size, type_num_t type_num, palloc_constr constructor,
+		int flags)
 {
 	LOG(3, NULL);
 
@@ -1000,6 +970,7 @@ tx_alloc_common(size_t size, type_num_t type_num, palloc_constr constructor)
 	struct tx_alloc_args args = {
 		.type_num = type_num,
 		.entry_offset = (uint64_t)entry_offset,
+		.flags = flags,
 	};
 
 	/* allocate object to undo log */
@@ -1029,7 +1000,7 @@ err_oom:
  */
 static PMEMoid
 tx_alloc_copy_common(size_t size, type_num_t type_num, const void *ptr,
-	size_t copy_size, palloc_constr constructor)
+	size_t copy_size, palloc_constr constructor, int flags)
 {
 	LOG(3, NULL);
 
@@ -1055,6 +1026,7 @@ tx_alloc_copy_common(size_t size, type_num_t type_num, const void *ptr,
 		.size = size,
 		.ptr = ptr,
 		.copy_size = copy_size,
+		.flags = flags,
 	};
 
 	/* allocate object to undo log */
@@ -1084,7 +1056,8 @@ err_oom:
 static PMEMoid
 tx_realloc_common(PMEMoid oid, size_t size, uint64_t type_num,
 	palloc_constr constructor_alloc,
-	palloc_constr constructor_realloc)
+	palloc_constr constructor_realloc,
+	int flags)
 {
 	LOG(3, NULL);
 
@@ -1099,7 +1072,7 @@ tx_realloc_common(PMEMoid oid, size_t size, uint64_t type_num,
 	/* if oid is NULL just alloc */
 	if (OBJ_OID_IS_NULL(oid))
 		return tx_alloc_common(size, (type_num_t)type_num,
-				constructor_alloc);
+				constructor_alloc, flags);
 
 	ASSERT(OBJ_OID_IS_VALID(lane->pop, oid));
 
@@ -1121,7 +1094,7 @@ tx_realloc_common(PMEMoid oid, size_t size, uint64_t type_num,
 	size_t copy_size = old_size < size ? old_size : size;
 
 	PMEMoid new_obj = tx_alloc_copy_common(size, (type_num_t)type_num,
-			ptr, copy_size, constructor_realloc);
+			ptr, copy_size, constructor_realloc, flags);
 
 	if (!OBJ_OID_IS_NULL(new_obj)) {
 		if (pmemobj_tx_free(oid)) {
@@ -1814,7 +1787,7 @@ pmemobj_tx_alloc(size_t size, uint64_t type_num)
 	}
 
 	return tx_alloc_common(size, (type_num_t)type_num,
-			constructor_tx_alloc);
+			constructor_tx_alloc, 0);
 }
 
 /*
@@ -1834,7 +1807,32 @@ pmemobj_tx_zalloc(size_t size, uint64_t type_num)
 	}
 
 	return tx_alloc_common(size, (type_num_t)type_num,
-			constructor_tx_zalloc);
+			constructor_tx_alloc, PMEMOBJ_FLAG_ZERO);
+}
+
+/*
+ * pmemobj_tx_xalloc -- allocates a new object
+ */
+PMEMoid
+pmemobj_tx_xalloc(size_t size, uint64_t type_num, int flags)
+{
+	LOG(3, NULL);
+
+	ASSERT_IN_TX();
+	ASSERT_TX_STAGE_WORK();
+
+	if (size == 0) {
+		ERR("allocation with size 0");
+		return obj_tx_abort_null(EINVAL);
+	}
+
+	if (flags & ~PMEMOBJ_VALID_FLAGS) {
+		ERR("unknown flags 0x%x", flags & ~PMEMOBJ_VALID_FLAGS);
+		return obj_tx_abort_null(EINVAL);
+	}
+
+	return tx_alloc_common(size, (type_num_t)type_num,
+			constructor_tx_alloc, flags);
 }
 
 /*
@@ -1849,7 +1847,7 @@ pmemobj_tx_realloc(PMEMoid oid, size_t size, uint64_t type_num)
 	ASSERT_TX_STAGE_WORK();
 
 	return tx_realloc_common(oid, size, type_num,
-			constructor_tx_alloc, constructor_tx_copy);
+			constructor_tx_alloc, constructor_tx_copy, 0);
 }
 
 
@@ -1865,7 +1863,8 @@ pmemobj_tx_zrealloc(PMEMoid oid, size_t size, uint64_t type_num)
 	ASSERT_TX_STAGE_WORK();
 
 	return tx_realloc_common(oid, size, type_num,
-			constructor_tx_zalloc, constructor_tx_copy_zero);
+			constructor_tx_alloc, constructor_tx_copy,
+			PMEMOBJ_FLAG_ZERO);
 }
 
 /*
@@ -1888,12 +1887,12 @@ pmemobj_tx_strdup(const char *s, uint64_t type_num)
 
 	if (len == 0)
 		return tx_alloc_common(sizeof(char), (type_num_t)type_num,
-				constructor_tx_zalloc);
+				constructor_tx_alloc, PMEMOBJ_FLAG_ZERO);
 
 	size_t size = (len + 1) * sizeof(char);
 
 	return tx_alloc_copy_common(size, (type_num_t)type_num, s, size,
-			constructor_tx_copy);
+			constructor_tx_copy, 0);
 }
 
 /*
