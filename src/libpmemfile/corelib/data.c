@@ -305,9 +305,6 @@ file_move_within_block(PMEMfilepool *pfp,
 	return len;
 }
 
-extern int pmemfile_track_data;
-extern int pmemfile_replace_blocks;
-
 static size_t
 file_write_within_block(PMEMfilepool *pfp,
 		PMEMfile *file,

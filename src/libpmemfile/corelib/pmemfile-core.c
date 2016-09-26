@@ -37,6 +37,7 @@
 #include "callbacks.h"
 #include "data.h"
 #include "internal.h"
+#include "locks.h"
 #include "util.h"
 
 #define PMEMFILE_LOG_PREFIX "libpmemfile-core"
