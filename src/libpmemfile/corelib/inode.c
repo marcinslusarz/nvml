@@ -331,7 +331,7 @@ file_vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 	struct pmemfile_inode_map *c = pfp->inode_map;
 
 	rwlock_tx_wlock(&c->rwlock);
-	if (__sync_add_and_fetch(&vinode->ref, -1) > 0) {
+	if (__sync_sub_and_fetch(&vinode->ref, 1) > 0) {
 		if (locked)
 			inode_tx_unlock_on_commit(vinode);
 
