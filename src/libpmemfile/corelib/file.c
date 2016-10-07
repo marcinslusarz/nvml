@@ -496,7 +496,7 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 		ret = -1;
 	} TX_END
 
-	if (ret && vinode)
+	if (vinode)
 		file_vinode_unref_tx(pfp, vinode);
 
 	file_vinode_unref_tx(pfp, parent_vinode);
