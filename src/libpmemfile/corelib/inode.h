@@ -113,8 +113,7 @@ struct pmemfile_vinode *file_vinode_ref_new(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode);
 
 void file_vinode_unref(PMEMfilepool *pfp,
-		struct pmemfile_vinode *vinode,
-		bool locked);
+		struct pmemfile_vinode *vinode);
 void file_vinode_unref_tx(PMEMfilepool *pfp,
 		struct pmemfile_vinode *vinode);
 
