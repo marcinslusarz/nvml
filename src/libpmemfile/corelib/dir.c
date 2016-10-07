@@ -310,12 +310,10 @@ file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	TX_ADD_DIRECT(dentry);
 
 	--inode->nlink;
+	inode_tx_unlock_on_commit(*vinode);
 
 	dentry->name[0] = '\0';
 	dentry->inode = TOID_NULL(struct pmemfile_inode);
-
-	file_vinode_unref(pfp, *vinode, true);
-	*vinode = NULL;
 }
 
 /*
