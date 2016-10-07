@@ -325,16 +325,12 @@ file_vinode_ref(PMEMfilepool *pfp,
 }
 
 void
-file_vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
-		bool locked)
+file_vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 {
 	struct pmemfile_inode_map *c = pfp->inode_map;
 
 	rwlock_tx_wlock(&c->rwlock);
 	if (__sync_sub_and_fetch(&vinode->ref, 1) > 0) {
-		if (locked)
-			inode_tx_unlock_on_commit(vinode);
-
 		rwlock_tx_unlock_on_commit(&c->rwlock);
 		return;
 	}
@@ -345,9 +341,6 @@ file_vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 
 	if (D_RO(vinode->inode)->nlink == 0)
 		file_inode_free(pfp, vinode->inode);
-
-	if (locked)
-		inode_tx_unlock_on_commit(vinode);
 
 	cb_push_back(TX_STAGE_ONCOMMIT,
 		(cb_basic)file_vinode_unregister_locked,
@@ -362,7 +355,7 @@ file_vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_NONE);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		file_vinode_unref(pfp, vinode, false);
+		file_vinode_unref(pfp, vinode);
 	} TX_ONABORT {
 		FATAL("!");
 	} TX_END
