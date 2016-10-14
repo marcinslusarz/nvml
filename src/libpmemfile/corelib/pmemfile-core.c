@@ -48,7 +48,6 @@
 size_t pmemfile_core_block_size = 2 << 20;
 int pmemfile_optimized_list_walk = 0;
 int pmemfile_optimized_tree_walk = 1;
-int pmemfile_contention_level = 5;
 int pmemfile_track_data = 0;
 int pmemfile_replace_blocks = 0;
 
@@ -82,16 +81,6 @@ libpmemfile_core_init(void)
 	if (tmp)
 		pmemfile_optimized_tree_walk = atoi(tmp);
 	LOG(LINF, "optimized tree walk %d", pmemfile_optimized_tree_walk);
-
-	tmp = getenv("PMEMFILECORE_CONTENTION_LEVEL");
-	if (tmp) {
-		pmemfile_contention_level = atoi(tmp);
-		if (pmemfile_contention_level < 0 ||
-				pmemfile_contention_level > 5)
-			FATAL("invalid contention level %d",
-					pmemfile_contention_level);
-	}
-	LOG(LINF, "contention level %d", pmemfile_contention_level);
 
 	tmp = getenv("PMEMFILECORE_TRACK_DATA");
 	if (tmp)

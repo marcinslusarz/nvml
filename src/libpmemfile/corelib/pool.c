@@ -43,6 +43,7 @@
 #include "locks.h"
 #include "out.h"
 #include "pool.h"
+#include "sys_util.h"
 #include "util.h"
 
 /*
@@ -183,7 +184,7 @@ pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode)
 		ERR("cannot initialize super block");
 		goto init_super;
 	}
-	pool_lock_init(pfp);
+	util_rwlock_init(&pfp->rwlock);
 	pfp->inode_map = file_inode_map_alloc();
 
 	if (file_initialize_super(pfp)) {
@@ -227,7 +228,7 @@ pmemfile_pool_open(const char *pathname)
 		ERR("pool in file %s is not initialized", pathname);
 		goto no_super;
 	}
-	pool_lock_init(pfp);
+	util_rwlock_init(&pfp->rwlock);
 	pfp->inode_map = file_inode_map_alloc();
 
 	if (file_initialize_super(pfp)) {
@@ -257,7 +258,7 @@ pmemfile_pool_close(PMEMfilepool *pfp)
 
 	file_vinode_unref_tx(pfp, pfp->root);
 	file_inode_map_free(pfp->inode_map);
-	pool_lock_destroy(pfp);
+	util_rwlock_destroy(&pfp->rwlock);
 
 	pmemobj_close(pfp->pop);
 	pfp->pop = NULL;
