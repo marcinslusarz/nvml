@@ -100,6 +100,8 @@ const char *pmemfile_check_version(
 
 const char *pmemfile_errormsg(void);
 
+#include "libpmemfile-core-stubs.h"
+
 #ifdef __cplusplus
 }
 #endif

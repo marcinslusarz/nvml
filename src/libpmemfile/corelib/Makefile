@@ -44,6 +44,7 @@ SOURCE = \
 	inode_array.c\
 	locks.c \
 	pmemfile-core.c\
+	stubs.c\
 	pool.c\
 	$(COMMON)/out.c\
 	$(COMMON)/util.c\
