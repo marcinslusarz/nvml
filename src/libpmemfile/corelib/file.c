@@ -48,6 +48,7 @@
 #include "inode_array.h"
 #include "internal.h"
 #include "locks.h"
+#include "out.h"
 #include "pool.h"
 #include "util.h"
 
