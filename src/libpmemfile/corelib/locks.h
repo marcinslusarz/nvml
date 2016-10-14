@@ -53,15 +53,6 @@ void mutex_tx_lock(PMEMfilepool *pfp, PMEMmutex *mutexp);
 void mutex_tx_unlock_on_abort(PMEMmutex *mutexp);
 void mutex_tx_unlock_on_commit(PMEMmutex *mutexp);
 
-/* struct pmemfile_vinode locking */
-void inode_lock_init(struct pmemfile_vinode *vinode);
-void inode_rlock(struct pmemfile_vinode *vinode);
-void inode_wlock(struct pmemfile_vinode *vinode);
-void inode_tx_wlock(struct pmemfile_vinode *vinode);
-void inode_tx_unlock_on_commit(struct pmemfile_vinode *vinode);
-void inode_unlock(struct pmemfile_vinode *vinode);
-void inode_lock_destroy(struct pmemfile_vinode *vinode);
-
 /* struct pmemfilepool locking */
 void pool_lock_init(struct pmemfilepool *pfp);
 void pool_tx_wlock(struct pmemfilepool *pfp);

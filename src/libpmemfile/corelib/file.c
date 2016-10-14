@@ -211,7 +211,7 @@ file_register_opened_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	LOG(LDBG, "inode 0x%lx path %s", vinode->inode.oid.off,
 			pmfi_path(vinode));
 
-	inode_tx_wlock(vinode);
+	rwlock_tx_wlock(&vinode->rwlock);
 
 	if (vinode->opened.arr == NULL) {
 		pool_tx_wlock(pfp);
@@ -229,7 +229,7 @@ file_register_opened_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 		pool_tx_unlock_on_commit(pfp);
 	}
 
-	inode_tx_unlock_on_commit(vinode);
+	rwlock_tx_unlock_on_commit(&vinode->rwlock);
 }
 
 /*
@@ -318,13 +318,13 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 			// create file
 			struct timespec t;
 
-			inode_tx_wlock(parent_vinode);
+			rwlock_tx_wlock(&parent_vinode->rwlock);
 
 			vinode = file_inode_alloc(pfp, S_IFREG | mode, &t);
 			file_add_dentry(pfp, parent_vinode, pathname,
 					vinode, &t);
 
-			inode_tx_unlock_on_commit(parent_vinode);
+			rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 		}
 
 		file_register_opened_inode(pfp, vinode);
@@ -430,7 +430,7 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 	}
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		inode_tx_wlock(parent_vinode);
+		rwlock_tx_wlock(&parent_vinode->rwlock);
 
 		struct timespec t;
 
@@ -441,7 +441,7 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 
 		file_add_dentry(pfp, parent_vinode, newpath, src_vinode, &t);
 
-		inode_tx_unlock_on_commit(parent_vinode);
+		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
 	} TX_END
@@ -490,9 +490,9 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 	struct pmemfile_vinode *volatile vinode = NULL;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		inode_tx_wlock(parent_vinode);
+		rwlock_tx_wlock(&parent_vinode->rwlock);
 		file_unlink_dentry(pfp, parent_vinode, pathname, &vinode);
-		inode_tx_unlock_on_commit(parent_vinode);
+		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
 		ret = -1;
@@ -521,11 +521,11 @@ _pmemfile_list_root(PMEMfilepool *pfp, const char *msg)
 	struct pmemfile_vinode *parent_vinode = pfp->root;
 	file_inode_ref(pfp, parent_vinode);
 
-	inode_rlock(parent_vinode);
+	util_rwlock_rdlock(&parent_vinode->rwlock);
 
 	_pmemfile_list(pfp, parent_vinode);
 
-	inode_unlock(parent_vinode);
+	util_rwlock_unlock(&parent_vinode->rwlock);
 
 	file_vinode_unref_tx(pfp, parent_vinode);
 

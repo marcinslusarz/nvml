@@ -207,7 +207,7 @@ file_vinode_unregister_locked(PMEMfilepool *pfp,
 	/* "path" field is defined only in DEBUG builds */
 	Free(vinode->path);
 #endif
-	inode_lock_destroy(vinode);
+	util_rwlock_destroy(&vinode->rwlock);
 	Free(vinode);
 }
 
@@ -281,7 +281,7 @@ _file_vinode_get(PMEMfilepool *pfp,
 	if (!vinode)
 		goto end;
 
-	inode_lock_init(vinode);
+	util_rwlock_init(&vinode->rwlock);
 	vinode->inode = inode;
 
 	b->arr[empty_slot].pinode = inode;

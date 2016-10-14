@@ -44,10 +44,7 @@
 struct pmemfile_vinode {
 	uint32_t ref;
 
-	union {
-		pthread_spinlock_t spin;
-		pthread_rwlock_t rwlock;
-	} lock;
+	pthread_rwlock_t rwlock;
 	TOID(struct pmemfile_inode) inode;
 
 #ifdef DEBUG
