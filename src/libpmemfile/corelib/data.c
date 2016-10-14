@@ -40,6 +40,7 @@
 #include "inode.h"
 #include "internal.h"
 #include "locks.h"
+#include "out.h"
 #include "pool.h"
 #include "util.h"
 #include "../../libpmemobj/ctree.h"

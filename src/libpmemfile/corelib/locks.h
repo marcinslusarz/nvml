@@ -49,9 +49,6 @@ void spin_tx_lock(pthread_spinlock_t *l);
 int  spin_tx_trylock(pthread_spinlock_t *l);
 void spin_tx_unlock_on_commit(pthread_spinlock_t *l);
 
-void urwlock_tx_wlock(struct urwlock *l);
-void urwlock_tx_unlock_on_commit(struct urwlock *l);
-
 void mutex_tx_lock(PMEMfilepool *pfp, PMEMmutex *mutexp);
 void mutex_tx_unlock_on_abort(PMEMmutex *mutexp);
 void mutex_tx_unlock_on_commit(PMEMmutex *mutexp);
