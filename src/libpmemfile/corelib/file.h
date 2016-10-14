@@ -55,10 +55,7 @@ struct pmemfile {
 	 * Protects against changes to offset / position cache from multiple
 	 * threads.
 	 */
-	union {
-		pthread_spinlock_t spin;
-		pthread_mutex_t mutex;
-	} lock;
+	pthread_mutex_t mutex;
 
 	/* Requested/current position. */
 	size_t offset;

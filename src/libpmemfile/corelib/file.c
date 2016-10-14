@@ -50,6 +50,7 @@
 #include "locks.h"
 #include "out.h"
 #include "pool.h"
+#include "sys_util.h"
 #include "util.h"
 
 /*
@@ -361,7 +362,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 	if (old_vinode == NULL)
 		file_set_path_debug(pfp, parent_vinode, vinode, pathname);
 
-	file_lock_init(file);
+	util_mutex_init(&file->mutex, NULL);
 
 	LOG(LDBG, "pathname %s opened inode 0x%lx", orig_pathname,
 			file->vinode->inode.oid.off);
@@ -382,7 +383,7 @@ pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
 
 	file_destroy_data_state(file);
 
-	file_lock_destroy(file);
+	util_mutex_destroy(&file->mutex);
 
 	Free(file);
 }
