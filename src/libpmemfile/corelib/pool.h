@@ -48,10 +48,7 @@ struct pmemfilepool {
 	uint64_t run_id;
 	struct pmemfile_vinode *root;
 	TOID(struct pmemfile_super) super;
-	union {
-		pthread_spinlock_t spin;
-		pthread_rwlock_t rwlock;
-	} lock;
+	pthread_rwlock_t rwlock;
 
 	struct pmemfile_inode_map *inode_map;
 };

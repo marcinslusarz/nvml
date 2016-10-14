@@ -36,11 +36,7 @@
 
 #include "libpmemobj/thread.h"
 
-#include "file.h"
-#include "inode.h"
 #include "pool.h"
-
-extern int pmemfile_contention_level;
 
 void rwlock_tx_wlock(pthread_rwlock_t *l);
 void rwlock_tx_unlock_on_commit(pthread_rwlock_t *l);
@@ -52,11 +48,5 @@ void spin_tx_unlock_on_commit(pthread_spinlock_t *l);
 void mutex_tx_lock(PMEMfilepool *pfp, PMEMmutex *mutexp);
 void mutex_tx_unlock_on_abort(PMEMmutex *mutexp);
 void mutex_tx_unlock_on_commit(PMEMmutex *mutexp);
-
-/* struct pmemfilepool locking */
-void pool_lock_init(struct pmemfilepool *pfp);
-void pool_tx_wlock(struct pmemfilepool *pfp);
-void pool_tx_unlock_on_commit(struct pmemfilepool *pfp);
-void pool_lock_destroy(struct pmemfilepool *pfp);
 
 #endif
