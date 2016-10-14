@@ -214,7 +214,7 @@ file_register_opened_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	rwlock_tx_wlock(&vinode->rwlock);
 
 	if (vinode->opened.arr == NULL) {
-		pool_tx_wlock(pfp);
+		rwlock_tx_wlock(&pfp->rwlock);
 
 		TOID(struct pmemfile_inode_array) opened =
 				D_RW(pfp->super)->opened_inodes;
@@ -226,7 +226,7 @@ file_register_opened_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 		file_inode_array_add(pfp, opened, vinode,
 				&vinode->opened.arr, &vinode->opened.idx);
 
-		pool_tx_unlock_on_commit(pfp);
+		rwlock_tx_unlock_on_commit(&pfp->rwlock);
 	}
 
 	rwlock_tx_unlock_on_commit(&vinode->rwlock);
