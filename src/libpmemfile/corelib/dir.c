@@ -42,6 +42,7 @@
 #include "internal.h"
 #include "locks.h"
 #include "out.h"
+#include "sys_util.h"
 #include "util.h"
 
 /*
@@ -88,11 +89,11 @@ file_set_path_debug(PMEMfilepool *pfp,
 		struct pmemfile_vinode *child_vinode,
 		const char *name)
 {
-	inode_wlock(child_vinode);
+	util_rwlock_wrlock(&child_vinode->rwlock);
 
 	file_set_path_debug_locked(pfp, parent_vinode, child_vinode, name);
 
-	inode_unlock(child_vinode);
+	util_rwlock_unlock(&child_vinode->rwlock);
 }
 
 /*
@@ -259,7 +260,7 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	struct pmemfile_vinode *vinode = NULL;
 
-	inode_rlock(parent);
+	util_rwlock_rdlock(&parent->rwlock);
 
 	struct pmemfile_dentry *dentry =
 			file_lookup_dentry_locked(pfp, parent, name, NULL);
@@ -268,7 +269,7 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		file_set_path_debug(pfp, parent, vinode, name);
 	}
 
-	inode_unlock(parent);
+	util_rwlock_unlock(&parent->rwlock);
 
 	return vinode;
 }
@@ -303,7 +304,7 @@ file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		pmemobj_tx_abort(EISDIR);
 
 	*vinode = file_vinode_ref(pfp, tinode);
-	inode_tx_wlock(*vinode);
+	rwlock_tx_wlock(&(*vinode)->rwlock);
 
 	ASSERT(inode->nlink > 0);
 
@@ -311,7 +312,7 @@ file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	TX_ADD_DIRECT(dentry);
 
 	--inode->nlink;
-	inode_tx_unlock_on_commit(*vinode);
+	rwlock_tx_unlock_on_commit(&(*vinode)->rwlock);
 
 	dentry->name[0] = '\0';
 	dentry->inode = TOID_NULL(struct pmemfile_inode);

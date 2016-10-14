@@ -545,11 +545,11 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 	memcpy(&pos, &file->pos, sizeof(pos));
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		inode_tx_wlock(vinode);
+		rwlock_tx_wlock(&vinode->rwlock);
 
 		file_write(pfp, file, inode, buf, count);
 
-		inode_tx_unlock_on_commit(vinode);
+		rwlock_tx_unlock_on_commit(&vinode->rwlock);
 	} TX_ONABORT {
 		error = 1;
 		memcpy(&file->pos, &pos, sizeof(pos));
@@ -746,7 +746,7 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 
 	util_mutex_lock(&file->mutex);
-	inode_rlock(vinode);
+	util_rwlock_rdlock(&vinode->rwlock);
 
 	if (!file->blocks)
 		file_rebuild_block_tree(file);
@@ -755,7 +755,7 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 
 	file->offset += bytes_read;
 
-	inode_unlock(vinode);
+	util_rwlock_unlock(&vinode->rwlock);
 	util_mutex_unlock(&file->mutex);
 
 	ASSERT(bytes_read <= count);
@@ -786,9 +786,9 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 			ret = (off64_t)file->offset + offset;
 			break;
 		case SEEK_END:
-			inode_rlock(vinode);
+			util_rwlock_rdlock(&vinode->rwlock);
 			ret = (off64_t)inode->size + offset;
-			inode_unlock(vinode);
+			util_rwlock_unlock(&vinode->rwlock);
 			break;
 		default:
 			ret = -1;
