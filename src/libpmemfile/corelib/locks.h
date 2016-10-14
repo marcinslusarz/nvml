@@ -53,12 +53,6 @@ void mutex_tx_lock(PMEMfilepool *pfp, PMEMmutex *mutexp);
 void mutex_tx_unlock_on_abort(PMEMmutex *mutexp);
 void mutex_tx_unlock_on_commit(PMEMmutex *mutexp);
 
-/* struct pmemfile locking */
-void file_lock_init(struct pmemfile *file);
-void file_lock(struct pmemfile *file);
-void file_unlock(struct pmemfile *file);
-void file_lock_destroy(struct pmemfile *file);
-
 /* struct pmemfile_vinode locking */
 void inode_lock_init(struct pmemfile_vinode *vinode);
 void inode_rlock(struct pmemfile_vinode *vinode);

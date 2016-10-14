@@ -42,6 +42,7 @@
 #include "locks.h"
 #include "out.h"
 #include "pool.h"
+#include "sys_util.h"
 #include "util.h"
 #include "../../libpmemobj/ctree.h"
 
@@ -536,7 +537,7 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	struct pmemfile_pos pos;
 
-	file_lock(file);
+	util_mutex_lock(&file->mutex);
 
 	if (!file->blocks)
 		file_rebuild_block_tree(file);
@@ -556,7 +557,7 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 		file->offset += count;
 	} TX_END
 
-	file_unlock(file);
+	util_mutex_unlock(&file->mutex);
 
 	if (error)
 		return -1;
@@ -744,7 +745,7 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 	struct pmemfile_vinode *vinode = file->vinode;
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 
-	file_lock(file);
+	util_mutex_lock(&file->mutex);
 	inode_rlock(vinode);
 
 	if (!file->blocks)
@@ -755,7 +756,7 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 	file->offset += bytes_read;
 
 	inode_unlock(vinode);
-	file_unlock(file);
+	util_mutex_unlock(&file->mutex);
 
 	ASSERT(bytes_read <= count);
 	return (ssize_t)bytes_read;
@@ -775,7 +776,7 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	off64_t ret;
 
-	file_lock(file);
+	util_mutex_lock(&file->mutex);
 
 	switch (whence) {
 		case SEEK_SET:
@@ -804,7 +805,7 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 		file->offset = (size_t)ret;
 	}
 
-	file_unlock(file);
+	util_mutex_unlock(&file->mutex);
 
 	return ret;
 }
