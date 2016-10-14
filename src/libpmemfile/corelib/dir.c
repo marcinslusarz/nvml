@@ -41,6 +41,7 @@
 #include "inode.h"
 #include "internal.h"
 #include "locks.h"
+#include "out.h"
 #include "util.h"
 
 /*

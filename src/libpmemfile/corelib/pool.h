@@ -39,7 +39,6 @@
 #include <pthread.h>
 #include "inode.h"
 #include "layout.h"
-#include "urwlock.h"
 
 struct pmemfile_inode_map;
 
@@ -52,7 +51,6 @@ struct pmemfilepool {
 	union {
 		pthread_spinlock_t spin;
 		pthread_rwlock_t rwlock;
-		struct urwlock urwlock;
 	} lock;
 
 	struct pmemfile_inode_map *inode_map;

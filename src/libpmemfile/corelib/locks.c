@@ -34,6 +34,7 @@
 #include "inode.h"
 #include "internal.h"
 #include "locks.h"
+#include "out.h"
 #include "sys_util.h"
 #include "../../libpmemobj/sync.h"
 
@@ -67,38 +68,6 @@ rwlock_tx_unlock_on_commit(pthread_rwlock_t *l)
 
 	cb_push_back(TX_STAGE_ONCOMMIT,
 			(cb_basic)file_util_rwlock_unlock, l);
-}
-
-static void
-file_util_urwlock_unlock(PMEMfilepool *pfp, struct urwlock *arg)
-{
-	urwlock_unlock(arg);
-}
-
-/*
- * file_tx_urwlock_wlock -- transactional read-write lock
- */
-void
-urwlock_tx_wlock(struct urwlock *l)
-{
-	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
-
-	cb_push_front(TX_STAGE_ONABORT,
-			(cb_basic)file_util_urwlock_unlock, l);
-
-	urwlock_wlock(l);
-}
-
-/*
- * file_tx_urwlock_unlock_on_commit -- transactional read-write unlock
- */
-void
-urwlock_tx_unlock_on_commit(struct urwlock *l)
-{
-	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
-
-	cb_push_back(TX_STAGE_ONCOMMIT,
-			(cb_basic)file_util_urwlock_unlock, l);
 }
 
 static void
@@ -289,8 +258,6 @@ inode_lock_init(struct pmemfile_vinode *vinode)
 			break;
 		case 3:
 		case 4:
-			urwlock_init(&vinode->lock.urwlock);
-			break;
 		case 5:
 			util_rwlock_init(&vinode->lock.rwlock);
 			break;
@@ -312,8 +279,6 @@ inode_rlock(struct pmemfile_vinode *vinode)
 			break;
 		case 3:
 		case 4:
-			urwlock_rlock(&vinode->lock.urwlock);
-			break;
 		case 5:
 			util_rwlock_rdlock(&vinode->lock.rwlock);
 			break;
@@ -335,8 +300,6 @@ inode_wlock(struct pmemfile_vinode *vinode)
 			break;
 		case 3:
 		case 4:
-			urwlock_wlock(&vinode->lock.urwlock);
-			break;
 		case 5:
 			util_rwlock_wrlock(&vinode->lock.rwlock);
 			break;
@@ -358,8 +321,6 @@ inode_tx_wlock(struct pmemfile_vinode *vinode)
 			break;
 		case 3:
 		case 4:
-			urwlock_tx_wlock(&vinode->lock.urwlock);
-			break;
 		case 5:
 			rwlock_tx_wlock(&vinode->lock.rwlock);
 			break;
@@ -378,9 +339,6 @@ inode_tx_unlock_on_commit(struct pmemfile_vinode *vinode)
 			break;
 		case 3:
 		case 4:
-			urwlock_tx_unlock_on_commit(
-					&vinode->lock.urwlock);
-			break;
 		case 5:
 			rwlock_tx_unlock_on_commit(
 					&vinode->lock.rwlock);
@@ -400,8 +358,6 @@ inode_unlock(struct pmemfile_vinode *vinode)
 			break;
 		case 3:
 		case 4:
-			urwlock_unlock(&vinode->lock.urwlock);
-			break;
 		case 5:
 			util_rwlock_unlock(&vinode->lock.rwlock);
 			break;
@@ -420,8 +376,6 @@ inode_lock_destroy(struct pmemfile_vinode *vinode)
 			break;
 		case 3:
 		case 4:
-			urwlock_destroy(&vinode->lock.urwlock);
-			break;
 		case 5:
 			util_rwlock_destroy(&vinode->lock.rwlock);
 			break;
@@ -441,8 +395,6 @@ pool_lock_init(struct pmemfilepool *pfp)
 			break;
 		case 3:
 		case 4:
-			urwlock_init(&pfp->lock.urwlock);
-			break;
 		case 5:
 			util_rwlock_init(&pfp->lock.rwlock);
 			break;
@@ -464,8 +416,6 @@ pool_tx_wlock(struct pmemfilepool *pfp)
 			break;
 		case 3:
 		case 4:
-			urwlock_tx_wlock(&pfp->lock.urwlock);
-			break;
 		case 5:
 			rwlock_tx_wlock(&pfp->lock.rwlock);
 			break;
@@ -484,9 +434,6 @@ pool_tx_unlock_on_commit(struct pmemfilepool *pfp)
 			break;
 		case 3:
 		case 4:
-			urwlock_tx_unlock_on_commit(
-					&pfp->lock.urwlock);
-			break;
 		case 5:
 			rwlock_tx_unlock_on_commit(&pfp->lock.rwlock);
 			break;
@@ -505,8 +452,6 @@ pool_lock_destroy(struct pmemfilepool *pfp)
 			break;
 		case 3:
 		case 4:
-			urwlock_destroy(&pfp->lock.urwlock);
-			break;
 		case 5:
 			util_rwlock_destroy(&pfp->lock.rwlock);
 			break;

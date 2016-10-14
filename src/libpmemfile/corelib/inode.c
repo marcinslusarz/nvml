@@ -42,6 +42,7 @@
 #include "inode_array.h"
 #include "internal.h"
 #include "locks.h"
+#include "out.h"
 #include "sys_util.h"
 
 /*

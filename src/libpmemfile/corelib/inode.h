@@ -39,7 +39,6 @@
 
 #include "libpmemfile-core.h"
 #include "layout.h"
-#include "urwlock.h"
 
 /* Inode */
 struct pmemfile_vinode {
@@ -48,7 +47,6 @@ struct pmemfile_vinode {
 	union {
 		pthread_spinlock_t spin;
 		pthread_rwlock_t rwlock;
-		struct urwlock urwlock;
 	} lock;
 	TOID(struct pmemfile_inode) inode;
 
