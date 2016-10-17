@@ -66,8 +66,7 @@ ssize_t pmemfile_pread(PMEMfilepool *, PMEMfile *file,
 ssize_t pmemfile_pwrite(PMEMfilepool *, PMEMfile *file,
 			const char *buf, size_t count, off_t pos);
 int pmemfile_access(PMEMfilepool *, const char *path, mode_t mode);
-int pmemfile_sync(PMEMfilepool *, PMEMfile *);
-int pmemfile_fsync(PMEMfilepool *, PMEMfile *);
+int pmemfile_sync(PMEMfilepool *);
 int pmemfile_fdatasync(PMEMfilepool *, PMEMfile *);
 int pmemfile_rename(PMEMfilepool *, const char *old_path, const char *new_path);
 int pmemfile_renameat(PMEMfilepool *, PMEMfile *old_at, const char *old_path,
@@ -88,23 +87,8 @@ int pmemfile_rmdir(PMEMfilepool *, const char *path);
 int pmemfile_symlink(PMEMfilepool *, const char *path1, const char *path2);
 int pmemfile_symlinkat(PMEMfilepool *, const char *path1,
 				PMEMfile *at, const char *path2);
-
-/*
- * Do we need pmemfile_readahead ? It would be a NOP, wouldn't it?
- * ssize_t pmemfile_readahead(PMEMfilepool *, PMEMfile *file,
- *				off64_t offset, size_t count);
- */
-
-/*
- * What about chmod, chown, etc... ?
- * I guess the contents of the pmemfile pool in effect belong to the owner of
- * the underlying pool file, so probably no point in implementing
- * pmemfile_chown and friends.
- */
-
-// De we need a pmemfile_sendfile? Probably not
-ssize_t pmemfile_sendfile(PMEMfilepool *, PMEMfile *out, PMEMfile *in,
-					off_t *offset, size_t count);
+int pmemfile_chmod(PMEMfilepool *, const char *path, mode_t mode);
+int pmemfile_fchmod(PMEMfilepool *, PMEMfile *, mode_t mode);
 
 // De we need dup, dup2 in corelib? Maybe, dunno...
 PMEMfile *pmemfile_dup(PMEMfilepool *, PMEMfile *);
@@ -118,13 +102,5 @@ void *pmemfile_mremap(PMEMfilepool *, void *old_addr, size_t old_size,
 			size_t new_size, int flags, void *new_addr);
 int pmemfile_msync(PMEMfilepool *, void *addr, size_t len, int flags);
 int pmemfile_mprotect(PMEMfilepool *, void *addr, size_t len, int prot);
-/*
- * Do we need mincore or madvise? Probably not.
- * int pmemfile_mincore(PMEMfilepool *, void *addr, size_t length,
- *						unsigned char *vec);
- * int pmemfile_madvise(PMEMfilepool *, void *addr, size_t length, int advice);
- *
- * Also, don't forget about mlock and friends!
- */
 
 #endif

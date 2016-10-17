@@ -129,7 +129,9 @@ pmemfile_getcwd(PMEMfilepool *pfp, char *buf, size_t buf_len)
 	if (buf != NULL && buf_len == 0) {
 		errno = EINVAL;
 		return NULL;
-	} else if (buf_len > 1) {
+	}
+
+	if (buf_len > 1) {
 		buf[0] = '/';
 		buf[1] = '\0';
 		return buf;
@@ -182,18 +184,9 @@ pmemfile_access(PMEMfilepool *pfp, const char *path, mode_t mode)
 }
 
 int
-pmemfile_sync(PMEMfilepool *pfp, PMEMfile *file)
+pmemfile_sync(PMEMfilepool *pfp)
 {
-	check_pfp_file(pfp, file);
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
-pmemfile_fsync(PMEMfilepool *pfp, PMEMfile *file)
-{
-	check_pfp_file(pfp, file);
+	check_pfp(pfp);
 
 	errno = ENOTSUP;
 	return -1;
@@ -373,6 +366,29 @@ pmemfile_symlinkat(PMEMfilepool *pfp, const char *path1,
 
 	(void) path1;
 	(void) path2;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_chmod(PMEMfilepool *pfp, const char *path, mode_t mode)
+{
+	check_pfp(pfp);
+
+	(void) path;
+	(void) mode;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_fchmod(PMEMfilepool *pfp, PMEMfile *file, mode_t mode)
+{
+	check_pfp_file(pfp, file);
+
+	(void) mode;
 
 	errno = ENOTSUP;
 	return -1;
