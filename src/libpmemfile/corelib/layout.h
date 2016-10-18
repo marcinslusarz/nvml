@@ -135,11 +135,14 @@ struct pmemfile_super {
 	/* Root directory inode */
 	TOID(struct pmemfile_inode) root_inode;
 
+	/* List of arrays of opened inodes. */
+	TOID(struct pmemfile_inode_array) opened_inodes;
+
 	/* Flag indicating mkfs finished its work. */
 	char initialized;
 
-	/* List of arrays of opened inodes. */
-	TOID(struct pmemfile_inode_array) opened_inodes;
+	char padding[4096 - 64/*obj*/ - 8/*version*/ - 16/*toid*/ - 16/*toid*/
+		     - 1/*init*/];
 };
 
 #endif
