@@ -312,24 +312,6 @@ file_write_within_block(PMEMfilepool *pfp,
 	/* How much data should we write to this block? */
 	size_t len = min(block->allocated - pos->block_offset, count_left);
 
-	/*
-	 * Snapshot data between pos->block_offset and block->used.
-	 * Everything above block->used is unused, so we don't
-	 * have to restore it on abort.
-	 */
-	if (pmemfile_track_data && pos->block_offset < block->used) {
-		size_t slen = min(len,
-				block->used - pos->block_offset);
-		if (pmemfile_replace_blocks && slen == block->allocated) {
-			TX_FREE(block->data);
-			block->data = TX_XALLOC(char, slen,
-					PMEMOBJ_FLAG_NO_FLUSH);
-		} else {
-			pmemobj_tx_add_range_direct(
-				D_RW(block->data) + pos->block_offset, slen);
-		}
-	}
-
 	pmemobj_memcpy_persist(pfp->pop, D_RW(block->data) + pos->block_offset,
 			buf, len);
 
