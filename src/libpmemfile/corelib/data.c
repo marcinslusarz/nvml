@@ -155,9 +155,6 @@ file_allocate_block(PMEMfile *file, struct pmemfile_pos *pos,
 	block->data = TX_XALLOC(char, sz, POBJ_XALLOC_NO_FLUSH);
 	block->allocated = pmemobj_alloc_usable_size(block->data.oid);
 
-	TX_ADD_FIELD_DIRECT(block_array, bytes_allocated);
-	block_array->bytes_allocated += block->allocated;
-
 	TX_ADD_FIELD_DIRECT(block_array, blocks_allocated);
 	block_array->blocks_allocated++;
 
@@ -174,9 +171,6 @@ file_extend_block_meta_data(struct pmemfile_inode *inode,
 {
 	TX_ADD_FIELD_DIRECT(block, used);
 	block->used += len;
-
-	TX_ADD_FIELD_DIRECT(block_array, bytes_used);
-	block_array->bytes_used += len;
 
 	TX_ADD_FIELD_DIRECT(inode, size);
 	inode->size += len;
@@ -382,33 +376,6 @@ file_read_from_block(struct pmemfile_pos *pos,
 	return len;
 }
 
-static size_t
-file_skip_array_entry(struct pmemfile_pos *pos, size_t offset_left, bool extend)
-{
-	/* We can start only from the beginning of array */
-	if (pos->block_id > 0 || pos->block_offset > 0)
-		return 0;
-
-	struct pmemfile_block_array *cur = pos->block_array;
-	size_t offset = 0;
-
-	/* Can we skip to the next list entry? */
-	while (offset_left > 0 &&
-			offset_left >= cur->bytes_used &&
-			cur->bytes_allocated == cur->bytes_used &&
-			cur->blocks_allocated == MAXNUMBLOCKS) {
-		size_t tmp = cur->bytes_used;
-		if (!file_next_block_array(pos, extend))
-			break;
-		offset += tmp;
-		offset_left -= tmp;
-		pos->global_offset += tmp;
-		cur = pos->block_array;
-	}
-
-	return offset;
-}
-
 static void
 file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		const char *buf, size_t count)
@@ -454,9 +421,6 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	 * Find the position, possibly extending and/or zeroing unused space.
 	 */
 
-	if (pmemfile_optimized_list_walk)
-		offset_left -= file_skip_array_entry(pos, offset_left, true);
-
 	while (offset_left > 0) {
 		struct pmemfile_block *block =
 				&pos->block_array->blocks[pos->block_id];
@@ -472,13 +436,8 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_id++;
 			pos->block_offset = 0;
 
-			if (pos->block_id == MAXNUMBLOCKS) {
+			if (pos->block_id == MAXNUMBLOCKS)
 				file_next_block_array(pos, true);
-
-				if (pmemfile_optimized_list_walk)
-					offset_left -= file_skip_array_entry(
-						pos, offset_left, true);
-			}
 		}
 	}
 
@@ -601,11 +560,6 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 		}
 	}
 
-	size_t offset_left = file->offset - pos->global_offset;
-
-	if (offset_left > 0 && pmemfile_optimized_list_walk)
-		file_skip_array_entry(pos, offset_left, false);
-
 	return true;
 }
 
@@ -664,9 +618,6 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 				if (!file_next_block_array(pos, false))
 					/* EOF */
 					return 0;
-				if (pmemfile_optimized_list_walk)
-					offset_left -= file_skip_array_entry(
-						pos, offset_left, false);
 			}
 		}
 	}

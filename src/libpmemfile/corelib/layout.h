@@ -87,9 +87,6 @@ struct pmemfile_block {
 #define MAXNUMBLOCKS 100
 /* File */
 struct pmemfile_block_array {
-	size_t bytes_allocated;
-	size_t bytes_used;
-
 	/* number of allocated chunks, <0, MAXNUMBLOCKS> */
 	unsigned blocks_allocated;
 	struct pmemfile_block blocks[MAXNUMBLOCKS];
