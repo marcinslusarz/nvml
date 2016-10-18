@@ -132,9 +132,6 @@ struct pmemfile_super {
 	/* XXX unused */
 	uint64_t version;
 
-	/* Generation id. */
-	uint64_t run_id;
-
 	/* Root directory inode */
 	TOID(struct pmemfile_inode) root_inode;
 
