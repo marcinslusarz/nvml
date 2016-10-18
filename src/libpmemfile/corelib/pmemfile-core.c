@@ -56,6 +56,8 @@ __attribute__((constructor))
 static void
 libpmemfile_core_init(void)
 {
+	COMPILE_ERROR_ON(sizeof(struct pmemfile_super) != 4096 - 64);
+
 	out_init(PMEMFILE_LOG_PREFIX, PMEMFILE_LOG_LEVEL_VAR,
 			PMEMFILE_LOG_FILE_VAR, PMEMFILE_MAJOR_VERSION,
 			PMEMFILE_MINOR_VERSION);
