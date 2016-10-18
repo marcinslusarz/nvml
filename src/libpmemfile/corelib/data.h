@@ -35,7 +35,6 @@
 #include "file.h"
 
 extern size_t pmemfile_core_block_size;
-extern int pmemfile_optimized_tree_walk;
 extern int pmemfile_track_data;
 extern int pmemfile_replace_blocks;
 
