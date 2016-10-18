@@ -59,8 +59,6 @@ file_insert_block_to_cache(struct ctree *c,
 		unsigned id,
 		size_t off)
 {
-	if (!pmemfile_optimized_tree_walk)
-		return;
 	struct file_block_info *info = Malloc(sizeof(*info));
 	info->arr = block_array;
 	info->id = id;
@@ -71,8 +69,6 @@ file_insert_block_to_cache(struct ctree *c,
 static void
 file_rebuild_block_tree(PMEMfile *file)
 {
-	if (!pmemfile_optimized_tree_walk)
-		return;
 	struct ctree *c = ctree_new();
 	if (!c)
 		return;
@@ -99,7 +95,7 @@ file_rebuild_block_tree(PMEMfile *file)
 void
 file_destroy_data_state(PMEMfile *file)
 {
-	if (!pmemfile_optimized_tree_walk || !file->blocks)
+	if (!file->blocks)
 		return;
 
 	uint64_t key = UINT64_MAX;
@@ -386,8 +382,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	if (pos->block_array == NULL)
 		file_reset_cache(file, inode, pos, true);
 
-	if (pmemfile_optimized_tree_walk &&
-			file->offset != pos->global_offset) {
+	if (file->offset != pos->global_offset) {
 		size_t block_start = pos->global_offset - pos->block_offset;
 		size_t off = file->offset;
 
@@ -528,24 +523,21 @@ static bool
 file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 		struct pmemfile_inode *inode)
 {
-	if (pmemfile_optimized_tree_walk) {
-		size_t block_start = pos->global_offset - pos->block_offset;
-		size_t off = file->offset;
+	size_t block_start = pos->global_offset - pos->block_offset;
+	size_t off = file->offset;
 
-		if (off < block_start ||
-				off >= block_start +
-			pos->block_array->blocks[pos->block_id].allocated) {
+	if (off < block_start || off >= block_start +
+		pos->block_array->blocks[pos->block_id].allocated) {
 
-			struct file_block_info *info = (void *)(uintptr_t)
-				ctree_find_le_unlocked(file->blocks, &off);
-			if (!info)
-				return false;
+		struct file_block_info *info = (void *)(uintptr_t)
+			ctree_find_le_unlocked(file->blocks, &off);
+		if (!info)
+			return false;
 
-			pos->block_array = info->arr;
-			pos->block_id = info->id;
-			pos->block_offset = 0;
-			pos->global_offset = off;
-		}
+		pos->block_array = info->arr;
+		pos->block_id = info->id;
+		pos->block_offset = 0;
+		pos->global_offset = off;
 	}
 
 	if (file->offset < pos->global_offset) {
