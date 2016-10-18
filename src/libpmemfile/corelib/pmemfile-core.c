@@ -45,7 +45,7 @@
 #define PMEMFILE_LOG_LEVEL_VAR "PMEMFILECORE_LOG_LEVEL"
 #define PMEMFILE_LOG_FILE_VAR "PMEMFILECORE_LOG_FILE"
 
-size_t pmemfile_core_block_size = 2 << 20;
+size_t pmemfile_core_block_size = 0;
 
 /*
  * libpmemfile_core_init -- load-time initialization for libpmemfile-core
