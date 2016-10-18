@@ -46,7 +46,6 @@
 #define PMEMFILE_LOG_FILE_VAR "PMEMFILECORE_LOG_FILE"
 
 size_t pmemfile_core_block_size = 2 << 20;
-int pmemfile_optimized_tree_walk = 1;
 int pmemfile_track_data = 0;
 int pmemfile_replace_blocks = 0;
 
@@ -70,11 +69,6 @@ libpmemfile_core_init(void)
 	if (tmp)
 		pmemfile_core_block_size = (size_t)atoll(tmp);
 	LOG(LINF, "block size %lu", pmemfile_core_block_size);
-
-	tmp = getenv("PMEMFILECORE_OPT_TREE_WALK");
-	if (tmp)
-		pmemfile_optimized_tree_walk = atoi(tmp);
-	LOG(LINF, "optimized tree walk %d", pmemfile_optimized_tree_walk);
 
 	tmp = getenv("PMEMFILECORE_TRACK_DATA");
 	if (tmp)
