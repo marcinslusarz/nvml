@@ -115,16 +115,18 @@ struct pmemfile_dir {
 	TOID(struct pmemfile_dir) next;
 };
 
-#define NUMINODES_PER_ENTRY 64
+#define NUMINODES_PER_ENTRY (249 - 4/*64 bytes for obj*/)
 
 struct pmemfile_inode_array {
 	PMEMmutex mtx;
+	TOID(struct pmemfile_inode_array) prev;
+	TOID(struct pmemfile_inode_array) next;
 
 	/* Number of used entries, <0, NUMINODES_PER_ENTRY>. */
 	uint64_t used;
+
 	TOID(struct pmemfile_inode) inodes[NUMINODES_PER_ENTRY];
-	TOID(struct pmemfile_inode_array) prev;
-	TOID(struct pmemfile_inode_array) next;
+	char padding[8];
 };
 
 /* Superblock */
