@@ -45,7 +45,6 @@ struct pmemfile_inode_map;
 /* Pool */
 struct pmemfilepool {
 	PMEMobjpool *pop;
-	uint64_t run_id;
 	struct pmemfile_vinode *root;
 	TOID(struct pmemfile_super) super;
 	pthread_rwlock_t rwlock;

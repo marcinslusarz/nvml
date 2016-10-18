@@ -61,15 +61,11 @@ file_initialize_super(PMEMfilepool *pfp)
 		TX_ADD(pfp->super);
 
 		if (super->initialized) {
-			super->run_id += 2;
-			pfp->run_id = super->run_id;
 			pfp->root = file_vinode_ref(pfp, super->root_inode);
 #ifdef DEBUG
 			pfp->root->path = Strdup("/");
 #endif
 		} else {
-			super->run_id = 2;
-			pfp->run_id = super->run_id;
 			pfp->root = file_new_dir(pfp, NULL, "/");
 
 			super->root_inode = pfp->root->inode;
