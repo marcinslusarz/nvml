@@ -82,8 +82,10 @@ static inline bool file_is_regular_file(struct pmemfile_vinode *vinode)
 	return _file_is_regular_file(D_RO(vinode->inode));
 }
 
+void file_get_time(struct pmemfile_time *t);
+
 struct pmemfile_vinode *file_inode_alloc(PMEMfilepool *pfp,
-		uint64_t flags, struct timespec *t);
+		uint64_t flags, struct pmemfile_time *t);
 
 void file_inode_free(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) tinode);

@@ -58,6 +58,7 @@ libpmemfile_core_init(void)
 {
 	COMPILE_ERROR_ON(sizeof(struct pmemfile_super) != 4096);
 	COMPILE_ERROR_ON(sizeof(struct pmemfile_inode_array) != 4096);
+	COMPILE_ERROR_ON(sizeof(struct pmemfile_inode) != 4096);
 
 	out_init(PMEMFILE_LOG_PREFIX, PMEMFILE_LOG_LEVEL_VAR,
 			PMEMFILE_LOG_FILE_VAR, PMEMFILE_MAJOR_VERSION,

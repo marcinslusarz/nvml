@@ -107,7 +107,7 @@ file_add_dentry(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		const char *name,
 		struct pmemfile_vinode *child_vinode,
-		const struct timespec *tm)
+		const struct pmemfile_time *tm)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s child_inode 0x%lx",
 		parent_vinode->inode.oid.off, pmfi_path(parent_vinode),
@@ -187,7 +187,7 @@ file_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
 
-	struct timespec t;
+	struct pmemfile_time t;
 	struct pmemfile_vinode *child =
 			file_inode_alloc(pfp, S_IFDIR | 0777, &t);
 	file_set_path_debug_locked(pfp, parent, child, name);
