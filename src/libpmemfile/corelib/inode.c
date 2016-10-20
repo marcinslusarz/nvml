@@ -362,32 +362,48 @@ file_vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	} TX_END
 }
 
+void
+file_get_time(struct pmemfile_time *t)
+{
+	struct timespec tm;
+	if (clock_gettime(CLOCK_REALTIME, &tm)) {
+		ERR("!clock_gettime");
+		pmemobj_tx_abort(errno);
+	}
+	t->sec = tm.tv_sec;
+	t->nsec = tm.tv_nsec;
+}
+
 /*
  * file_inode_alloc -- allocates inode
  *
  * Must be called in transaction.
  */
 struct pmemfile_vinode *
-file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct timespec *t)
+file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 {
 	LOG(LDBG, "flags 0x%lx", flags);
 
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
 
-	TOID(struct pmemfile_inode) inode = TX_ZNEW(struct pmemfile_inode);
+	TOID(struct pmemfile_inode) tinode = TX_ZNEW(struct pmemfile_inode);
+	struct pmemfile_inode *inode = D_RW(tinode);
 
-	if (clock_gettime(CLOCK_REALTIME, t)) {
-		ERR("!clock_gettime");
-		pmemobj_tx_abort(errno);
-	}
+	file_get_time(t);
 
-	D_RW(inode)->flags = flags;
-	D_RW(inode)->ctime = *t;
-	D_RW(inode)->mtime = *t;
-	D_RW(inode)->atime = *t;
-	D_RW(inode)->nlink = 0;
+	inode->flags = flags;
+	inode->ctime = *t;
+	inode->mtime = *t;
+	inode->atime = *t;
+	inode->nlink = 0;
 
-	return file_vinode_ref_new(pfp, inode);
+	if (_file_is_regular_file(inode))
+		inode->file_data.blocks.length =
+				(sizeof(inode->file_data) -
+				sizeof(inode->file_data.blocks)) /
+				sizeof(struct pmemfile_block);
+
+	return file_vinode_ref_new(pfp, tinode);
 }
 
 /*
@@ -414,22 +430,20 @@ file_inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode)
 			dir = next;
 		}
 	} else if (_file_is_regular_file(inode)) {
-		TOID(struct pmemfile_block_array) block_arr =
-				inode->file_data.blocks;
-		while (!TOID_IS_NULL(block_arr)) {
-			struct pmemfile_block_array *arr = D_RW(block_arr);
+		struct pmemfile_block_array *arr = &inode->file_data.blocks;
+		TOID(struct pmemfile_block_array) tarr =
+				TOID_NULL(struct pmemfile_block_array);
 
-			for (unsigned i = 0; i < arr->blocks_allocated; ++i)
+		while (arr != NULL) {
+			for (unsigned i = 0; i < arr->length; ++i)
 				TX_FREE(arr->blocks[i].data);
 
 			TOID(struct pmemfile_block_array) next = arr->next;
-			TX_FREE(block_arr);
-			block_arr = next;
+			if (!TOID_IS_NULL(tarr))
+				TX_FREE(tarr);
+			tarr = next;
+			arr = D_RW(tarr);
 		}
-
-		if (!TOID_IS_NULL(inode->file_data.blocks))
-			TX_SET_DIRECT(inode, file_data.blocks,
-					TOID_NULL(struct pmemfile_block_array));
 	} else {
 		FATAL("unknown inode type 0x%lx", inode->flags);
 	}

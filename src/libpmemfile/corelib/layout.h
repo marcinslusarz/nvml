@@ -48,50 +48,79 @@ POBJ_LAYOUT_TOID(pmemfile, struct pmemfile_inode_array);
 POBJ_LAYOUT_TOID(pmemfile, char);
 POBJ_LAYOUT_END(pmemfile);
 
-/* Inode */
-struct pmemfile_inode {
-	/* Size of file. */
-	uint64_t size;
-
-	/* File flags. */
-	uint64_t flags;
-
-	/* Time of last status change. */
-	struct timespec ctime;
-
-	/* Time of last modification. */
-	struct timespec mtime;
-
-	/* Time of last access. */
-	struct timespec atime;
-
-	/* Hard link counter. */
-	nlink_t nlink;
-
-	union {
-		/* File specific data. */
-		TOID(struct pmemfile_block_array) blocks;
-
-		/* Directory specific data. */
-		TOID(struct pmemfile_dir) dir;
-	} file_data;
-};
-
 struct pmemfile_block {
 	TOID(char) data;
 	size_t allocated;
 	size_t used;
 };
 
-/* XXX tweak this value */
-#define MAXNUMBLOCKS 100
 /* File */
 struct pmemfile_block_array {
-	/* number of allocated chunks, <0, MAXNUMBLOCKS> */
-	unsigned blocks_allocated;
-	struct pmemfile_block blocks[MAXNUMBLOCKS];
-
 	TOID(struct pmemfile_block_array) next;
+
+	/* size of the blocks array */
+	uint32_t length;
+
+	uint32_t padding;
+
+	struct pmemfile_block blocks[];
+};
+
+struct pmemfile_time {
+	/* Seconds */
+	int64_t sec;
+
+	/* Nanoseconds */
+	int64_t nsec;
+};
+
+/* Inode */
+struct pmemfile_inode {
+	/* Layout version */
+	uint32_t version;
+
+	/* Owner */
+	uint32_t uid;
+
+	/* Group */
+	uint32_t gid;
+
+	/* Padding */
+	uint32_t padding;
+
+	/* Time of last access. */
+	struct pmemfile_time atime;
+
+	/* Time of last status change. */
+	struct pmemfile_time ctime;
+
+	/* Time of last modification. */
+	struct pmemfile_time mtime;
+
+	/* Hard link counter. */
+	nlink_t nlink;
+
+	/* Size of file. */
+	uint64_t size;
+
+	/* File flags. */
+	uint64_t flags;
+
+	/* Number of bytes written in the last block */
+	uint64_t last_block_fill;
+
+	/* Data! */
+	union {
+		/* File specific data. */
+		struct pmemfile_block_array blocks;
+
+		/* Directory specific data. */
+		TOID(struct pmemfile_dir) dir;
+
+		char padding[4096 - 4/*version*/ - 4/*uid*/ - 4/*gid*/ -
+			     4 /*padding*/ - 3 * 16/*times*/ - 8/*nlink*/ -
+			     8/*size*/ - 8/*flags*/ - 8/*last_block_fill*/];
+	} file_data;
 };
 
 #define PMEMFILE_MAX_FILE_NAME 255

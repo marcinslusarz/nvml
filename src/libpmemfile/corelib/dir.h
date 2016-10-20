@@ -41,7 +41,7 @@ void file_add_dentry(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		const char *name,
 		struct pmemfile_vinode *child_vinode,
-		const struct timespec *tm);
+		const struct pmemfile_time *tm);
 
 void file_set_path_debug(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
