@@ -117,9 +117,18 @@ struct pmemfile_inode {
 		/* Directory specific data. */
 		TOID(struct pmemfile_dir) dir;
 
-		char padding[4096 - 4/*version*/ - 4/*uid*/ - 4/*gid*/ -
-			     4 /*padding*/ - 3 * 16/*times*/ - 8/*nlink*/ -
-			     8/*size*/ - 8/*flags*/ - 8/*last_block_fill*/];
+		char padding[4096
+				- 4  /* version */
+				- 4  /* uid */
+				- 4  /* gid */
+				- 4  /* padding */
+				- 16 /* atime */
+				- 16 /* ctime */
+				- 16 /* mtime */
+				- 8  /* nlink */
+				- 8  /* size */
+				- 8  /* flags */
+				- 8  /* last_block_fill */];
 	} file_data;
 };
 
@@ -172,7 +181,11 @@ struct pmemfile_super {
 	/* Flag indicating mkfs finished its work. */
 	char initialized;
 
-	char padding[4096 - 8/*version*/ - 16/*toid*/ - 16/*toid*/ - 1/*init*/];
+	char padding[4096
+			- 8  /* version */
+			- 16 /* toid */
+			- 16 /* toid */
+			- 1  /* init */];
 };
 
 #endif
