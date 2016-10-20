@@ -115,7 +115,7 @@ struct pmemfile_dir {
 	TOID(struct pmemfile_dir) next;
 };
 
-#define NUMINODES_PER_ENTRY (249 - 4/*64 bytes for obj*/)
+#define NUMINODES_PER_ENTRY 249
 
 struct pmemfile_inode_array {
 	PMEMmutex mtx;
@@ -143,8 +143,7 @@ struct pmemfile_super {
 	/* Flag indicating mkfs finished its work. */
 	char initialized;
 
-	char padding[4096 - 64/*obj*/ - 8/*version*/ - 16/*toid*/ - 16/*toid*/
-		     - 1/*init*/];
+	char padding[4096 - 8/*version*/ - 16/*toid*/ - 16/*toid*/ - 1/*init*/];
 };
 
 #endif
