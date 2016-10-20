@@ -316,7 +316,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 
 		if (vinode == NULL) {
 			// create file
-			struct timespec t;
+			struct pmemfile_time t;
 
 			rwlock_tx_wlock(&parent_vinode->rwlock);
 
@@ -432,13 +432,8 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&parent_vinode->rwlock);
 
-		struct timespec t;
-
-		if (clock_gettime(CLOCK_REALTIME, &t)) {
-			ERR("!clock_gettime");
-			pmemobj_tx_abort(errno);
-		}
-
+		struct pmemfile_time t;
+		file_get_time(&t);
 		file_add_dentry(pfp, parent_vinode, newpath, src_vinode, &t);
 
 		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);

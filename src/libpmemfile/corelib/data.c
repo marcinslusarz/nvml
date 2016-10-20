@@ -73,14 +73,15 @@ file_rebuild_block_tree(PMEMfile *file)
 	if (!c)
 		return;
 	struct pmemfile_inode *inode = D_RW(file->vinode->inode);
-	struct pmemfile_block_array *block_array =
-			D_RW(inode->file_data.blocks);
+	struct pmemfile_block_array *block_array = &inode->file_data.blocks;
 	size_t off = 0;
 
 	while (block_array != NULL) {
-		for (unsigned i = 0; i < block_array->blocks_allocated; ++i) {
+		for (unsigned i = 0; i < block_array->length; ++i) {
 			struct pmemfile_block *block = &block_array->blocks[i];
 
+			if (block->allocated == 0)
+				break;
 			file_insert_block_to_cache(c, block_array, i, off);
 
 			off += block->allocated;
@@ -114,14 +115,9 @@ file_destroy_data_state(PMEMfile *file)
 
 static void
 file_reset_cache(PMEMfile *file, struct pmemfile_inode *inode,
-		struct pmemfile_pos *pos, bool alloc)
+		struct pmemfile_pos *pos)
 {
-	pos->block_array = D_RW(inode->file_data.blocks);
-	if (pos->block_array == NULL && alloc) {
-		TX_SET_DIRECT(inode, file_data.blocks,
-				TX_ZNEW(struct pmemfile_block_array));
-		pos->block_array = D_RW(inode->file_data.blocks);
-	}
+	pos->block_array = &inode->file_data.blocks;
 	pos->block_id = 0;
 	pos->block_offset = 0;
 
@@ -150,9 +146,6 @@ file_allocate_block(PMEMfile *file, struct pmemfile_pos *pos,
 	block->used = 0;
 	block->data = TX_XALLOC(char, sz, POBJ_XALLOC_NO_FLUSH);
 	block->allocated = pmemobj_alloc_usable_size(block->data.oid);
-
-	TX_ADD_FIELD_DIRECT(block_array, blocks_allocated);
-	block_array->blocks_allocated++;
 
 	file_insert_block_to_cache(file->blocks, block_array,
 			(unsigned)(block - &block_array->blocks[0]),
@@ -200,7 +193,11 @@ file_next_block_array(struct pmemfile_pos *pos, bool extend)
 		if (!extend)
 			return false;
 
-		next = TX_ZNEW(struct pmemfile_block_array);
+		next = TX_ZALLOC(struct pmemfile_block_array, 4096);
+		D_RW(next)->length = (uint32_t)
+				((pmemobj_alloc_usable_size(next.oid) -
+				sizeof(struct pmemfile_block_array)) /
+				sizeof(struct pmemfile_block));
 		TX_SET_DIRECT(pos->block_array, next, next);
 	}
 
@@ -362,7 +359,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	struct pmemfile_pos *pos = &file->pos;
 
 	if (pos->block_array == NULL)
-		file_reset_cache(file, inode, pos, true);
+		file_reset_cache(file, inode, pos);
 
 	if (file->offset != pos->global_offset) {
 		size_t block_start = pos->global_offset - pos->block_offset;
@@ -388,7 +385,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->global_offset -= pos->block_offset;
 			pos->block_offset = 0;
 		} else {
-			file_reset_cache(file, inode, pos, true);
+			file_reset_cache(file, inode, pos);
 		}
 	}
 
@@ -399,8 +396,9 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	 */
 
 	while (offset_left > 0) {
+		struct pmemfile_block_array *block_array = pos->block_array;
 		struct pmemfile_block *block =
-				&pos->block_array->blocks[pos->block_id];
+				&block_array->blocks[pos->block_id];
 
 		size_t offset = file_move_within_block(pfp, file, inode, pos,
 				block, offset_left, true);
@@ -413,7 +411,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_id++;
 			pos->block_offset = 0;
 
-			if (pos->block_id == MAXNUMBLOCKS)
+			if (pos->block_id == block_array->length)
 				file_next_block_array(pos, true);
 		}
 	}
@@ -426,8 +424,9 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 
 	size_t count_left = count;
 	while (count_left > 0) {
+		struct pmemfile_block_array *block_array = pos->block_array;
 		struct pmemfile_block *block =
-				&pos->block_array->blocks[pos->block_id];
+				&block_array->blocks[pos->block_id];
 
 		size_t written = file_write_within_block(pfp, file, inode, pos,
 				block, buf, count_left);
@@ -441,7 +440,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_id++;
 			pos->block_offset = 0;
 
-			if (pos->block_id == MAXNUMBLOCKS)
+			if (pos->block_id == block_array->length)
 				file_next_block_array(pos, true);
 		}
 	}
@@ -527,7 +526,7 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 			pos->global_offset -= pos->block_offset;
 			pos->block_offset = 0;
 		} else {
-			file_reset_cache(file, inode, pos, false);
+			file_reset_cache(file, inode, pos);
 
 			if (pos->block_array == NULL)
 				return false;
@@ -544,7 +543,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	struct pmemfile_pos *pos = &file->pos;
 
 	if (unlikely(pos->block_array == NULL)) {
-		file_reset_cache(file, inode, pos, false);
+		file_reset_cache(file, inode, pos);
 
 		if (pos->block_array == NULL)
 			return 0;
@@ -561,8 +560,9 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	size_t offset_left = file->offset - pos->global_offset;
 
 	while (offset_left > 0) {
+		struct pmemfile_block_array *block_array = pos->block_array;
 		struct pmemfile_block *block =
-				&pos->block_array->blocks[pos->block_id];
+				&block_array->blocks[pos->block_id];
 
 		size_t offset = file_move_within_block(pfp, file, inode, pos,
 				block, offset_left, false);
@@ -588,7 +588,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_id++;
 			pos->block_offset = 0;
 
-			if (pos->block_id == MAXNUMBLOCKS) {
+			if (pos->block_id == block_array->length) {
 				if (!file_next_block_array(pos, false))
 					/* EOF */
 					return 0;
@@ -605,8 +605,9 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	size_t bytes_read = 0;
 	size_t count_left = count;
 	while (count_left > 0) {
+		struct pmemfile_block_array *block_array = pos->block_array;
 		struct pmemfile_block *block =
-				&pos->block_array->blocks[pos->block_id];
+				&block_array->blocks[pos->block_id];
 
 		size_t read1 = file_read_from_block(pos, block, buf,
 				count_left);
@@ -634,7 +635,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_id++;
 			pos->block_offset = 0;
 
-			if (pos->block_id == MAXNUMBLOCKS) {
+			if (pos->block_id == block_array->length) {
 				if (!file_next_block_array(pos, false))
 					/* EOF */
 					return 0;
