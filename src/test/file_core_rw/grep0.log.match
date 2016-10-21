@@ -57,7 +57,7 @@ parent 0x$(X) ppath /
 *   2 0x$(X)     2      0 0040777 ..
 *   1 0x$(X)     1 838858752 0100644 file1
 STOP  /file1 ~800MB
-inodes 2 dirs 1 block_arrays 15 inode_arrays 1 blocks 2014
+inodes 2 dirs 1 block_arrays 11 inode_arrays 1 blocks 2014
 START no files
 parent 0x$(X) ppath /
 - ref    inode nlink   size   flags name
