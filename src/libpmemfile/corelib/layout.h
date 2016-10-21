@@ -51,7 +51,6 @@ POBJ_LAYOUT_END(pmemfile);
 struct pmemfile_block {
 	TOID(char) data;
 	uint64_t size;
-	size_t used;
 };
 
 /* File */
