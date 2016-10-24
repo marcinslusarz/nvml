@@ -77,7 +77,7 @@ test_open_create_close(PMEMfilepool *pfp)
 
 	/* file does not exist */
 	errno = 0;
-	f1 = pmemfile_open(pfp, "/aaa", 0, 0);
+	f1 = pmemfile_open(pfp, "/aaa", 0);
 	UT_ASSERTeq(f1, NULL);
 	UT_ASSERTeq(errno, ENOENT);
 
@@ -97,7 +97,7 @@ test_open_create_close(PMEMfilepool *pfp)
 
 	/* file does not exist */
 	errno = 0;
-	f2 = pmemfile_open(pfp, "/bbb", 0, 0);
+	f2 = pmemfile_open(pfp, "/bbb", 0);
 	UT_ASSERTeq(f2, NULL);
 	UT_ASSERTeq(errno, ENOENT);
 
@@ -108,7 +108,7 @@ test_open_create_close(PMEMfilepool *pfp)
 
 
 	/* successful open */
-	f1 = pmemfile_open(pfp, "/aaa", 0, 0);
+	f1 = pmemfile_open(pfp, "/aaa", 0);
 	UT_ASSERTne(f1, NULL);
 
 	pmemfile_close(pfp, f2);
@@ -218,7 +218,7 @@ test_unlink(const char *path)
 	int ret;
 	PMEMfile *f1;
 
-	f1 = pmemfile_open(pfp, "/bbb2.link", 0, 0);
+	f1 = pmemfile_open(pfp, "/bbb2.link", 0);
 	UT_ASSERTne(f1, NULL);
 	pmemfile_close(pfp, f1);
 
@@ -231,7 +231,7 @@ test_unlink(const char *path)
 	UT_ASSERTeq(errno, ENOENT);
 
 	errno = 0;
-	f1 = pmemfile_open(pfp, "/bbb2.link", 0, 0);
+	f1 = pmemfile_open(pfp, "/bbb2.link", 0);
 	UT_ASSERTeq(f1, NULL);
 	UT_ASSERTeq(errno, ENOENT);
 
@@ -241,14 +241,14 @@ test_unlink(const char *path)
 	UT_ASSERTeq(errno, ENOENT);
 
 
-	f1 = pmemfile_open(pfp, "/bbb", 0, 0);
+	f1 = pmemfile_open(pfp, "/bbb", 0);
 	UT_ASSERTne(f1, NULL);
 	ret = pmemfile_unlink(pfp, "/bbb");
 	UT_ASSERTeq(ret, 0);
 	pmemfile_close(pfp, f1);
 
 	errno = 0;
-	f1 = pmemfile_open(pfp, "/bbb", 0, 0);
+	f1 = pmemfile_open(pfp, "/bbb", 0);
 	UT_ASSERTeq(f1, NULL);
 	UT_ASSERTeq(errno, ENOENT);
 

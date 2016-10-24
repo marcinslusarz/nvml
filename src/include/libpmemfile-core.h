@@ -59,7 +59,7 @@ PMEMfilepool *pmemfile_pool_open(const char *pathname);
 void pmemfile_pool_close(PMEMfilepool *pfp);
 
 PMEMfile *pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags,
-		mode_t mode);
+		...);
 /* XXX Should we get rid of PMEMfilepool pointer? */
 void pmemfile_close(PMEMfilepool *pfp, PMEMfile *file);
 

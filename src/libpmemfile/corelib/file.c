@@ -36,6 +36,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -236,7 +237,7 @@ file_register_opened_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
  * pmemfile_open -- open file
  */
 PMEMfile *
-pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
+pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 {
 	if (!pathname) {
 		LOG(LUSR, "NULL pathname");
@@ -244,14 +245,20 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 		return NULL;
 	}
 
-	LOG(LDBG, "pathname %s flags 0x%x mode %o", pathname, flags, mode);
+	LOG(LDBG, "pathname %s flags 0x%x", pathname, flags);
 
 	const char *orig_pathname = pathname;
 
 	if (file_check_flags(flags))
 		return NULL;
 
+	va_list ap;
+	va_start(ap, flags);
+	mode_t mode;
+
 	if (flags & O_CREAT) {
+		mode = va_arg(ap, mode_t);
+		LOG(LDBG, "mode %o", mode);
 		if (mode & ~(mode_t)(S_IRWXU | S_IRWXG | S_IRWXO)) {
 			LOG(LUSR, "invalid mode 0%o", mode);
 			errno = EINVAL;
@@ -262,14 +269,8 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 			LOG(LSUP, "execute bits are not supported");
 			mode = mode & ~(mode_t)(S_IXUSR | S_IXGRP | S_IXOTH);
 		}
-	} else {
-		if (mode) {
-			LOG(LUSR, "non-zero mode (0%o) without O_CREAT flag",
-					mode);
-			errno = EINVAL;
-			return NULL;
-		}
 	}
+	va_end(ap);
 
 	pathname = file_check_pathname(pathname);
 	if (!pathname)
