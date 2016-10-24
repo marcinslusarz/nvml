@@ -41,10 +41,6 @@
 void rwlock_tx_wlock(pthread_rwlock_t *l);
 void rwlock_tx_unlock_on_commit(pthread_rwlock_t *l);
 
-void spin_tx_lock(pthread_spinlock_t *l);
-int  spin_tx_trylock(pthread_spinlock_t *l);
-void spin_tx_unlock_on_commit(pthread_spinlock_t *l);
-
 void mutex_tx_lock(PMEMfilepool *pfp, PMEMmutex *mutexp);
 void mutex_tx_unlock_on_abort(PMEMmutex *mutexp);
 void mutex_tx_unlock_on_commit(PMEMmutex *mutexp);

@@ -71,58 +71,6 @@ rwlock_tx_unlock_on_commit(pthread_rwlock_t *l)
 }
 
 static void
-file_util_spin_unlock(PMEMfilepool *pfp, pthread_spinlock_t *arg)
-{
-	util_spin_unlock(arg);
-}
-
-/*
- * file_tx_spin_lock -- transactional spin lock
- */
-void
-spin_tx_lock(pthread_spinlock_t *l)
-{
-	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
-
-	cb_push_front(TX_STAGE_ONABORT,
-			(cb_basic)file_util_spin_unlock,
-			(void *)l);
-
-	util_spin_lock(l);
-}
-
-/*
- * file_tx_spin_trylock -- transactional spin lock
- */
-int
-spin_tx_trylock(pthread_spinlock_t *l)
-{
-	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
-
-	int r = util_spin_trylock(l);
-	if (r)
-		return r;
-	/* XXX should be done before lock */
-	cb_push_front(TX_STAGE_ONABORT,
-			(cb_basic)file_util_spin_unlock,
-			(void *)l);
-	return r;
-}
-
-/*
- * file_tx_spin_unlock_on_commit -- transactional spin unlock
- */
-void
-spin_tx_unlock_on_commit(pthread_spinlock_t *l)
-{
-	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
-
-	cb_push_back(TX_STAGE_ONCOMMIT,
-			(cb_basic)file_util_spin_unlock,
-			(void *)l);
-}
-
-static void
 file_mutex_unlock_nofail(PMEMfilepool *pfp, PMEMmutex *mutexp)
 {
 	pmemobj_mutex_unlock_nofail(pfp->pop, mutexp);
