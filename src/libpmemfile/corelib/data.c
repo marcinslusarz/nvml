@@ -232,7 +232,8 @@ file_seek_within_block(PMEMfilepool *pfp,
 {
 	if (block->size == 0) {
 		if (extend)
-			file_allocate_block(file, inode, pos, block, offset_left);
+			file_allocate_block(file, inode, pos, block,
+					offset_left);
 		else
 			return 0;
 	}

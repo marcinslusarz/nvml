@@ -411,6 +411,14 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 	return file_vinode_ref_new(pfp, tinode);
 }
 
+static void
+file_assert_no_dentries(struct pmemfile_dir *dir)
+{
+	for (uint64_t i = 0; i < dir->num_elements; ++i)
+		if (dir->dentries[i].inode.oid.off)
+			FATAL("Trying to free non-empty directory");
+}
+
 /*
  * file_inode_free -- frees inode
  *
@@ -428,9 +436,7 @@ file_inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode)
 
 		while (dir != NULL) {
 			/* should have been catched earlier */
-			for (uint64_t i = 0; i < dir->num_elements; ++i)
-				if (dir->dentries[i].inode.oid.off)
-					FATAL("Trying to free non-empty directory");
+			file_assert_no_dentries(dir);
 
 			TOID(struct pmemfile_dir) next = dir->next;
 			if (!TOID_IS_NULL(tdir))
