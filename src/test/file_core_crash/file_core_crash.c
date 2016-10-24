@@ -85,13 +85,13 @@ main(int argc, char *argv[])
 	} else if (strcmp(argv[2], "crash1") == 0) {
 		pfp = open_pool(path);
 
-		f1 = pmemfile_open(pfp, "/aaa", 0, 0);
+		f1 = pmemfile_open(pfp, "/aaa", 0);
 		UT_ASSERTne(f1, NULL);
 		exit(0);
 	} else if (strcmp(argv[2], "crash2") == 0) {
 		pfp = open_pool(path);
 
-		f1 = pmemfile_open(pfp, "/aaa", 0, 0);
+		f1 = pmemfile_open(pfp, "/aaa", 0);
 		UT_ASSERTne(f1, NULL);
 
 		ret = pmemfile_unlink(pfp, "/aaa");

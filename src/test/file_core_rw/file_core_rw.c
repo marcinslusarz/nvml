@@ -76,7 +76,7 @@ test1(PMEMfilepool *pfp)
 
 
 
-	f = pmemfile_open(pfp, "/file1", O_RDONLY, 0);
+	f = pmemfile_open(pfp, "/file1", O_RDONLY);
 	UT_ASSERTne(f, NULL);
 
 	memset(data2, 0xff, sizeof(data2));
@@ -98,7 +98,7 @@ test1(PMEMfilepool *pfp)
 
 
 
-	f = pmemfile_open(pfp, "/file1", O_RDONLY, 0);
+	f = pmemfile_open(pfp, "/file1", O_RDONLY);
 	UT_ASSERTne(f, NULL);
 
 	memset(data2, 0xff, sizeof(data2));
@@ -112,7 +112,7 @@ test1(PMEMfilepool *pfp)
 
 
 
-	f = pmemfile_open(pfp, "/file1", O_RDONLY, 0);
+	f = pmemfile_open(pfp, "/file1", O_RDONLY);
 	UT_ASSERTne(f, NULL);
 
 	memset(data2, 0xff, sizeof(data2));
@@ -133,7 +133,7 @@ test1(PMEMfilepool *pfp)
 
 
 
-	f = pmemfile_open(pfp, "/file1", O_RDWR, 0);
+	f = pmemfile_open(pfp, "/file1", O_RDWR);
 	UT_ASSERTne(f, NULL);
 
 	ret = pmemfile_write(pfp, f, "pmem", 4);
@@ -154,7 +154,7 @@ test1(PMEMfilepool *pfp)
 
 
 
-	f = pmemfile_open(pfp, "/file1", O_RDWR, 0);
+	f = pmemfile_open(pfp, "/file1", O_RDWR);
 	UT_ASSERTne(f, NULL);
 
 	memset(data2, 0xff, sizeof(data2));
@@ -169,7 +169,7 @@ test1(PMEMfilepool *pfp)
 
 
 
-	f = pmemfile_open(pfp, "/file1", O_RDWR, 0);
+	f = pmemfile_open(pfp, "/file1", O_RDWR);
 	UT_ASSERTne(f, NULL);
 
 	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
@@ -314,7 +314,7 @@ test2(PMEMfilepool *pfp)
 	_pmemfile_list_root(pfp, "/file1 ~800MB");
 	_pmemfile_stats(pfp);
 
-	f = pmemfile_open(pfp, "/file1", O_RDONLY, 0);
+	f = pmemfile_open(pfp, "/file1", O_RDONLY);
 	UT_ASSERTne(f, NULL);
 
 	for (int i = 0; i < LOOPS; ++i) {
