@@ -147,9 +147,13 @@ file_check_flags(int flags)
 #endif
 
 	if (flags & O_TRUNC) {
-		LOG(LSUP, "O_TRUNC is not supported (yet)");
-		errno = ENOTSUP;
-		return -1;
+		if ((flags & O_ACCMODE) == O_RDONLY) {
+			LOG(LUSR, "O_TRUNC without write permissions");
+			errno = EACCES;
+			return -1;
+		}
+		LOG(LTRC, "O_TRUNC");
+		flags &= ~O_TRUNC;
 	}
 
 	if ((flags & O_ACCMODE) == O_RDONLY) {
@@ -313,6 +317,9 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 						" (yet)");
 				pmemobj_tx_abort(EISDIR);
 			}
+
+			if (flags & O_TRUNC)
+				file_truncate(vinode);
 		}
 
 		if (vinode == NULL) {
@@ -380,8 +387,6 @@ pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
 			pmfi_path(file->vinode));
 
 	file_vinode_unref_tx(pfp, file->vinode);
-
-	file_destroy_data_state(file);
 
 	util_mutex_destroy(&file->mutex);
 

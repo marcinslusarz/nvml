@@ -36,6 +36,7 @@
 
 extern size_t pmemfile_core_block_size;
 
-void file_destroy_data_state(PMEMfile *file);
+void file_destroy_data_state(struct pmemfile_vinode *vinode);
+void file_truncate(struct pmemfile_vinode *vinode);
 
 #endif

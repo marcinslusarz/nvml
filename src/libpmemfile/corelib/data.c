@@ -73,12 +73,12 @@ file_insert_block_to_cache(struct ctree *c,
  * file_rebuild_block_tree -- rebuilds runtime tree of blocks
  */
 static void
-file_rebuild_block_tree(PMEMfile *file)
+file_rebuild_block_tree(struct pmemfile_vinode *vinode)
 {
 	struct ctree *c = ctree_new();
 	if (!c)
 		return;
-	struct pmemfile_inode *inode = D_RW(file->vinode->inode);
+	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	struct pmemfile_block_array *block_array = &inode->file_data.blocks;
 	size_t off = 0;
 
@@ -96,30 +96,32 @@ file_rebuild_block_tree(PMEMfile *file)
 		block_array = D_RW(block_array->next);
 	}
 
-	file->blocks = c;
+	vinode->blocks = c;
 }
 
 /*
  * file_destroy_data_state -- destroys file state related to data
  */
 void
-file_destroy_data_state(PMEMfile *file)
+file_destroy_data_state(struct pmemfile_vinode *vinode)
 {
-	if (!file->blocks)
+	struct ctree *blocks = vinode->blocks;
+	if (!blocks)
 		return;
 
 	uint64_t key = UINT64_MAX;
 	struct file_block_info *info;
-	while ((info = (void *)(uintptr_t)ctree_find_le_unlocked(file->blocks,
+	while ((info = (void *)(uintptr_t)ctree_find_le_unlocked(blocks,
 			&key))) {
 		Free(info);
-		uint64_t k = ctree_remove_unlocked(file->blocks, key, 1);
+		uint64_t k = ctree_remove_unlocked(blocks, key, 1);
 		ASSERTeq(k, key);
 
 		key = UINT64_MAX;
 	}
 
-	ctree_delete(file->blocks);
+	ctree_delete(blocks);
+	vinode->blocks = NULL;
 }
 
 /*
@@ -167,7 +169,7 @@ file_allocate_block(PMEMfile *file,
 	TX_ADD_DIRECT(&inode->last_block_fill);
 	inode->last_block_fill = 0;
 
-	file_insert_block_to_cache(file->blocks, block_array,
+	file_insert_block_to_cache(file->vinode->blocks, block_array,
 			(unsigned)(block - &block_array->blocks[0]),
 			pos->global_offset);
 }
@@ -414,7 +416,8 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_array->blocks[pos->block_id].size) {
 
 			struct file_block_info *info = (void *)(uintptr_t)
-				ctree_find_le_unlocked(file->blocks, &off);
+				ctree_find_le_unlocked(file->vinode->blocks,
+						&off);
 			if (info) {
 				pos->block_array = info->arr;
 				pos->block_id = info->block_id;
@@ -523,8 +526,8 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 
 	util_mutex_lock(&file->mutex);
 
-	if (!file->blocks)
-		file_rebuild_block_tree(file);
+	if (!vinode->blocks)
+		file_rebuild_block_tree(vinode);
 
 	memcpy(&pos, &file->pos, sizeof(pos));
 
@@ -564,7 +567,7 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 		pos->block_array->blocks[pos->block_id].size) {
 
 		struct file_block_info *info = (void *)(uintptr_t)
-			ctree_find_le_unlocked(file->blocks, &off);
+			ctree_find_le_unlocked(file->vinode->blocks, &off);
 		if (!info)
 			return false;
 
@@ -739,8 +742,8 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 	util_mutex_lock(&file->mutex);
 	util_rwlock_rdlock(&vinode->rwlock);
 
-	if (!file->blocks)
-		file_rebuild_block_tree(file);
+	if (!vinode->blocks)
+		file_rebuild_block_tree(vinode);
 
 	bytes_read = file_read(pfp, file, inode, buf, count);
 
@@ -811,4 +814,47 @@ off_t
 pmemfile_lseek(PMEMfilepool *pfp, PMEMfile *file, off_t offset, int whence)
 {
 	return pmemfile_lseek64(pfp, file, offset, whence);
+}
+
+/*
+ * file_truncate -- changes file size to 0
+ */
+void
+file_truncate(struct pmemfile_vinode *vinode)
+{
+	struct pmemfile_block_array *arr =
+			&D_RW(vinode->inode)->file_data.blocks;
+	TOID(struct pmemfile_block_array) tarr = arr->next;
+
+	TX_MEMSET(&arr->next, 0, sizeof(arr->next));
+	for (uint32_t i = 0; i < arr->length; ++i) {
+		if (arr->blocks[i].size > 0) {
+			TX_FREE(arr->blocks[i].data);
+			continue;
+		}
+
+		TX_MEMSET(&arr->blocks[0], 0, sizeof(arr->blocks[0]) * i);
+		break;
+	}
+
+	arr = D_RW(tarr);
+	while (arr != NULL) {
+		for (uint32_t i = 0; i < arr->length; ++i)
+			TX_FREE(arr->blocks[i].data);
+
+		TOID(struct pmemfile_block_array) next = arr->next;
+		TX_FREE(tarr);
+		tarr = next;
+		arr = D_RW(tarr);
+	}
+
+	struct pmemfile_inode *inode = D_RW(vinode->inode);
+
+	TX_ADD_DIRECT(&inode->size);
+	inode->size = 0;
+
+	TX_ADD_DIRECT(&inode->last_block_fill);
+	inode->last_block_fill = 0;
+
+	file_destroy_data_state(vinode);
 }

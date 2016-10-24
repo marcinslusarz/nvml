@@ -60,6 +60,8 @@ struct pmemfile_vinode {
 		struct pmemfile_inode_array *arr;
 		unsigned idx;
 	} opened;
+
+	struct ctree *blocks;
 };
 
 static inline bool _file_is_dir(const struct pmemfile_inode *inode)

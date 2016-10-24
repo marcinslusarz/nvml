@@ -65,3 +65,28 @@ parent 0x$(X) ppath /
 *   2 0x$(X)     2      0 0040777 ..
 STOP  no files
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
+START /file1,file2 25600
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1  25600 0100644 file1
+*   1 0x$(X)     1  25600 0100644 file2
+STOP  /file1,file2 25600
+inodes 3 dirs 0 block_arrays 0 inode_arrays 1 blocks 14
+START /file1 0, /file2 128
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+*   1 0x$(X)     1      0 0100644 file1
+*   1 0x$(X)     1    128 0100644 file2
+STOP  /file1 0, /file2 128
+inodes 3 dirs 0 block_arrays 0 inode_arrays 1 blocks 1
+START no files
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
+STOP  no files
+inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
