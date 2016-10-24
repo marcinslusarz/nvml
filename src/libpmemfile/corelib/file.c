@@ -336,11 +336,11 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 		file->vinode = vinode;
 
 		if ((flags & O_ACCMODE) == O_RDONLY)
-			file->read = true;
+			file->flags = PFILE_READ;
 		else if ((flags & O_ACCMODE) == O_WRONLY)
-			file->write = true;
+			file->flags = PFILE_WRITE;
 		else if ((flags & O_ACCMODE) == O_RDWR)
-			file->read = file->write = true;
+			file->flags = PFILE_READ | PFILE_WRITE;
 	} TX_ONABORT {
 		error = 1;
 	} TX_END

@@ -465,7 +465,7 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 		return -1;
 	}
 
-	if (!file->write) {
+	if (!(file->flags & PFILE_WRITE)) {
 		errno = EBADF;
 		return -1;
 	}
@@ -671,7 +671,7 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 		return -1;
 	}
 
-	if (!file->read) {
+	if (!(file->flags & PFILE_READ)) {
 		errno = EBADF;
 		return -1;
 	}
