@@ -57,7 +57,7 @@ open_close_worker(void *arg)
 	sched_yield();
 
 	for (int i = 0; i < ops; ++i) {
-		PMEMfile *f1 = pmemfile_open(pfp, path, 0, 0);
+		PMEMfile *f1 = pmemfile_open(pfp, path, 0);
 		if (f1)
 			pmemfile_close(pfp, f1);
 	}
