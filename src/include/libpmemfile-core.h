@@ -51,7 +51,7 @@ extern "C" {
  * opaque type internal to libpmemfile
  */
 typedef struct pmemfilepool PMEMfilepool;
-typedef struct pmemfile PMEMfile;
+typedef struct pmemfile_file PMEMfile;
 
 PMEMfilepool *pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode);
 
