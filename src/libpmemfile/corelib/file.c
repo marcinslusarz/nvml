@@ -333,7 +333,6 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 		if (!file)
 			pmemobj_tx_abort(errno);
 
-		file->parent = parent_vinode;
 		file->vinode = vinode;
 
 		if ((flags & O_ACCMODE) == O_RDONLY)
@@ -346,12 +345,13 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, mode_t mode)
 		error = 1;
 	} TX_END
 
+	file_vinode_unref_tx(pfp, parent_vinode);
+
 	if (error) {
 		int oerrno = errno;
 
 		if (old_vinode != NULL)
 			file_vinode_unref_tx(pfp, old_vinode);
-		file_vinode_unref_tx(pfp, parent_vinode);
 
 		errno = oerrno;
 		LOG(LDBG, "!");
@@ -379,7 +379,6 @@ pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
 			pmfi_path(file->vinode));
 
 	file_vinode_unref_tx(pfp, file->vinode);
-	file_vinode_unref_tx(pfp, file->parent);
 
 	file_destroy_data_state(file);
 

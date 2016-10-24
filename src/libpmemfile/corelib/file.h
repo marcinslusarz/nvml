@@ -48,9 +48,6 @@ struct pmemfile {
 	/* File inode. */
 	struct pmemfile_vinode *vinode;
 
-	/* Inode of a directory that this inode was opened from. */
-	struct pmemfile_vinode *parent;
-
 	/*
 	 * Protects against changes to offset / position cache from multiple
 	 * threads.
