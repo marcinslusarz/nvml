@@ -65,6 +65,20 @@ struct pmemfile_block_array {
 	struct pmemfile_block blocks[];
 };
 
+#define PMEMFILE_MAX_FILE_NAME 255
+/* Directory entry */
+struct pmemfile_dirent {
+	TOID(struct pmemfile_inode) inode;
+	char name[PMEMFILE_MAX_FILE_NAME + 1];
+};
+
+/* Directory */
+struct pmemfile_dir {
+	uint64_t num_elements;
+	TOID(struct pmemfile_dir) next;
+	struct pmemfile_dirent dentries[];
+};
+
 struct pmemfile_time {
 	/* Seconds */
 	int64_t sec;
@@ -114,7 +128,7 @@ struct pmemfile_inode {
 		struct pmemfile_block_array blocks;
 
 		/* Directory specific data. */
-		TOID(struct pmemfile_dir) dir;
+		struct pmemfile_dir dir;
 
 		char padding[4096
 				- 4  /* version */
@@ -129,27 +143,6 @@ struct pmemfile_inode {
 				- 8  /* flags */
 				- 8  /* last_block_fill */];
 	} file_data;
-};
-
-#define PMEMFILE_MAX_FILE_NAME 255
-/* Directory entry */
-struct pmemfile_dentry {
-	TOID(struct pmemfile_inode) inode;
-	char name[PMEMFILE_MAX_FILE_NAME + 1];
-};
-
-/*
- * XXX tweak this number when on-media layout will be complete to let inode fit
- * in some nice number (one page?)
- */
-#define NUMDENTRIES 100
-
-/* Directory */
-struct pmemfile_dir {
-	/* Number of used entries, <0, NUMDENTRIES>. */
-	uint64_t used;
-	struct pmemfile_dentry dentries[NUMDENTRIES];
-	TOID(struct pmemfile_dir) next;
 };
 
 #define NUMINODES_PER_ENTRY 249

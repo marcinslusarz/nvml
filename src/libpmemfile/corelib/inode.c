@@ -402,6 +402,11 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 				(sizeof(inode->file_data) -
 				sizeof(inode->file_data.blocks)) /
 				sizeof(struct pmemfile_block);
+	else if (_file_is_dir(inode))
+		inode->file_data.dir.num_elements =
+				(sizeof(inode->file_data) -
+				sizeof(inode->file_data.dir)) /
+				sizeof(struct pmemfile_dirent);
 
 	return file_vinode_ref_new(pfp, tinode);
 }
@@ -418,16 +423,20 @@ file_inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode)
 
 	struct pmemfile_inode *inode = D_RW(tinode);
 	if (_file_is_dir(inode)) {
-		TOID(struct pmemfile_dir) dir = inode->file_data.dir;
+		struct pmemfile_dir *dir = &inode->file_data.dir;
+		TOID(struct pmemfile_dir) tdir = TOID_NULL(struct pmemfile_dir);
 
-		while (!TOID_IS_NULL(dir)) {
+		while (dir != NULL) {
 			/* should have been catched earlier */
-			if (D_RW(dir)->used != 0)
-				FATAL("Trying to free non-empty directory");
+			for (uint64_t i = 0; i < dir->num_elements; ++i)
+				if (dir->dentries[i].inode.oid.off)
+					FATAL("Trying to free non-empty directory");
 
-			TOID(struct pmemfile_dir) next = D_RW(dir)->next;
-			TX_FREE(dir);
-			dir = next;
+			TOID(struct pmemfile_dir) next = dir->next;
+			if (!TOID_IS_NULL(tdir))
+				TX_FREE(tdir);
+			tdir = next;
+			dir = D_RW(tdir);
 		}
 	} else if (_file_is_regular_file(inode)) {
 		struct pmemfile_block_array *arr = &inode->file_data.blocks;
