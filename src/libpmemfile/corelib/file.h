@@ -79,8 +79,6 @@ struct pmemfile_file {
 		/* Offset from the beginning of file. */
 		size_t global_offset;
 	} pos;
-
-	struct ctree *blocks;
 };
 
 #endif

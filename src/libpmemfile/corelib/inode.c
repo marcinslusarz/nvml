@@ -38,6 +38,7 @@
 #include <stdlib.h>
 
 #include "callbacks.h"
+#include "data.h"
 #include "inode.h"
 #include "inode_array.h"
 #include "internal.h"
@@ -220,6 +221,8 @@ file_vinode_unregister_locked(PMEMfilepool *pfp,
 		FATAL("vinode not found");
 
 	c->inodes--;
+
+	file_destroy_data_state(vinode);
 
 #ifdef DEBUG
 	/* "path" field is defined only in DEBUG builds */

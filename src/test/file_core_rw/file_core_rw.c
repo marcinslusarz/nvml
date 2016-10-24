@@ -334,6 +334,64 @@ test2(PMEMfilepool *pfp)
 	UT_ASSERTeq(ret, 0);
 }
 
+static void
+test_trunc(PMEMfilepool *pfp)
+{
+	char bufFF[128], bufDD[128], buftmp[128];
+	int ret;
+
+	memset(bufFF, 0xFF, sizeof(bufFF));
+	memset(bufDD, 0xDD, sizeof(bufDD));
+
+	PMEMfile *f1 = pmemfile_open(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
+			0644);
+	UT_ASSERTne(f1, NULL);
+	PMEMfile *f2 = pmemfile_open(pfp, "/file2", O_CREAT | O_EXCL | O_WRONLY,
+			0644);
+	UT_ASSERTne(f2, NULL);
+
+	for (int i = 0; i < 100; ++i) {
+		ret = pmemfile_write(pfp, f1, bufFF, 128);
+		UT_ASSERTeq(ret, 128);
+		ret = pmemfile_write(pfp, f1, bufDD, 128);
+		UT_ASSERTeq(ret, 128);
+
+		ret = pmemfile_write(pfp, f2, bufFF, 128);
+		UT_ASSERTeq(ret, 128);
+		ret = pmemfile_write(pfp, f2, bufDD, 128);
+		UT_ASSERTeq(ret, 128);
+	}
+
+	pmemfile_close(pfp, f1);
+	pmemfile_close(pfp, f2);
+	_pmemfile_list_root(pfp, "/file1,file2 25600");
+	_pmemfile_stats(pfp);
+
+	f1 = pmemfile_open(pfp, "/file1", O_RDWR | O_TRUNC, 0);
+	UT_ASSERTne(f1, NULL);
+
+	f2 = pmemfile_open(pfp, "/file2", O_RDWR | O_TRUNC, 0);
+	UT_ASSERTne(f1, NULL);
+
+	ret = pmemfile_read(pfp, f1, buftmp, 128);
+	UT_ASSERTeq(ret, 0);
+
+	ret = pmemfile_write(pfp, f2, bufDD, 128);
+	UT_ASSERTeq(ret, 128);
+
+	pmemfile_close(pfp, f1);
+	pmemfile_close(pfp, f2);
+
+	_pmemfile_list_root(pfp, "/file1 0, /file2 128");
+	_pmemfile_stats(pfp);
+
+	ret = pmemfile_unlink(pfp, "/file1");
+	UT_ASSERTeq(ret, 0);
+
+	ret = pmemfile_unlink(pfp, "/file2");
+	UT_ASSERTeq(ret, 0);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -355,6 +413,10 @@ main(int argc, char *argv[])
 	_pmemfile_stats(pfp);
 
 	test2(pfp);
+	_pmemfile_list_root(pfp, "no files");
+	_pmemfile_stats(pfp);
+
+	test_trunc(pfp);
 	_pmemfile_list_root(pfp, "no files");
 	_pmemfile_stats(pfp);
 
