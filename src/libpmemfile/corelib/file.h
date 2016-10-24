@@ -43,6 +43,9 @@
 
 struct ctree;
 
+#define PFILE_READ (1ULL << 0)
+#define PFILE_WRITE (1ULL << 1)
+
 /* File */
 struct pmemfile_file {
 	/* File inode. */
@@ -53,6 +56,9 @@ struct pmemfile_file {
 	 * threads.
 	 */
 	pthread_mutex_t mutex;
+
+	/* Flags */
+	uint64_t flags;
 
 	/* Requested/current position. */
 	size_t offset;
@@ -75,12 +81,6 @@ struct pmemfile_file {
 	} pos;
 
 	struct ctree *blocks;
-
-	/* Open for read. */
-	bool read;
-
-	/* Open for write. */
-	bool write;
 };
 
 #endif
