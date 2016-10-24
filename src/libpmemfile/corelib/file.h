@@ -44,7 +44,7 @@
 struct ctree;
 
 /* File */
-struct pmemfile {
+struct pmemfile_file {
 	/* File inode. */
 	struct pmemfile_vinode *vinode;
 
