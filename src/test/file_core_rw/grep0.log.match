@@ -8,15 +8,15 @@ STOP  no files
 START /file1 0
 parent 0x$(X) ppath /
 - ref    inode nlink   size   flags name
-*   3 0x$(X)     2      0 0040777 .
-*   3 0x$(X)     2      0 0040777 ..
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
 *   2 0x$(X)     1      0 0100644 file1
 STOP  /file1 0
 START /file1 9
 parent 0x$(X) ppath /
 - ref    inode nlink   size   flags name
-*   3 0x$(X)     2      0 0040777 .
-*   3 0x$(X)     2      0 0040777 ..
+*   2 0x$(X)     2      0 0040777 .
+*   2 0x$(X)     2      0 0040777 ..
 *   2 0x$(X)     1      9 0100644 file1
 STOP  /file1 9
 START /file1 9
