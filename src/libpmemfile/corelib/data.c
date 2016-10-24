@@ -50,22 +50,28 @@
 
 struct file_block_info {
 	struct pmemfile_block_array *arr;
-	unsigned id;
+	unsigned block_id;
 };
 
+/*
+ * file_insert_block_to_cache -- inserts block into the tree
+ */
 static void
 file_insert_block_to_cache(struct ctree *c,
 		struct pmemfile_block_array *block_array,
-		unsigned id,
+		unsigned block_id,
 		size_t off)
 {
 	struct file_block_info *info = Malloc(sizeof(*info));
 	info->arr = block_array;
-	info->id = id;
+	info->block_id = block_id;
 
 	ctree_insert_unlocked(c, off, (uintptr_t)info);
 }
 
+/*
+ * file_rebuild_block_tree -- rebuilds runtime tree of blocks
+ */
 static void
 file_rebuild_block_tree(PMEMfile *file)
 {
@@ -93,6 +99,9 @@ file_rebuild_block_tree(PMEMfile *file)
 	file->blocks = c;
 }
 
+/*
+ * file_destroy_data_state -- destroys file state related to data
+ */
 void
 file_destroy_data_state(PMEMfile *file)
 {
@@ -113,6 +122,9 @@ file_destroy_data_state(PMEMfile *file)
 	ctree_delete(file->blocks);
 }
 
+/*
+ * file_reset_cache -- resets position pointer to the beginning of the file
+ */
 static void
 file_reset_cache(PMEMfile *file, struct pmemfile_inode *inode,
 		struct pmemfile_pos *pos)
@@ -124,6 +136,9 @@ file_reset_cache(PMEMfile *file, struct pmemfile_inode *inode,
 	pos->global_offset = 0;
 }
 
+/*
+ * file_allocate_block -- allocates new block
+ */
 static void
 file_allocate_block(PMEMfile *file,
 		struct pmemfile_inode *inode,
@@ -157,6 +172,9 @@ file_allocate_block(PMEMfile *file,
 			pos->global_offset);
 }
 
+/*
+ * file_extend_block_meta_data -- updates metadata of the current block
+ */
 static void
 file_extend_block_meta_data(struct pmemfile_inode *inode,
 		struct pmemfile_block_array *block_array,
@@ -170,6 +188,9 @@ file_extend_block_meta_data(struct pmemfile_inode *inode,
 	inode->size += len;
 }
 
+/*
+ * file_zero_extend_block -- extends current block with zeroes
+ */
 static void
 file_zero_extend_block(PMEMfilepool *pfp,
 		struct pmemfile_inode *inode,
@@ -188,6 +209,9 @@ file_zero_extend_block(PMEMfilepool *pfp,
 	file_extend_block_meta_data(inode, block_array, block, len);
 }
 
+/*
+ * file_next_block_array -- changes current block array to the next one
+ */
 static bool
 file_next_block_array(struct pmemfile_pos *pos, bool extend)
 {
@@ -283,6 +307,9 @@ file_seek_within_block(PMEMfilepool *pfp,
 	return sz;
 }
 
+/*
+ * file_write_within_block -- writes data to current block
+ */
 static size_t
 file_write_within_block(PMEMfilepool *pfp,
 		PMEMfile *file,
@@ -324,6 +351,9 @@ file_write_within_block(PMEMfilepool *pfp,
 	return len;
 }
 
+/*
+ * file_read_from_block -- reads data from current block
+ */
 static size_t
 file_read_from_block(struct pmemfile_inode *inode,
 		struct pmemfile_pos *pos,
@@ -350,6 +380,9 @@ file_read_from_block(struct pmemfile_inode *inode,
 	return len;
 }
 
+/*
+ * is_last_block -- returns true when specified block is the last one in a file
+ */
 static bool
 is_last_block(unsigned block_id, struct pmemfile_block_array *block_array)
 {
@@ -359,6 +392,9 @@ is_last_block(unsigned block_id, struct pmemfile_block_array *block_array)
 		return block_array->blocks[block_id + 1].size == 0;
 }
 
+/*
+ * file_write -- writes to file
+ */
 static void
 file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		const char *buf, size_t count)
@@ -381,7 +417,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 				ctree_find_le_unlocked(file->blocks, &off);
 			if (info) {
 				pos->block_array = info->arr;
-				pos->block_id = info->id;
+				pos->block_id = info->block_id;
 				pos->block_offset = 0;
 				pos->global_offset = off;
 			}
@@ -456,6 +492,9 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	}
 }
 
+/*
+ * pmemfile_write -- writes to file
+ */
 ssize_t
 pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 {
@@ -510,6 +549,10 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 	return (ssize_t)count;
 }
 
+/*
+ * file_sync_off -- sanitizes file position (internal) WRT file offset (set by
+ * user)
+ */
 static bool
 file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 		struct pmemfile_inode *inode)
@@ -526,7 +569,7 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 			return false;
 
 		pos->block_array = info->arr;
-		pos->block_id = info->id;
+		pos->block_id = info->block_id;
 		pos->block_offset = 0;
 		pos->global_offset = off;
 	}
@@ -546,6 +589,9 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 	return true;
 }
 
+/*
+ * file_read -- reads file
+ */
 static size_t
 file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		char *buf, size_t count)
@@ -662,6 +708,9 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	return bytes_read;
 }
 
+/*
+ * pmemfile_read -- reads file
+ */
 ssize_t
 pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 {
@@ -704,6 +753,9 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 	return (ssize_t)bytes_read;
 }
 
+/*
+ * pmemfile_lseek64 -- changes file current offset
+ */
 off64_t
 pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 {
@@ -752,6 +804,9 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 	return ret;
 }
 
+/*
+ * pmemfile_lseek -- changes file current offset
+ */
 off_t
 pmemfile_lseek(PMEMfilepool *pfp, PMEMfile *file, off_t offset, int whence)
 {

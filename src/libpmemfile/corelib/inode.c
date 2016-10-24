@@ -96,6 +96,9 @@ struct pmemfile_inode_map {
 	size_t inodes;
 };
 
+/*
+ * inode_map_rand_params -- randomizes coefficients of the hashmap function
+ */
 static void
 inode_map_rand_params(struct pmemfile_inode_map *c)
 {
@@ -106,6 +109,9 @@ inode_map_rand_params(struct pmemfile_inode_map *c)
 	c->hash_fun_b = (uint32_t)rand();
 }
 
+/*
+ * file_inode_map_alloc -- allocates inode hashmap
+ */
 struct pmemfile_inode_map *
 file_inode_map_alloc()
 {
@@ -122,6 +128,9 @@ file_inode_map_alloc()
 	return c;
 }
 
+/*
+ * file_inode_map_free -- destroys inode hashmap
+ */
 void
 file_inode_map_free(struct pmemfile_inode_map *c)
 {
@@ -138,12 +147,18 @@ file_inode_map_free(struct pmemfile_inode_map *c)
 	Free(c);
 }
 
+/*
+ * file_hash_inode -- returns hash value of the inode
+ */
 static inline size_t
 file_hash_inode(struct pmemfile_inode_map *c, TOID(struct pmemfile_inode) inode)
 {
 	return (c->hash_fun_a * inode.oid.off + c->hash_fun_b) % c->hash_fun_p;
 }
 
+/*
+ * file_inode_map_rebuild -- rebuilds the whole inode hashmap
+ */
 static bool
 file_inode_map_rebuild(struct pmemfile_inode_map *c, size_t new_sz)
 {
@@ -182,6 +197,9 @@ file_inode_map_rebuild(struct pmemfile_inode_map *c, size_t new_sz)
 	return true;
 }
 
+/*
+ * file_vinode_unregister_locked -- removes vinode from  inode map
+ */
 static void
 file_vinode_unregister_locked(PMEMfilepool *pfp,
 		struct pmemfile_vinode *vinode)
@@ -211,6 +229,9 @@ file_vinode_unregister_locked(PMEMfilepool *pfp,
 	Free(vinode);
 }
 
+/*
+ * _file_vinode_get -- (internal) deals with vinode life time related to inode
+ */
 static struct pmemfile_vinode *
 _file_vinode_get(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode, bool ref, bool is_new)
@@ -304,6 +325,11 @@ end:
 	return vinode;
 }
 
+/*
+ * file_vinode_get -- returns volatile inode
+ *
+ * May be called outside of transaction.
+ */
 struct pmemfile_vinode *
 file_vinode_get(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode, bool ref)
@@ -311,6 +337,12 @@ file_vinode_get(PMEMfilepool *pfp,
 	return _file_vinode_get(pfp, inode, ref, false);
 }
 
+/*
+ * file_vinode_ref_new -- increases inode reference counter
+ *
+ * Assumes inode was allocated in the same transaction.
+ * Return volatile inode.
+ */
 struct pmemfile_vinode *
 file_vinode_ref_new(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode)
@@ -318,6 +350,12 @@ file_vinode_ref_new(PMEMfilepool *pfp,
 	return _file_vinode_get(pfp, inode, true, true);
 }
 
+/*
+ * file_vinode_ref -- increases inode reference counter
+ *
+ * Assumes inode was not allocated in the same transaction.
+ * Return volatile inode.
+ */
 struct pmemfile_vinode *
 file_vinode_ref(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode)
@@ -325,6 +363,11 @@ file_vinode_ref(PMEMfilepool *pfp,
 	return _file_vinode_get(pfp, inode, true, false);
 }
 
+/*
+ * file_vinode_unref -- decreases inode reference counter
+ *
+ * Must be called in transaction.
+ */
 void
 file_vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 {
@@ -350,6 +393,9 @@ file_vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	rwlock_tx_unlock_on_commit(&c->rwlock);
 }
 
+/*
+ * file_vinode_unref_tx -- decreases inode reference counter
+ */
 void
 file_vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 {
@@ -362,6 +408,9 @@ file_vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	} TX_END
 }
 
+/*
+ * file_get_time -- sets *t to current time
+ */
 void
 file_get_time(struct pmemfile_time *t)
 {
@@ -411,6 +460,9 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 	return file_vinode_ref_new(pfp, tinode);
 }
 
+/*
+ * file_assert_no_dentries -- checks that directory has no entries
+ */
 static void
 file_assert_no_dentries(struct pmemfile_dir *dir)
 {
