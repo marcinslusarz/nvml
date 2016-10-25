@@ -29,30 +29,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-#
-# src/libpmemfile/corelib/libpmemfile-core.map -- linker map file for libpmemfile-core
-#
-{
-	global:
-		pmemfile_errormsg;
-		pmemfile_mkfs;
-		pmemfile_pool_open;
-		pmemfile_pool_close;
-		pmemfile_open;
-		pmemfile_close;
-		pmemfile_link;
-		pmemfile_unlink;
-		pmemfile_read;
-		pmemfile_write;
-		pmemfile_lseek;
-		pmemfile_lseek64;
-		pmemfile_stat;
-		pmemfile_fstat;
 
-		# temporary, do NOT use
-		_pmemfile_list_root;
-		_pmemfile_stats;
-		_pmemfile_file_size;
-	local:
-		*;
-};
+#
+# src/test/file_core_stat/Makefile -- build file_core_stat unit test
+#
+TARGET = file_core_stat
+OBJS = file_core_stat.o
+
+LIBPMEM=y
+LIBPMEMOBJ=y
+LIBPMEMFILE=y
+
+include ../Makefile.inc

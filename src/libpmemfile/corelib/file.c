@@ -183,7 +183,7 @@ file_check_flags(int flags)
 /*
  * file_check_pathname -- (internal) validates pathname
  */
-static const char *
+const char *
 file_check_pathname(const char *pathname)
 {
 	const char *orig_pathname = pathname;
