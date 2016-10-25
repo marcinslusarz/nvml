@@ -1,3 +1,4 @@
+#!/bin/bash -e
 #
 # Copyright 2016, Intel Corporation
 #
@@ -29,30 +30,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-#
-# src/libpmemfile/corelib/libpmemfile-core.map -- linker map file for libpmemfile-core
-#
-{
-	global:
-		pmemfile_errormsg;
-		pmemfile_mkfs;
-		pmemfile_pool_open;
-		pmemfile_pool_close;
-		pmemfile_open;
-		pmemfile_close;
-		pmemfile_link;
-		pmemfile_unlink;
-		pmemfile_read;
-		pmemfile_write;
-		pmemfile_lseek;
-		pmemfile_lseek64;
-		pmemfile_stat;
-		pmemfile_fstat;
 
-		# temporary, do NOT use
-		_pmemfile_list_root;
-		_pmemfile_stats;
-		_pmemfile_file_size;
-	local:
-		*;
-};
+export UNITTEST_NAME=file_core_stat/TEST0
+export UNITTEST_NUM=0
+
+# standard unit test setup
+. ../unittest/unittest.sh
+
+require_test_type short
+require_fs_type pmem
+require_build_type debug nondebug
+
+setup
+
+expect_normal_exit ./file_core_stat$EXESUFFIX $DIR/testfile1
+
+check
+
+pass

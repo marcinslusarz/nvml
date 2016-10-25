@@ -55,7 +55,8 @@ FILE_TESTS = \
 	file_core_basic\
 	file_core_crash\
 	file_core_mt\
-	file_core_rw
+	file_core_rw\
+	file_core_stat
 
 LOG_TESTS = \
 	log_basic\

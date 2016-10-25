@@ -81,4 +81,6 @@ struct pmemfile_file {
 	} pos;
 };
 
+const char *file_check_pathname(const char *pathname);
+
 #endif

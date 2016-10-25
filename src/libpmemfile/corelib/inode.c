@@ -39,6 +39,7 @@
 
 #include "callbacks.h"
 #include "data.h"
+#include "dir.h"
 #include "inode.h"
 #include "inode_array.h"
 #include "internal.h"
@@ -518,4 +519,100 @@ file_inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode)
 		FATAL("unknown inode type 0x%lx", inode->flags);
 	}
 	TX_FREE(tinode);
+}
+
+static inline struct timespec
+pmemfile_time_to_timespec(const struct pmemfile_time *t)
+{
+	struct timespec tm;
+	tm.tv_sec = t->sec;
+	tm.tv_nsec = t->nsec;
+	return tm;
+}
+
+/*
+ * file_fill_stat
+ */
+static int
+file_fill_stat(struct pmemfile_vinode *vinode, struct stat *buf)
+{
+	struct pmemfile_inode *inode = D_RW(vinode->inode);
+
+	memset(buf, 0, sizeof(*buf));
+	buf->st_dev = vinode->inode.oid.pool_uuid_lo;
+	buf->st_ino = vinode->inode.oid.off;
+	buf->st_mode = inode->flags & (S_IFMT | S_IRWXU | S_IRWXG | S_IRWXO);
+	buf->st_nlink = inode->nlink;
+	buf->st_uid = inode->uid;
+	buf->st_gid = inode->gid;
+	buf->st_rdev = 0;
+	if ((off_t)inode->size < 0) {
+		errno = EOVERFLOW;
+		return -1;
+	}
+	buf->st_size = (off_t)inode->size;
+	buf->st_blksize = 1;
+	if ((blkcnt_t)inode->size < 0) {
+		errno = EOVERFLOW;
+		return -1;
+	}
+	buf->st_blocks = (blkcnt_t)inode->size;
+	buf->st_atim = pmemfile_time_to_timespec(&inode->atime);
+	buf->st_ctim = pmemfile_time_to_timespec(&inode->ctime);
+	buf->st_mtim = pmemfile_time_to_timespec(&inode->mtime);
+
+	return 0;
+}
+
+/*
+ * pmemfile_stat
+ */
+int
+pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
+{
+	if (!path || !buf) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	LOG(LDBG, "path %s", path);
+
+	path = file_check_pathname(path);
+	if (!path)
+		return -1;
+
+	struct pmemfile_vinode *parent_vinode = pfp->root;
+
+	file_inode_ref(pfp, parent_vinode);
+
+	struct pmemfile_vinode *vinode =
+			file_lookup_dentry(pfp, parent_vinode, path);
+
+	if (!vinode) {
+		int oerrno = errno;
+		file_vinode_unref_tx(pfp, parent_vinode);
+		errno = oerrno;
+		return -1;
+	}
+
+	int ret = file_fill_stat(vinode, buf);
+
+	file_vinode_unref_tx(pfp, vinode);
+	file_vinode_unref_tx(pfp, parent_vinode);
+
+	return ret;
+}
+
+/*
+ * pmemfile_fstat
+ */
+int
+pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
+{
+	if (!file || !buf) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	return file_fill_stat(file->vinode, buf);
 }
