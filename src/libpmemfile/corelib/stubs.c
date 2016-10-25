@@ -86,29 +86,6 @@ pmemfile_lstat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 }
 
 int
-pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
-{
-	check_pfp(pfp);
-
-	(void) path;
-	(void) buf;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
-pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
-{
-	check_pfp_file(pfp, file);
-
-	(void) buf;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_readlink(PMEMfilepool *pfp, const char *path,
 			char *buf, size_t buf_len)
 {

@@ -255,11 +255,15 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	util_rwlock_rdlock(&parent->rwlock);
 
-	struct pmemfile_dirent *dentry =
+	if (name[0] == 0) {
+		vinode = file_vinode_ref(pfp, parent->inode);
+	} else {
+		struct pmemfile_dirent *dentry =
 			file_lookup_dentry_locked(pfp, parent, name, NULL);
-	if (dentry) {
-		vinode = file_vinode_ref(pfp, dentry->inode);
-		file_set_path_debug(pfp, parent, vinode, name);
+		if (dentry) {
+			vinode = file_vinode_ref(pfp, dentry->inode);
+			file_set_path_debug(pfp, parent, vinode, name);
+		}
 	}
 
 	util_rwlock_unlock(&parent->rwlock);
