@@ -58,8 +58,6 @@ file_initialize_super(PMEMfilepool *pfp)
 	struct pmemfile_super *super = D_RW(pfp->super);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		TX_ADD(pfp->super);
-
 		if (super->initialized) {
 			pfp->root = file_vinode_ref(pfp, super->root_inode);
 #ifdef DEBUG
@@ -68,6 +66,7 @@ file_initialize_super(PMEMfilepool *pfp)
 		} else {
 			pfp->root = file_new_dir(pfp, NULL, "/");
 
+			TX_ADD(pfp->super);
 			super->root_inode = pfp->root->inode;
 			super->initialized = 1;
 		}
