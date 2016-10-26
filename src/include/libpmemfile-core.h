@@ -81,6 +81,10 @@ off64_t pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset,
 		int whence);
 #endif
 
+int pmemfile_stat(PMEMfilepool *, const char *path, struct stat *buf);
+int pmemfile_lstat(PMEMfilepool *, const char *path, struct stat *buf);
+int pmemfile_fstat(PMEMfilepool *, PMEMfile *file, struct stat *buf);
+
 /* temporary debugging functions, do NOT use outside of tests */
 void _pmemfile_list_root(PMEMfilepool *pfp, const char *msg);
 void _pmemfile_stats(PMEMfilepool *pfp);

@@ -616,3 +616,13 @@ pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
 
 	return file_fill_stat(file->vinode, buf);
 }
+
+/*
+ * pmemfile_lstat
+ */
+int
+pmemfile_lstat(PMEMfilepool *pfp, const char *path, struct stat *buf)
+{
+	// XXX because symlinks are not yet implemented
+	return pmemfile_stat(pfp, path, buf);
+}

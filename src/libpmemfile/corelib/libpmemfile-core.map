@@ -48,6 +48,7 @@
 		pmemfile_lseek64;
 		pmemfile_stat;
 		pmemfile_fstat;
+		pmemfile_lstat;
 
 		pmemfile_chdir;
 		pmemfile_lstat;
