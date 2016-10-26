@@ -122,7 +122,7 @@ file_check_flags(int flags)
 	}
 
 	if (flags & O_NONBLOCK) {
-		LOG(LSUP, "O_NONBLOCK is not supported (yet)");
+		LOG(LSUP, "O_NONBLOCK is not going to be supported");
 		errno = ENOTSUP;
 		return -1;
 	}
