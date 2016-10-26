@@ -55,9 +55,6 @@ struct linux_dirent64;
 
 int pmemfile_chdir(PMEMfilepool *, const char *path);
 int pmemfile_fchdir(PMEMfilepool *, PMEMfile *);
-int pmemfile_stat(PMEMfilepool *, const char *path, struct stat *buf);
-int pmemfile_lstat(PMEMfilepool *, const char *path, struct stat *buf);
-int pmemfile_fstat(PMEMfilepool *, PMEMfile *file, struct stat *buf);
 int pmemfile_readlink(PMEMfilepool *, const char *path,
 			char *buf, size_t buf_len);
 char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t buf_len);
