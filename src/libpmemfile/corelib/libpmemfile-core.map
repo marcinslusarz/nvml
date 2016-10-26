@@ -49,6 +49,34 @@
 		pmemfile_stat;
 		pmemfile_fstat;
 
+		pmemfile_chdir;
+		pmemfile_lstat;
+		pmemfile_readlink;
+		pmemfile_getcwd;
+		pmemfile_pread;
+		pmemfile_pwrite;
+		pmemfile_access;
+		pmemfile_sync;
+		pmemfile_fdatasync;
+		pmemfile_rename;
+		pmemfile_renameat;
+		pmemfile_openat;
+		pmemfile_flock;
+		pmemfile_truncate;
+		pmemfile_ftruncate;
+		pmemfile_getdents;
+		pmemfile_getdents64;
+		pmemfile_fchdir;
+		pmemfile_mkdir;
+		pmemfile_mkdirat;
+		pmemfile_rmdir;
+		pmemfile_symlink;
+		pmemfile_symlinkat;
+		pmemfile_chmod;
+		pmemfile_fchmod;
+		pmemfile_dup;
+		pmemfile_dup2;
+
 		# temporary, do NOT use
 		_pmemfile_list_root;
 		_pmemfile_stats;
