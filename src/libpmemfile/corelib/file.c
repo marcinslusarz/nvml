@@ -116,9 +116,9 @@ file_check_flags(int flags)
 	}
 
 	if (flags & O_NOFOLLOW) {
-		LOG(LSUP, "O_NOFOLLOW is not supported (yet)");
-		errno = ENOTSUP;
-		return -1;
+		LOG(LSUP, "O_NOFOLLOW");
+		// XXX we don't support symlinks yet, so we can just ignore it
+		flags &= ~O_NOFOLLOW;
 	}
 
 	if (flags & O_NONBLOCK) {
