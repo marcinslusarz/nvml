@@ -69,9 +69,12 @@ dump_stat(struct stat *st, const char *path)
 	UT_OUT("st_size:    %ld", st->st_size);
 	UT_OUT("st_blksize: %ld", st->st_blksize);
 	UT_OUT("st_blocks:  %ld", st->st_blocks);
-	UT_OUT("st_atim:    %ld.%.9ld, %s", st->st_atim.tv_sec, st->st_atim.tv_nsec, timespec_to_str(&st->st_atim));
-	UT_OUT("st_mtim:    %ld.%.9ld, %s", st->st_mtim.tv_sec, st->st_mtim.tv_nsec, timespec_to_str(&st->st_mtim));
-	UT_OUT("st_ctim:    %ld.%.9ld, %s", st->st_ctim.tv_sec, st->st_ctim.tv_nsec, timespec_to_str(&st->st_ctim));
+	UT_OUT("st_atim:    %ld.%.9ld, %s", st->st_atim.tv_sec,
+			st->st_atim.tv_nsec, timespec_to_str(&st->st_atim));
+	UT_OUT("st_mtim:    %ld.%.9ld, %s", st->st_mtim.tv_sec,
+			st->st_mtim.tv_nsec, timespec_to_str(&st->st_mtim));
+	UT_OUT("st_ctim:    %ld.%.9ld, %s", st->st_ctim.tv_sec,
+			st->st_ctim.tv_nsec, timespec_to_str(&st->st_ctim));
 	UT_OUT("---");
 }
 
