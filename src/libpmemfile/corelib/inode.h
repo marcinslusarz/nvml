@@ -59,7 +59,7 @@ struct pmemfile_vinode {
 	struct {
 		struct pmemfile_inode_array *arr;
 		unsigned idx;
-	} opened;
+	} orphaned;
 
 	struct ctree *blocks;
 };

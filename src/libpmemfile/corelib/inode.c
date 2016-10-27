@@ -383,12 +383,12 @@ file_vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 		return;
 	}
 
-	struct pmemfile_inode_array *cur = vinode->opened.arr;
-	if (cur)
-		file_inode_array_unregister(pfp, cur, vinode->opened.idx);
+	if (D_RO(vinode->inode)->nlink == 0) {
+		file_inode_array_unregister(pfp, vinode->orphaned.arr,
+				vinode->orphaned.idx);
 
-	if (D_RO(vinode->inode)->nlink == 0)
 		file_inode_free(pfp, vinode->inode);
+	}
 
 	cb_push_back(TX_STAGE_ONCOMMIT,
 		(cb_basic)file_vinode_unregister_locked,
