@@ -148,7 +148,7 @@ file_cleanup_inode_array(PMEMfilepool *pfp,
 					TOID_NULL(struct pmemfile_inode_array);
 		}
 	} TX_ONABORT {
-		FATAL("!cannot cleanup list of previously opened files");
+		FATAL("!cannot cleanup list of previously deleted files");
 	} TX_END
 }
 
@@ -231,7 +231,7 @@ pmemfile_pool_open(const char *pathname)
 		goto no_super;
 	}
 
-	file_cleanup_inode_array(pfp, D_RO(pfp->super)->opened_inodes);
+	file_cleanup_inode_array(pfp, D_RO(pfp->super)->orphaned_inodes);
 
 	return pfp;
 

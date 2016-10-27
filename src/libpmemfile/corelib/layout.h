@@ -167,8 +167,8 @@ struct pmemfile_super {
 	/* Root directory inode */
 	TOID(struct pmemfile_inode) root_inode;
 
-	/* List of arrays of opened inodes. */
-	TOID(struct pmemfile_inode_array) opened_inodes;
+	/* List of arrays of inodes that were deleted, but are still opened. */
+	TOID(struct pmemfile_inode_array) orphaned_inodes;
 
 	/* Flag indicating mkfs finished its work. */
 	char initialized;

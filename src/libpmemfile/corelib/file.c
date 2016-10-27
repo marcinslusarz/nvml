@@ -207,37 +207,6 @@ file_check_pathname(const char *pathname)
 }
 
 /*
- * file_register_opened_inode -- (internal) register specified inode in
- * opened_inodes array
- */
-static void
-file_register_opened_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
-{
-	LOG(LDBG, "inode 0x%lx path %s", vinode->inode.oid.off,
-			pmfi_path(vinode));
-
-	rwlock_tx_wlock(&vinode->rwlock);
-
-	if (vinode->opened.arr == NULL) {
-		rwlock_tx_wlock(&pfp->rwlock);
-
-		TOID(struct pmemfile_inode_array) opened =
-				D_RW(pfp->super)->opened_inodes;
-		if (TOID_IS_NULL(opened)) {
-			opened = TX_ZNEW(struct pmemfile_inode_array);
-			TX_SET(pfp->super, opened_inodes, opened);
-		}
-
-		file_inode_array_add(pfp, opened, vinode,
-				&vinode->opened.arr, &vinode->opened.idx);
-
-		rwlock_tx_unlock_on_commit(&pfp->rwlock);
-	}
-
-	rwlock_tx_unlock_on_commit(&vinode->rwlock);
-}
-
-/*
  * pmemfile_open -- open file
  */
 PMEMfile *
@@ -334,8 +303,6 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 			rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 		}
-
-		file_register_opened_inode(pfp, vinode);
 
 		file = Zalloc(sizeof(*file));
 		if (!file)

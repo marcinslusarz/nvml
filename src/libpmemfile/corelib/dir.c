@@ -39,6 +39,7 @@
 
 #include "dir.h"
 #include "inode.h"
+#include "inode_array.h"
 #include "internal.h"
 #include "locks.h"
 #include "out.h"
@@ -272,6 +273,33 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 }
 
 /*
+ * file_register_orphaned_inode -- (internal) register specified inode in
+ * orphaned_inodes array
+ */
+static void
+file_register_orphaned_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
+{
+	LOG(LDBG, "inode 0x%lx path %s", vinode->inode.oid.off,
+			pmfi_path(vinode));
+
+	ASSERTeq(vinode->orphaned.arr, NULL);
+
+	rwlock_tx_wlock(&pfp->rwlock);
+
+	TOID(struct pmemfile_inode_array) orphaned =
+			D_RW(pfp->super)->orphaned_inodes;
+	if (TOID_IS_NULL(orphaned)) {
+		orphaned = TX_ZNEW(struct pmemfile_inode_array);
+		TX_SET(pfp->super, orphaned_inodes, orphaned);
+	}
+
+	file_inode_array_add(pfp, orphaned, vinode,
+			&vinode->orphaned.arr, &vinode->orphaned.idx);
+
+	rwlock_tx_unlock_on_commit(&pfp->rwlock);
+}
+
+/*
  * file_unlink_dentry -- removes dentry from directory
  *
  * Must be called in transaction. Caller must have exclusive access to parent
@@ -305,7 +333,8 @@ file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	TX_ADD_FIELD(tinode, nlink);
 	TX_ADD_DIRECT(dentry);
 
-	--inode->nlink;
+	if (--inode->nlink == 0)
+		file_register_orphaned_inode(pfp, *vinode);
 	rwlock_tx_unlock_on_commit(&(*vinode)->rwlock);
 
 	dentry->name[0] = '\0';
