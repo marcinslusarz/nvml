@@ -536,6 +536,12 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 
 		file_write(pfp, file, inode, buf, count);
 
+		if (count > 0) {
+			struct pmemfile_time tm;
+			file_get_time(&tm);
+			TX_SET(vinode->inode, mtime, tm);
+		}
+
 		rwlock_tx_unlock_on_commit(&vinode->rwlock);
 	} TX_ONABORT {
 		error = 1;
@@ -865,6 +871,10 @@ file_truncate(struct pmemfile_vinode *vinode)
 
 	TX_ADD_DIRECT(&inode->last_block_fill);
 	inode->last_block_fill = 0;
+
+	struct pmemfile_time tm;
+	file_get_time(&tm);
+	TX_SET(vinode->inode, mtime, tm);
 
 	// we don't have to rollback destroy of data state on abort, because
 	// it will be rebuilded when it's needed
