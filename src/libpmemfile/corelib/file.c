@@ -109,9 +109,8 @@ file_check_flags(int flags)
 	}
 
 	if (flags & O_NOATIME) {
-		LOG(LSUP, "O_NOATIME is not supported (yet)");
-		errno = ENOTSUP;
-		return -1;
+		LOG(LTRC, "O_NOATIME");
+		flags &= ~O_NOATIME;
 	}
 
 	if (flags & O_NOFOLLOW) {
@@ -323,6 +322,9 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 			file->flags = PFILE_WRITE;
 		else if ((flags & O_ACCMODE) == O_RDWR)
 			file->flags = PFILE_READ | PFILE_WRITE;
+
+		if (flags & O_NOATIME)
+			file->flags |= PFILE_NOATIME;
 	} TX_ONABORT {
 		error = 1;
 	} TX_END
