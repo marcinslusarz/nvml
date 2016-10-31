@@ -85,6 +85,13 @@ int pmemfile_stat(PMEMfilepool *, const char *path, struct stat *buf);
 int pmemfile_lstat(PMEMfilepool *, const char *path, struct stat *buf);
 int pmemfile_fstat(PMEMfilepool *, PMEMfile *file, struct stat *buf);
 
+struct linux_dirent;
+struct linux_dirent64;
+int pmemfile_getdents(PMEMfilepool *, PMEMfile *file,
+			struct linux_dirent *dirp, unsigned count);
+int pmemfile_getdents64(PMEMfilepool *, PMEMfile *file,
+			struct linux_dirent64 *dirp, unsigned count);
+
 /* temporary debugging functions, do NOT use outside of tests */
 void _pmemfile_list_root(PMEMfilepool *pfp, const char *msg);
 void _pmemfile_stats(PMEMfilepool *pfp);
