@@ -89,9 +89,8 @@ file_check_flags(int flags)
 	}
 
 	if (flags & O_DIRECTORY) {
-		LOG(LSUP, "O_DIRECTORY is not supported (yet)");
-		errno = ENOTSUP;
-		return -1;
+		LOG(LSUP, "O_DIRECTORY");
+		flags &= ~O_DIRECTORY;
 	}
 
 	if (flags & O_DSYNC) {
@@ -273,6 +272,9 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 						orig_pathname);
 				pmemobj_tx_abort(ENOENT);
 			}
+
+			if (flags & O_DIRECTORY)
+				LOG(LDBG, "O_DIRECTORY is ignored for O_CREAT");
 		} else {
 			if ((flags & (O_CREAT | O_EXCL)) ==
 					(O_CREAT | O_EXCL)) {
@@ -281,14 +283,16 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 				pmemobj_tx_abort(EEXIST);
 			}
 
-			if (file_is_dir(vinode)) {
-				LOG(LSUP, "opening directories is not supported"
-						" (yet)");
-				pmemobj_tx_abort(EISDIR);
-			}
+			if ((flags & O_DIRECTORY) && !file_is_dir(vinode))
+				pmemobj_tx_abort(ENOTDIR);
 
-			if (flags & O_TRUNC)
+			if (flags & O_TRUNC) {
+				if (flags & O_DIRECTORY) {
+					LOG(LUSR, "truncate directory? no way");
+					pmemobj_tx_abort(EINVAL);
+				}
 				file_truncate(vinode);
+			}
 		}
 
 		if (vinode == NULL) {

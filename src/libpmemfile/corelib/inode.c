@@ -470,7 +470,7 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 static void
 file_assert_no_dentries(struct pmemfile_dir *dir)
 {
-	for (uint64_t i = 0; i < dir->num_elements; ++i)
+	for (uint32_t i = 0; i < dir->num_elements; ++i)
 		if (dir->dentries[i].inode.oid.off)
 			FATAL("Trying to free non-empty directory");
 }

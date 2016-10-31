@@ -74,7 +74,7 @@ struct pmemfile_dirent {
 
 /* Directory */
 struct pmemfile_dir {
-	uint64_t num_elements;
+	uint32_t num_elements;
 	TOID(struct pmemfile_dir) next;
 	struct pmemfile_dirent dentries[];
 };
@@ -111,7 +111,7 @@ struct pmemfile_inode {
 	struct pmemfile_time mtime;
 
 	/* Hard link counter. */
-	nlink_t nlink;
+	uint64_t nlink;
 
 	/* Size of file. */
 	uint64_t size;
