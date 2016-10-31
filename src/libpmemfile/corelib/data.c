@@ -526,13 +526,13 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 
 	util_mutex_lock(&file->mutex);
 
-	if (!vinode->blocks)
-		file_rebuild_block_tree(vinode);
-
 	memcpy(&pos, &file->pos, sizeof(pos));
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&vinode->rwlock);
+
+		if (!vinode->blocks)
+			file_rebuild_block_tree(vinode);
 
 		file_write(pfp, file, inode, buf, count);
 
@@ -740,10 +740,13 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 
 	util_mutex_lock(&file->mutex);
-	util_rwlock_rdlock(&vinode->rwlock);
 
-	if (!vinode->blocks)
+	if (!vinode->blocks) {
+		util_rwlock_wrlock(&vinode->rwlock);
 		file_rebuild_block_tree(vinode);
+	} else {
+		util_rwlock_rdlock(&vinode->rwlock);
+	}
 
 	bytes_read = file_read(pfp, file, inode, buf, count);
 
@@ -863,5 +866,7 @@ file_truncate(struct pmemfile_vinode *vinode)
 	TX_ADD_DIRECT(&inode->last_block_fill);
 	inode->last_block_fill = 0;
 
+	// we don't have to rollback destroy of data state on abort, because
+	// it will be rebuilded when it's needed
 	file_destroy_data_state(vinode);
 }

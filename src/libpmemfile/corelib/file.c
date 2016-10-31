@@ -275,6 +275,17 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 			if (flags & O_DIRECTORY)
 				LOG(LDBG, "O_DIRECTORY is ignored for O_CREAT");
+
+			// create file
+			struct pmemfile_time t;
+
+			rwlock_tx_wlock(&parent_vinode->rwlock);
+
+			vinode = file_inode_alloc(pfp, S_IFREG | mode, &t);
+			file_add_dentry(pfp, parent_vinode, pathname,
+					vinode, &t);
+
+			rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 		} else {
 			if ((flags & (O_CREAT | O_EXCL)) ==
 					(O_CREAT | O_EXCL)) {
@@ -291,21 +302,13 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 					LOG(LUSR, "truncate directory? no way");
 					pmemobj_tx_abort(EINVAL);
 				}
+
+				rwlock_tx_wlock(&vinode->rwlock);
+
 				file_truncate(vinode);
+
+				rwlock_tx_unlock_on_commit(&vinode->rwlock);
 			}
-		}
-
-		if (vinode == NULL) {
-			// create file
-			struct pmemfile_time t;
-
-			rwlock_tx_wlock(&parent_vinode->rwlock);
-
-			vinode = file_inode_alloc(pfp, S_IFREG | mode, &t);
-			file_add_dentry(pfp, parent_vinode, pathname,
-					vinode, &t);
-
-			rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 		}
 
 		file = Zalloc(sizeof(*file));
