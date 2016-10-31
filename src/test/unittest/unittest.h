@@ -144,6 +144,16 @@ static inline int ut_util_stat(const char *path,
 #endif
 
 /*
+ * flags that control output
+ */
+#define OF_NONL		1	/* do not append newline */
+#define OF_ERR		2	/* output is error output */
+#define OF_TRACE	4	/* output to trace file only */
+#define OF_LOUD		8	/* output even in Quiet mode */
+#define OF_NAME		16	/* include Testname in the output */
+#define OF_NOPREFIX	32	/* do not add prefix info */
+
+/*
  * unit test support...
  */
 void ut_start(const char *file, int line, const char *func,
@@ -160,6 +170,9 @@ void ut_fatal(const char *file, int line, const char *func,
 void ut_out(const char *file, int line, const char *func,
 	const char *fmt, ...)
 	__attribute__((format(printf, 4, 5)));
+void ut_outf(const char *file, int line, const char *func, int flags,
+	const char *fmt, ...)
+	__attribute__((format(printf, 5, 6)));
 void ut_err(const char *file, int line, const char *func,
 	const char *fmt, ...)
 	__attribute__((format(printf, 4, 5)));
@@ -179,6 +192,10 @@ void ut_err(const char *file, int line, const char *func,
 /* normal output */
 #define UT_OUT(...)\
     ut_out(__FILE__, __LINE__, __func__, __VA_ARGS__)
+
+/* normal output */
+#define UT_OUTF(...)\
+    ut_outf(__FILE__, __LINE__, __func__, __VA_ARGS__)
 
 /* error output */
 #define UT_ERR(...)\

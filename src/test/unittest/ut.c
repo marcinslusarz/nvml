@@ -135,15 +135,6 @@ static char *Testname;		/* set by UNITTEST_NAME env variable */
 unsigned long Ut_pagesize;
 
 /*
- * flags that control output
- */
-#define OF_NONL		1	/* do not append newline */
-#define OF_ERR		2	/* output is error output */
-#define OF_TRACE	4	/* output to trace file only */
-#define OF_LOUD		8	/* output even in Quiet mode */
-#define OF_NAME		16	/* include Testname in the output */
-
-/*
  * vout -- common output code, all output happens here
  */
 static void
@@ -550,6 +541,27 @@ ut_out(const char *file, int line, const char *func,
 
 	prefix(file, line, func, 0);
 	vout(0, NULL, fmt, ap);
+
+	va_end(ap);
+
+	errno = saveerrno;
+}
+
+/*
+ * ut_outf -- output to stdout
+ */
+void
+ut_outf(const char *file, int line, const char *func, int flags,
+    const char *fmt, ...)
+{
+	va_list ap;
+	int saveerrno = errno;
+
+	va_start(ap, fmt);
+
+	if (!(flags & OF_NOPREFIX))
+		prefix(file, line, func, 0);
+	vout(flags, NULL, fmt, ap);
 
 	va_end(ap);
 
