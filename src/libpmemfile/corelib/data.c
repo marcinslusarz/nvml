@@ -717,6 +717,20 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	return bytes_read;
 }
 
+static int
+time_cmp(const struct pmemfile_time *t1, const struct pmemfile_time *t2)
+{
+	if (t1->sec < t2->sec)
+		return -1;
+	if (t1->sec > t2->sec)
+		return 1;
+	if (t1->nsec < t2->nsec)
+		return -1;
+	if (t1->nsec > t2->nsec)
+		return 1;
+	return 0;
+}
+
 /*
  * pmemfile_read -- reads file
  */
@@ -756,9 +770,33 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 
 	bytes_read = file_read(pfp, file, inode, buf, count);
 
-	file->offset += bytes_read;
+	struct pmemfile_time tm, tm1d;
+	file_get_time(&tm);
+	tm1d.nsec = tm.nsec;
+	tm1d.sec = tm.sec - 86400;
+
+	/* relatime */
+	bool update_atime = time_cmp(&inode->atime, &tm1d) < 0 ||
+			time_cmp(&inode->atime, &inode->ctime) < 0 ||
+			time_cmp(&inode->atime, &inode->mtime) < 0;
 
 	util_rwlock_unlock(&vinode->rwlock);
+
+	if (update_atime) {
+		TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
+			rwlock_tx_wlock(&vinode->rwlock);
+
+			TX_SET(vinode->inode, atime, tm);
+
+			rwlock_tx_unlock_on_commit(&vinode->rwlock);
+		} TX_ONABORT {
+			LOG(LINF, "can not update inode atime");
+		} TX_END
+	}
+
+
+	file->offset += bytes_read;
+
 	util_mutex_unlock(&file->mutex);
 
 	ASSERT(bytes_read <= count);
