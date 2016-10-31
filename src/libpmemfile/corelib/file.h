@@ -79,6 +79,14 @@ struct pmemfile_file {
 		/* Offset from the beginning of file. */
 		size_t global_offset;
 	} pos;
+
+	struct pmemfile_dir_pos {
+		/* Current directory list */
+		struct pmemfile_dir *dir;
+
+		/* Id of the current directory list */
+		unsigned dir_id;
+	} dir_pos;
 };
 
 const char *file_check_pathname(const char *pathname);

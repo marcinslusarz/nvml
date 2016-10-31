@@ -764,7 +764,14 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 {
 	LOG(LDBG, "file %p offset %lu whence %d", file, offset, whence);
 
-	if (!file_is_regular_file(file->vinode)) {
+	if (file_is_dir(file->vinode)) {
+		if (whence == SEEK_END) {
+			errno = EINVAL;
+			return -1;
+		}
+	} else if (file_is_regular_file(file->vinode)) {
+		/* Nothing to do for now */
+	} else {
 		errno = EINVAL;
 		return -1;
 	}

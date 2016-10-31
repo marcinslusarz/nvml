@@ -50,9 +50,6 @@
 #ifndef LIBPMEMFILE_CORE_STUBS_H
 #define LIBPMEMFILE_CORE_STUBS_H
 
-struct linux_dirent;
-struct linux_dirent64;
-
 int pmemfile_chdir(PMEMfilepool *, const char *path);
 int pmemfile_fchdir(PMEMfilepool *, PMEMfile *);
 int pmemfile_readlink(PMEMfilepool *, const char *path,
@@ -73,10 +70,6 @@ int pmemfile_openat(PMEMfilepool *, PMEMfile *at,
 int pmemfile_flock(PMEMfilepool *, PMEMfile *file, int operation);
 int pmemfile_truncate(PMEMfilepool *, const char *path, off_t length);
 int pmemfile_ftruncate(PMEMfilepool *, PMEMfile *file, off_t length);
-int pmemfile_getdents(PMEMfilepool *, PMEMfile *file,
-			struct linux_dirent *dirp, unsigned count);
-int pmemfile_getdents64(PMEMfilepool *, PMEMfile *file,
-			struct linux_dirent64 *dirp, unsigned count);
 int pmemfile_mkdir(PMEMfilepool *, const char *path, mode_t mode);
 int pmemfile_mkdirat(PMEMfilepool *, PMEMfile *file,
 			const char *path, mode_t mode);

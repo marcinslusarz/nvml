@@ -241,32 +241,6 @@ pmemfile_ftruncate(PMEMfilepool *pfp, PMEMfile *file, off_t length)
 }
 
 int
-pmemfile_getdents(PMEMfilepool *pfp, PMEMfile *file,
-			struct linux_dirent *dirp, unsigned count)
-{
-	check_pfp_file(pfp, file);
-
-	(void) dirp;
-	(void) count;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
-pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
-			struct linux_dirent64 *dirp, unsigned count)
-{
-	check_pfp_file(pfp, file);
-
-	(void) dirp;
-	(void) count;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_fchdir(PMEMfilepool *pfp, PMEMfile *file)
 {
 	check_pfp_file(pfp, file);
