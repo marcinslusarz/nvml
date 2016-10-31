@@ -335,8 +335,26 @@ file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	TX_ADD_FIELD(tinode, nlink);
 	TX_ADD_DIRECT(dentry);
 
+	struct pmemfile_time tm;
+	file_get_time(&tm);
+
 	if (--inode->nlink == 0)
 		file_register_orphaned_inode(pfp, *vinode);
+	else {
+		/*
+		 * From "stat" man page:
+		 * "The field st_ctime is changed by writing or by setting inode
+		 * information (i.e., owner, group, link count, mode, etc.)."
+		 */
+		TX_SET((*vinode)->inode, ctime, tm);
+	}
+	/*
+	 * From "stat" man page:
+	 * "st_mtime of a directory is changed by the creation
+	 * or deletion of files in that directory."
+	 */
+	TX_SET(parent->inode, mtime, tm);
+
 	rwlock_tx_unlock_on_commit(&(*vinode)->rwlock);
 
 	dentry->name[0] = '\0';
