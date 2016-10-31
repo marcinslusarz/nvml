@@ -498,9 +498,9 @@ file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		data += namelen + 1;
 
 		if (_file_is_regular_file(D_RO(dirent->inode)))
-			*data = DT_DIR;
-		else
 			*data = DT_REG;
+		else
+			*data = DT_DIR;
 		data++;
 
 		read1 += slen;
@@ -602,9 +602,9 @@ file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		data += 2;
 
 		if (_file_is_regular_file(D_RO(dirent->inode)))
-			*data = DT_DIR;
-		else
 			*data = DT_REG;
+		else
+			*data = DT_DIR;
 		data++;
 
 		memcpy(data, dirent->name, namelen + 1);
