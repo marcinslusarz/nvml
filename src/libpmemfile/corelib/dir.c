@@ -142,12 +142,16 @@ file_add_dentry(PMEMfilepool *pfp,
 		}
 
 		if (!found && TOID_IS_NULL(dir->next)) {
-			TX_SET_DIRECT(dir, next, TX_ZNEW(struct pmemfile_dir));
+			TX_SET_DIRECT(dir, next,
+					TX_ZALLOC(struct pmemfile_dir, 4096));
 
 			size_t sz = pmemobj_alloc_usable_size(dir->next.oid);
 
 			TX_ADD_DIRECT(&parent->size);
 			parent->size += sz;
+
+			D_RW(dir->next)->num_elements = (uint32_t) (sz /
+					sizeof(struct pmemfile_dirent));
 		}
 
 		dir = D_RW(dir->next);
@@ -264,7 +268,9 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	util_rwlock_rdlock(&parent->rwlock);
 
-	if (name[0] == 0) {
+	/* XXX hack, deal with this properly */
+	if (name[0] == 0 || (name[0] == '.' && (name[1] == 0 ||
+			(name[1] == '.' && name[2] == 0)))) {
 		vinode = file_vinode_ref(pfp, parent->inode);
 	} else {
 		struct pmemfile_dirent *dentry =
