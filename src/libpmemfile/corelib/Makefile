@@ -46,6 +46,7 @@ SOURCE = \
 	pmemfile-core.c\
 	stubs.c\
 	pool.c\
+	posix.c\
 	$(COMMON)/out.c\
 	$(COMMON)/util.c\
 	$(COMMON)/util_linux.c\

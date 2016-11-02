@@ -70,6 +70,10 @@ file_initialize_super(PMEMfilepool *pfp)
 			super->root_inode = pfp->root->inode;
 			super->initialized = 1;
 		}
+		pfp->cwd = file_vinode_ref(pfp, super->root_inode);
+#ifdef DEBUG
+		pfp->cwd->path = Strdup(pfp->root->path);
+#endif
 	} TX_ONABORT {
 		err = -1;
 	} TX_END

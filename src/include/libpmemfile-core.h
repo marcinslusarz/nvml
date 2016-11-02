@@ -60,12 +60,19 @@ void pmemfile_pool_close(PMEMfilepool *pfp);
 
 PMEMfile *pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags,
 		...);
+PMEMfile *pmemfile_openat(PMEMfilepool *pfp, PMEMfile *file,
+		const char *pathname, int flags,
+		...);
 /* XXX Should we get rid of PMEMfilepool pointer? */
 void pmemfile_close(PMEMfilepool *pfp, PMEMfile *file);
 
 int pmemfile_link(PMEMfilepool *pfp, const char *oldpath,
 		const char *newpath);
+int pmemfile_linkat(PMEMfilepool *pfp,
+		PMEMfile *file1, const char *oldpath,
+		PMEMfile *file2, const char *newpath);
 int pmemfile_unlink(PMEMfilepool *pfp, const char *pathname);
+int pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *file, const char *pathname);
 
 ssize_t pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 		size_t count);
@@ -82,7 +89,11 @@ off64_t pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset,
 #endif
 
 int pmemfile_stat(PMEMfilepool *, const char *path, struct stat *buf);
+int pmemfile_statat(PMEMfilepool *, PMEMfile *file, const char *path,
+			struct stat *buf);
 int pmemfile_lstat(PMEMfilepool *, const char *path, struct stat *buf);
+int pmemfile_lstatat(PMEMfilepool *, PMEMfile *file, const char *path,
+			struct stat *buf);
 int pmemfile_fstat(PMEMfilepool *, PMEMfile *file, struct stat *buf);
 
 struct linux_dirent;
@@ -111,6 +122,7 @@ const char *pmemfile_check_version(
 
 const char *pmemfile_errormsg(void);
 
+#define PMEMFILE_AT_CWD (((PMEMfile *) 0) - 1)
 #include "libpmemfile-core-stubs.h"
 
 #ifdef __cplusplus

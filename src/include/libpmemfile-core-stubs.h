@@ -65,8 +65,6 @@ int pmemfile_fdatasync(PMEMfilepool *, PMEMfile *);
 int pmemfile_rename(PMEMfilepool *, const char *old_path, const char *new_path);
 int pmemfile_renameat(PMEMfilepool *, PMEMfile *old_at, const char *old_path,
 				PMEMfile *new_at, const char *new_path);
-int pmemfile_openat(PMEMfilepool *, PMEMfile *at,
-		const char *path, int oflag, mode_t mode);
 int pmemfile_flock(PMEMfilepool *, PMEMfile *file, int operation);
 int pmemfile_truncate(PMEMfilepool *, const char *path, off_t length);
 int pmemfile_ftruncate(PMEMfilepool *, PMEMfile *file, off_t length);
