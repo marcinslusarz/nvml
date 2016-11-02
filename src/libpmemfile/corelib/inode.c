@@ -36,6 +36,8 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "callbacks.h"
 #include "data.h"
@@ -449,6 +451,8 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 	inode->mtime = *t;
 	inode->atime = *t;
 	inode->nlink = 0;
+	inode->uid = geteuid();
+	inode->gid = getegid();
 
 	if (_file_is_regular_file(inode))
 		inode->file_data.blocks.length =
