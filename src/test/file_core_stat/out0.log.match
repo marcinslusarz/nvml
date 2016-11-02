@@ -8,9 +8,9 @@ st_nlink:   2
 st_uid:     0
 st_gid:     0
 st_rdev:    0x0
-st_size:    0
+st_size:    4000
 st_blksize: 1
-st_blocks:  0
+st_blocks:  4000
 st_atim:    $(*)
 st_mtim:    $(*)
 st_ctim:    $(*)
