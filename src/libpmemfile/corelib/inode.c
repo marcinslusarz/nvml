@@ -455,11 +455,13 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 				(sizeof(inode->file_data) -
 				sizeof(inode->file_data.blocks)) /
 				sizeof(struct pmemfile_block);
-	else if (_file_is_dir(inode))
+	else if (_file_is_dir(inode)) {
 		inode->file_data.dir.num_elements =
 				(sizeof(inode->file_data) -
 				sizeof(inode->file_data.dir)) /
 				sizeof(struct pmemfile_dirent);
+		inode->size = sizeof(inode->file_data);
+	}
 
 	return file_vinode_ref_new(pfp, tinode);
 }
