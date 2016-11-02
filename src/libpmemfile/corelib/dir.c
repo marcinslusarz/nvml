@@ -141,8 +141,14 @@ file_add_dentry(PMEMfilepool *pfp,
 			}
 		}
 
-		if (!found && TOID_IS_NULL(dir->next))
+		if (!found && TOID_IS_NULL(dir->next)) {
 			TX_SET_DIRECT(dir, next, TX_ZNEW(struct pmemfile_dir));
+
+			size_t sz = pmemobj_alloc_usable_size(dir->next.oid);
+
+			TX_ADD_DIRECT(&parent->size);
+			parent->size += sz;
+		}
 
 		dir = D_RW(dir->next);
 	} while (dir);
