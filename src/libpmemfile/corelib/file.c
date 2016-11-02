@@ -145,11 +145,6 @@ file_check_flags(int flags)
 #endif
 
 	if (flags & O_TRUNC) {
-		if ((flags & O_ACCMODE) == O_RDONLY) {
-			LOG(LUSR, "O_TRUNC without write permissions");
-			errno = EACCES;
-			return -1;
-		}
 		LOG(LTRC, "O_TRUNC");
 		flags &= ~O_TRUNC;
 	}
@@ -300,6 +295,12 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 				if (flags & O_DIRECTORY) {
 					LOG(LUSR, "truncate directory? no way");
 					pmemobj_tx_abort(EINVAL);
+				}
+
+				if ((flags & O_ACCMODE) == O_RDONLY) {
+					LOG(LUSR, "O_TRUNC without write "
+							"permissions");
+					pmemobj_tx_abort(EACCES);
 				}
 
 				rwlock_tx_wlock(&vinode->rwlock);
