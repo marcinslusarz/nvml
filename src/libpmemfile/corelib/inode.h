@@ -116,4 +116,7 @@ void file_vinode_unref(PMEMfilepool *pfp,
 void file_vinode_unref_tx(PMEMfilepool *pfp,
 		struct pmemfile_vinode *vinode);
 
+void file_register_orphaned_inode(PMEMfilepool *pfp,
+		struct pmemfile_vinode *vinode);
+
 #endif

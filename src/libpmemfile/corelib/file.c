@@ -87,6 +87,12 @@ file_check_flags(int flags)
 		flags &= ~O_DIRECT;
 	}
 
+	/* O_TMPFILE contains O_DIRECTORY */
+	if ((flags & O_TMPFILE) == O_TMPFILE) {
+		LOG(LTRC, "O_TMPFILE");
+		flags &= ~O_TMPFILE;
+	}
+
 	if (flags & O_DIRECTORY) {
 		LOG(LSUP, "O_DIRECTORY");
 		flags &= ~O_DIRECTORY;
@@ -133,14 +139,6 @@ file_check_flags(int flags)
 		LOG(LINF, "O_SYNC is always enabled");
 		flags &= ~O_SYNC;
 	}
-
-#ifdef O_TMPFILE
-	if (flags & O_TMPFILE) {
-		LOG(LSUP, "O_TMPFILE is not supported (yet)");
-		errno = ENOTSUP;
-		return -1;
-	}
-#endif
 
 	if (flags & O_TRUNC) {
 		LOG(LTRC, "O_TRUNC");
@@ -220,7 +218,8 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	va_start(ap, flags);
 	mode_t mode;
 
-	if (flags & O_CREAT) {
+	/* NOTE: O_TMPFILE contains O_DIRECTORY */
+	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
 		mode = va_arg(ap, mode_t);
 		LOG(LDBG, "mode %o", mode);
 		if (mode & ~(mode_t)(S_IRWXU | S_IRWXG | S_IRWXO)) {
@@ -251,22 +250,40 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	old_vinode = vinode =
 			file_lookup_dentry(pfp, parent_vinode, pathname);
 
+	if ((flags & O_TMPFILE) == O_TMPFILE) {
+		int oerrno = errno;
+		file_vinode_unref_tx(pfp, parent_vinode);
+		parent_vinode = vinode;
+		old_vinode = vinode = NULL;
+		errno = oerrno;
+	}
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (vinode == NULL) {
-			if (errno != ENOENT) {
-				ERR("!pmemfile_lookup_dentry failed in "
-						"unexpected way");
-				pmemobj_tx_abort(errno);
-			}
+			if ((flags & O_TMPFILE) == O_TMPFILE) {
+				if (parent_vinode == NULL)
+					pmemobj_tx_abort(ENOENT);
+				if (!file_is_dir(parent_vinode))
+					pmemobj_tx_abort(ENOTDIR);
+				if ((flags & O_ACCMODE) == O_RDONLY)
+					pmemobj_tx_abort(EINVAL);
+			} else {
+				if (errno != ENOENT) {
+					ERR("!pmemfile_lookup_dentry failed in "
+							"unexpected way");
+					pmemobj_tx_abort(errno);
+				}
 
-			if (!(flags & O_CREAT)) {
-				LOG(LUSR, "file %s does not exist",
-						orig_pathname);
-				pmemobj_tx_abort(ENOENT);
-			}
+				if (!(flags & O_CREAT)) {
+					LOG(LUSR, "file %s does not exist",
+							orig_pathname);
+					pmemobj_tx_abort(ENOENT);
+				}
 
-			if (flags & O_DIRECTORY)
-				LOG(LDBG, "O_DIRECTORY is ignored for O_CREAT");
+				if (flags & O_DIRECTORY)
+					LOG(LDBG, "O_DIRECTORY is ignored for "
+							"O_CREAT");
+			}
 
 			// create file
 			struct pmemfile_time t;
@@ -274,8 +291,13 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 			rwlock_tx_wlock(&parent_vinode->rwlock);
 
 			vinode = file_inode_alloc(pfp, S_IFREG | mode, &t);
-			file_add_dentry(pfp, parent_vinode, pathname,
-					vinode, &t);
+
+			if ((flags & O_TMPFILE) == O_TMPFILE) {
+				file_register_orphaned_inode(pfp, vinode);
+			} else {
+				file_add_dentry(pfp, parent_vinode, pathname,
+						vinode, &t);
+			}
 
 			rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 		} else {
@@ -290,8 +312,9 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 				pmemobj_tx_abort(ENOTDIR);
 
 			if (flags & O_TRUNC) {
-				if (flags & O_DIRECTORY) {
-					LOG(LUSR, "truncate directory? no way");
+				if (!file_is_regular_file(vinode)) {
+					LOG(LUSR, "truncating non regular "
+							"file");
 					pmemobj_tx_abort(EINVAL);
 				}
 
