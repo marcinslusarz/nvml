@@ -35,24 +35,13 @@
  */
 
 #include "unittest.h"
-
-static PMEMfilepool *
-create_pool(const char *path)
-{
-	PMEMfilepool *pfp = pmemfile_mkfs(path,
-			1024 * 1024 * 1024 /* PMEMOBJ_MIN_POOL */,
-			S_IWUSR | S_IRUSR);
-	if (!pfp)
-		UT_FATAL("!pmemfile_mkfs: %s", path);
-	return pfp;
-}
+#include "pmemfile_test.h"
 
 static void
 test1(PMEMfilepool *pfp)
 {
-	PMEMfile *f = pmemfile_open(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f, NULL);
 
 	_pmemfile_list_root(pfp, "/file1 0");
 
@@ -63,235 +52,163 @@ test1(PMEMfilepool *pfp)
 	memset(bufFF, 0xff, sizeof(bufFF));
 	memset(buf00, 0x00, sizeof(buf00));
 
-	int ret = pmemfile_write(pfp, f, data, len);
-	UT_ASSERTeq(ret, len);
+	PMEMFILE_WRITE(pfp, f, data, len, len);
 
 	_pmemfile_list_root(pfp, "/file1 9");
 
-	ret = pmemfile_read(pfp, f, data2, len);
-	UT_ASSERTeq(ret, -1);
-	UT_ASSERTeq(errno, EBADF); /* file is opened write-only */
+	/* file is opened write-only */
+	PMEMFILE_READ(pfp, f, data2, len, -1, EBADF);
+	PMEMFILE_CLOSE(pfp, f);
 
-	pmemfile_close(pfp, f);
-
-
-
-	f = pmemfile_open(pfp, "/file1", O_RDONLY);
-	UT_ASSERTne(f, NULL);
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, len);
-	UT_ASSERTeq(ret, len);
-
+	PMEMFILE_READ(pfp, f, data2, len, len);
 	UT_ASSERTeq(memcmp(data, data2, len), 0);
 	UT_ASSERTeq(memcmp(data2 + len, bufFF, sizeof(data2) - len), 0);
 
-	ret = pmemfile_write(pfp, f, data, len);
-	UT_ASSERTeq(ret, -1);
-	UT_ASSERTeq(errno, EBADF); /* file is opened read-only */
+	/* file is opened read-only */
+	PMEMFILE_WRITE(pfp, f, data, len, -1, EBADF);
 
 	memset(data2, 0, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, len);
-	UT_ASSERTeq(ret, 0); /* end of file */
-
-	pmemfile_close(pfp, f);
-
+	/* end of file */
+	PMEMFILE_READ(pfp, f, data2, len, 0);
+	PMEMFILE_CLOSE(pfp, f);
 
 
-	f = pmemfile_open(pfp, "/file1", O_RDONLY);
-	UT_ASSERTne(f, NULL);
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, sizeof(data2));
-	UT_ASSERTeq(ret, len);
-
+	PMEMFILE_READ(pfp, f, data2, sizeof(data2), len);
 	UT_ASSERTeq(memcmp(data, data2, len), 0);
 	UT_ASSERTeq(memcmp(data2 + len, bufFF, sizeof(data2) - len), 0);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
 
-
-	f = pmemfile_open(pfp, "/file1", O_RDONLY);
-	UT_ASSERTne(f, NULL);
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, 5);
-	UT_ASSERTeq(ret, 5);
-
+	PMEMFILE_READ(pfp, f, data2, 5, 5);
 	UT_ASSERTeq(memcmp(data, data2, 5), 0);
 	UT_ASSERTeq(memcmp(data2 + 5, bufFF, sizeof(data2) - 5), 0);
 
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, 15);
-	UT_ASSERTeq(ret, 4);
-
+	PMEMFILE_READ(pfp, f, data2, 15, 4);
 	UT_ASSERTeq(memcmp(data + 5, data2, 4), 0);
 	UT_ASSERTeq(memcmp(data2 + 4, bufFF, sizeof(data2) - 4), 0);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
 
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
 
-	f = pmemfile_open(pfp, "/file1", O_RDWR);
-	UT_ASSERTne(f, NULL);
-
-	ret = pmemfile_write(pfp, f, "pmem", 4);
-	UT_ASSERTeq(ret, 4);
+	PMEMFILE_WRITE(pfp, f, "pmem", 4, 4);
 
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, sizeof(data2));
-	UT_ASSERTeq(ret, 5);
-
+	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 5);
 	UT_ASSERTeq(memcmp(data + 4, data2, 5), 0);
 	UT_ASSERTeq(memcmp(data2 + 5, bufFF, sizeof(data2) - 5), 0);
 
-	pmemfile_close(pfp, f);
-
+	PMEMFILE_CLOSE(pfp, f);
 
 
 	_pmemfile_list_root(pfp, "/file1 9");
 
 
-
-	f = pmemfile_open(pfp, "/file1", O_RDWR);
-	UT_ASSERTne(f, NULL);
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
 
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, sizeof(data2));
-	UT_ASSERTeq(ret, 9);
-
+	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 9);
 	UT_ASSERTeq(memcmp("pmem", data2, 4), 0);
 	UT_ASSERTeq(memcmp(data + 4, data2 + 4, 5), 0);
 	UT_ASSERTeq(memcmp(data2 + 9, bufFF, sizeof(data2) - 9), 0);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
 
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 0);
+	PMEMFILE_LSEEK(pfp, f, 3, SEEK_CUR, 3);
 
-	f = pmemfile_open(pfp, "/file1", O_RDWR);
-	UT_ASSERTne(f, NULL);
-
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
-	UT_ASSERTeq(ret, 0);
-
-
-	ret = pmemfile_lseek(pfp, f, 3, SEEK_CUR);
-	UT_ASSERTeq(ret, 3);
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, sizeof(data2));
-	UT_ASSERTeq(ret, 6);
-
+	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 6);
 	UT_ASSERTeq(memcmp("min S\0", data2, 6), 0);
 	UT_ASSERTeq(memcmp(data2 + 6, bufFF, sizeof(data2) - 6), 0);
 
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
-	UT_ASSERTeq(ret, 9);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9);
+	PMEMFILE_LSEEK(pfp, f, -7, SEEK_CUR, 2);
 
-
-	ret = pmemfile_lseek(pfp, f, -7, SEEK_CUR);
-	UT_ASSERTeq(ret, 2);
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, sizeof(data2));
-	UT_ASSERTeq(ret, 7);
-
+	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 7);
 	UT_ASSERTeq(memcmp("emin S\0", data2, 7), 0);
 	UT_ASSERTeq(memcmp(data2 + 7, bufFF, sizeof(data2) - 7), 0);
 
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
-	UT_ASSERTeq(ret, 9);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9);
 
 
-	ret = pmemfile_lseek(pfp, f, -3, SEEK_END);
-	UT_ASSERTeq(ret, 6);
+	PMEMFILE_LSEEK(pfp, f, -3, SEEK_END, 6);
+
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, sizeof(data2));
-	UT_ASSERTeq(ret, 3);
-
+	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 3);
 	UT_ASSERTeq(memcmp(" S\0", data2, 3), 0);
 	UT_ASSERTeq(memcmp(data2 + 3, bufFF, sizeof(data2) - 3), 0);
 
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
-	UT_ASSERTeq(ret, 9);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9);
+	PMEMFILE_LSEEK(pfp, f, 100, SEEK_END, 9 + 100);
+	PMEMFILE_WRITE(pfp, f, "XYZ\0", 4, 4);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9 + 100 + 4);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_SET, 0);
 
-
-	ret = pmemfile_lseek(pfp, f, 100, SEEK_END);
-	UT_ASSERTeq(ret, 9 + 100);
-	ret = pmemfile_write(pfp, f, "XYZ\0", 4);
-	UT_ASSERTeq(ret, 4);
-
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
-	UT_ASSERTeq(ret, 9 + 100 + 4);
-
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_SET);
-	UT_ASSERTeq(ret, 0);
 	memset(data2, 0xff, sizeof(data2));
-	ret = pmemfile_read(pfp, f, data2, sizeof(data2));
-	UT_ASSERTeq(ret, 9 + 100 + 4);
-
+	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 9 + 100 + 4);
 	UT_ASSERTeq(memcmp("pmemin S\0", data2, 9), 0);
 	UT_ASSERTeq(memcmp(data2 + 9, buf00, 100), 0);
 	UT_ASSERTeq(memcmp("XYZ\0", data2 + 9 + 100, 4), 0);
 	UT_ASSERTeq(memcmp(data2 + 9 + 100 + 4, bufFF,
 			sizeof(data2) - 9 - 100 - 4), 0);
 
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
-	UT_ASSERTeq(ret, 9 + 100 + 4);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9 + 100 + 4);
 
-
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
 
 	_pmemfile_list_root(pfp, "/file1 9+100+4=113");
 
 	_pmemfile_stats(pfp);
 
-	ret = pmemfile_unlink(pfp, "/file1");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_UNLINK(pfp, "/file1");
 
 	_pmemfile_stats(pfp);
 
 
+	f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_RDWR, 0644);
 
+	PMEMFILE_WRITE(pfp, f, buf00, 4096, 4096);
+	PMEMFILE_FILE_SIZE(pfp, f, 4096);
 
-	f = pmemfile_open(pfp, "/file1", O_CREAT | O_EXCL | O_RDWR, 0644);
-	UT_ASSERTne(f, NULL);
+	PMEMFILE_WRITE(pfp, f, bufFF, 4096, 4096);
+	PMEMFILE_FILE_SIZE(pfp, f, 8192);
 
-	ret = pmemfile_write(pfp, f, buf00, 4096);
-	UT_ASSERTeq(ret, 4096);
-	ret = _pmemfile_file_size(pfp, f);
-	UT_ASSERTeq(ret, 4096);
-	ret = pmemfile_write(pfp, f, bufFF, 4096);
-	UT_ASSERTeq(ret, 4096);
-	ret = _pmemfile_file_size(pfp, f);
-	UT_ASSERTeq(ret, 8192);
-	ret = pmemfile_lseek(pfp, f, 0, SEEK_CUR);
-	UT_ASSERTeq(ret, 8192);
-	ret = pmemfile_lseek(pfp, f, 4096, SEEK_SET);
-	UT_ASSERTeq(ret, 4096);
-	ret = _pmemfile_file_size(pfp, f);
-	UT_ASSERTeq(ret, 8192);
-	ret = pmemfile_read(pfp, f, data2, 4096);
-	UT_ASSERTeq(ret, 4096);
-	ret = _pmemfile_file_size(pfp, f);
-	UT_ASSERTeq(ret, 8192);
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 8192);
+	PMEMFILE_LSEEK(pfp, f, 4096, SEEK_SET, 4096);
+	PMEMFILE_FILE_SIZE(pfp, f, 8192);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_READ(pfp, f, data2, 4096, 4096);
+	PMEMFILE_FILE_SIZE(pfp, f, 8192);
 
+	PMEMFILE_CLOSE(pfp, f);
 
 	_pmemfile_list_root(pfp, "/file1 8192");
 	_pmemfile_stats(pfp);
 
-	ret = pmemfile_unlink(pfp, "/file1");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_UNLINK(pfp, "/file1");
 }
 
 static void
 test2(PMEMfilepool *pfp)
 {
-
 	char buf00[128], bufFF[128], bufd[4096 * 4], buftmp[4096 * 4];
-	int ret;
 
 	memset(buf00, 0x00, sizeof(buf00));
 	memset(bufFF, 0xFF, sizeof(bufFF));
@@ -299,97 +216,77 @@ test2(PMEMfilepool *pfp)
 	for (int i = 0; i < sizeof(bufd); ++i)
 		bufd[i] = rand() % 255;
 
-	PMEMfile *f = pmemfile_open(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f, NULL);
 
 #define LEN (sizeof(bufd) - 1000)
 #define LOOPS ((800 * 1024 * 1024) / LEN)
-	for (int i = 0; i < LOOPS; ++i) {
-		ret = pmemfile_write(pfp, f, bufd, LEN);
-		UT_ASSERTeq(ret, LEN);
-	}
+	for (int i = 0; i < LOOPS; ++i)
+		PMEMFILE_WRITE(pfp, f, bufd, LEN, LEN);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 	_pmemfile_list_root(pfp, "/file1 ~800MB");
 	_pmemfile_stats(pfp);
 
-	f = pmemfile_open(pfp, "/file1", O_RDONLY);
-	UT_ASSERTne(f, NULL);
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
 	for (int i = 0; i < LOOPS; ++i) {
 		memset(buftmp, 0, sizeof(buftmp));
-		ret = pmemfile_read(pfp, f, buftmp, LEN);
-		UT_ASSERTeq(ret, LEN);
+		PMEMFILE_READ(pfp, f, buftmp, LEN, LEN);
 		if (memcmp(buftmp, bufd, LEN) != 0)
 			UT_ASSERT(0);
 	}
 #undef LEN
-	ret = pmemfile_read(pfp, f, buftmp, 1023);
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_READ(pfp, f, buftmp, 1023, 0);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
-	ret = pmemfile_unlink(pfp, "/file1");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_UNLINK(pfp, "/file1");
 }
 
 static void
 test_trunc(PMEMfilepool *pfp)
 {
 	char bufFF[128], bufDD[128], buftmp[128];
-	int ret;
 
 	memset(bufFF, 0xFF, sizeof(bufFF));
 	memset(bufDD, 0xDD, sizeof(bufDD));
 
-	PMEMfile *f1 = pmemfile_open(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
+	PMEMfile *f1 = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f1, NULL);
-	PMEMfile *f2 = pmemfile_open(pfp, "/file2", O_CREAT | O_EXCL | O_WRONLY,
+	PMEMfile *f2 = PMEMFILE_OPEN(pfp, "/file2", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f2, NULL);
 
 	for (int i = 0; i < 100; ++i) {
-		ret = pmemfile_write(pfp, f1, bufFF, 128);
-		UT_ASSERTeq(ret, 128);
-		ret = pmemfile_write(pfp, f1, bufDD, 128);
-		UT_ASSERTeq(ret, 128);
+		PMEMFILE_WRITE(pfp, f1, bufFF, 128, 128);
+		PMEMFILE_WRITE(pfp, f1, bufDD, 128, 128);
 
-		ret = pmemfile_write(pfp, f2, bufFF, 128);
-		UT_ASSERTeq(ret, 128);
-		ret = pmemfile_write(pfp, f2, bufDD, 128);
-		UT_ASSERTeq(ret, 128);
+		PMEMFILE_WRITE(pfp, f2, bufFF, 128, 128);
+		PMEMFILE_WRITE(pfp, f2, bufDD, 128, 128);
 	}
 
-	pmemfile_close(pfp, f1);
-	pmemfile_close(pfp, f2);
+	PMEMFILE_CLOSE(pfp, f1);
+	PMEMFILE_CLOSE(pfp, f2);
 	_pmemfile_list_root(pfp, "/file1,file2 25600");
 	_pmemfile_stats(pfp);
 
-	f1 = pmemfile_open(pfp, "/file1", O_RDWR | O_TRUNC, 0);
-	UT_ASSERTne(f1, NULL);
+	f1 = PMEMFILE_OPEN(pfp, "/file1", O_RDWR | O_TRUNC, 0);
 
-	f2 = pmemfile_open(pfp, "/file2", O_RDWR | O_TRUNC, 0);
-	UT_ASSERTne(f1, NULL);
+	f2 = PMEMFILE_OPEN(pfp, "/file2", O_RDWR | O_TRUNC, 0);
 
-	ret = pmemfile_read(pfp, f1, buftmp, 128);
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_READ(pfp, f1, buftmp, 128, 0);
 
-	ret = pmemfile_write(pfp, f2, bufDD, 128);
-	UT_ASSERTeq(ret, 128);
+	PMEMFILE_WRITE(pfp, f2, bufDD, 128, 128);
 
-	pmemfile_close(pfp, f1);
-	pmemfile_close(pfp, f2);
+	PMEMFILE_CLOSE(pfp, f1);
+	PMEMFILE_CLOSE(pfp, f2);
 
 	_pmemfile_list_root(pfp, "/file1 0, /file2 128");
 	_pmemfile_stats(pfp);
 
-	ret = pmemfile_unlink(pfp, "/file1");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_UNLINK(pfp, "/file1");
 
-	ret = pmemfile_unlink(pfp, "/file2");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_UNLINK(pfp, "/file2");
 }
 
 int
@@ -402,7 +299,7 @@ main(int argc, char *argv[])
 
 	const char *path = argv[1];
 
-	PMEMfilepool *pfp = create_pool(path);
+	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	_pmemfile_stats(pfp);
 
