@@ -137,3 +137,14 @@ PMEMFILE_FILE_SIZE(PMEMfilepool *pfp, PMEMfile *file, ssize_t expected_size)
 		UT_ASSERTeq(buf.st_size, expected_size);
 	return buf.st_size;
 }
+
+ssize_t
+PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path, ssize_t expected_size)
+{
+	struct stat buf;
+	int ret = pmemfile_stat(pfp, path, &buf);
+	UT_ASSERTeq(ret, 0);
+	if (expected_size >= 0)
+		UT_ASSERTeq(buf.st_size, expected_size);
+	return buf.st_size;
+}

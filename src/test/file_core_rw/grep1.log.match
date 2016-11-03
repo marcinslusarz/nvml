@@ -90,3 +90,10 @@ parent 0x$(X) ppath /
 *   2 0x$(X)     2   4000 0040777 ..
 STOP  no files
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
+START no files
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   2 0x$(X)     2   4000 0040777 .
+*   2 0x$(X)     2   4000 0040777 ..
+STOP  no files
+inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
