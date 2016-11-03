@@ -119,9 +119,8 @@ file_check_flags(int flags)
 	}
 
 	if (flags & O_NONBLOCK) {
-		LOG(LSUP, "O_NONBLOCK is not going to be supported");
-		errno = ENOTSUP;
-		return -1;
+		LOG(LINF, "O_NONBLOCK is ignored");
+		flags &= ~O_NONBLOCK;
 	}
 
 	if (flags & O_PATH) {
