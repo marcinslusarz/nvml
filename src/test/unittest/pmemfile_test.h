@@ -52,6 +52,8 @@ off_t PMEMFILE_LSEEK(PMEMfilepool *pfp, PMEMfile *file, off_t offset,
 		int whence, off_t expected);
 ssize_t PMEMFILE_FILE_SIZE(PMEMfilepool *pfp, PMEMfile *file,
 		ssize_t expected_size);
+ssize_t PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path,
+		ssize_t expected_size);
 
 #ifdef __cplusplus
 }

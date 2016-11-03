@@ -534,6 +534,9 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 		if (!vinode->blocks)
 			file_rebuild_block_tree(vinode);
 
+		if (file->flags & PFILE_APPEND)
+			file->offset = D_RO(vinode->inode)->size;
+
 		file_write(pfp, file, inode, buf, count);
 
 		if (count > 0) {

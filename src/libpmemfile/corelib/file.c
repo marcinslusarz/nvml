@@ -61,9 +61,8 @@ static int
 file_check_flags(int flags)
 {
 	if (flags & O_APPEND) {
-		LOG(LSUP, "O_APPEND is not supported (yet)");
-		errno = ENOTSUP;
-		return -1;
+		LOG(LSUP, "O_APPEND");
+		flags &= ~O_APPEND;
 	}
 
 	if (flags & O_ASYNC) {
@@ -326,6 +325,8 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 		if (flags & O_NOATIME)
 			file->flags |= PFILE_NOATIME;
+		if (flags & O_APPEND)
+			file->flags |= PFILE_APPEND;
 	} TX_ONABORT {
 		error = 1;
 	} TX_END
