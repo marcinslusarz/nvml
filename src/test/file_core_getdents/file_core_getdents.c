@@ -34,19 +34,9 @@
  * file_core_getdents.c -- unit test for pmemfile_getdents & pmemfile_getdents64
  */
 
+#include "pmemfile_test.h"
 #include "unittest.h"
 #include <ctype.h>
-
-static PMEMfilepool *
-create_pool(const char *path)
-{
-	PMEMfilepool *pfp = pmemfile_mkfs(path,
-			1024 * 1024 * 1024 /* PMEMOBJ_MIN_POOL */,
-			S_IWUSR | S_IRUSR);
-	if (!pfp)
-		UT_FATAL("!pmemfile_mkfs: %s", path);
-	return pfp;
-}
 
 static void
 dump_linux_dirents(void *dirp, unsigned length)
@@ -133,18 +123,16 @@ dump_linux_dirents64(void *dirp, unsigned length)
 static void
 test1(PMEMfilepool *pfp)
 {
-	PMEMfile *f = pmemfile_open(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f, NULL);
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
-	f = pmemfile_open(pfp, "/file2with_long_name",
+	f = PMEMFILE_OPEN(pfp, "/file2with_long_name",
 			O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f, NULL);
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
-	f = pmemfile_open(pfp, "/file3with_very_long_name"
+	f = PMEMFILE_OPEN(pfp, "/file3with_very_long_name"
 			"_1234567890_1234567890_1234567890_1234567890"
 			"_1234567890_1234567890_1234567890_1234567890"
 			"_1234567890_1234567890_1234567890_1234567890"
@@ -153,17 +141,14 @@ test1(PMEMfilepool *pfp)
 			"_qwertyuiop",
 			O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f, NULL);
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
 
-	f = pmemfile_open(pfp, "/file4", O_CREAT | O_EXCL | O_WRONLY,
+	f = PMEMFILE_OPEN(pfp, "/file4", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f, NULL);
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
-	f = pmemfile_open(pfp, "/", O_DIRECTORY | O_RDONLY);
-	UT_ASSERTne(f, NULL);
+	f = PMEMFILE_OPEN(pfp, "/", O_DIRECTORY | O_RDONLY);
 
 	char buf[32758];
 	int r = pmemfile_getdents(pfp, f, (void *)buf, sizeof(buf));
@@ -185,7 +170,7 @@ test1(PMEMfilepool *pfp)
 	r = pmemfile_getdents64(pfp, f, (void *)buf, sizeof(buf));
 	UT_ASSERT(r == 0);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 }
 
 int
@@ -198,7 +183,7 @@ main(int argc, char *argv[])
 
 	const char *path = argv[1];
 
-	PMEMfilepool *pfp = create_pool(path);
+	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	test1(pfp);
 

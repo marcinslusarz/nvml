@@ -34,18 +34,8 @@
  * file_core_stat.c -- unit test for pmemfile_stat & pmemfile_fstat
  */
 
+#include "pmemfile_test.h"
 #include "unittest.h"
-
-static PMEMfilepool *
-create_pool(const char *path)
-{
-	PMEMfilepool *pfp = pmemfile_mkfs(path,
-			1024 * 1024 * 1024 /* PMEMOBJ_MIN_POOL */,
-			S_IWUSR | S_IRUSR);
-	if (!pfp)
-		UT_FATAL("!pmemfile_mkfs: %s", path);
-	return pfp;
-}
 
 static const char *
 timespec_to_str(const struct timespec *t)
@@ -106,9 +96,8 @@ fstat_and_dump(PMEMfilepool *pfp, PMEMfile *f)
 static void
 test1(PMEMfilepool *pfp)
 {
-	PMEMfile *f = pmemfile_open(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
-	UT_ASSERTne(f, NULL);
 
 	UT_ASSERTeq(stat_and_dump(pfp, "/file1"), 0);
 
@@ -116,11 +105,11 @@ test1(PMEMfilepool *pfp)
 	memset(buf, 0xdd, 1024);
 
 	for (int i = 0; i < 100; ++i)
-		UT_ASSERTeq(pmemfile_write(pfp, f, buf, 1024), 1024);
+		PMEMFILE_WRITE(pfp, f, buf, 1024, 1024);
 
 	UT_ASSERTeq(stat_and_dump(pfp, "/file1"), 0);
 
-	UT_ASSERTeq(pmemfile_unlink(pfp, "/file1"), 0);
+	PMEMFILE_UNLINK(pfp, "/file1");
 
 	errno = 0;
 	UT_ASSERTeq(stat_and_dump(pfp, "/file1"), -1);
@@ -128,7 +117,7 @@ test1(PMEMfilepool *pfp)
 
 	UT_ASSERTeq(fstat_and_dump(pfp, f), 0);
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 }
 
 int
@@ -141,7 +130,7 @@ main(int argc, char *argv[])
 
 	const char *path = argv[1];
 
-	PMEMfilepool *pfp = create_pool(path);
+	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	UT_ASSERTeq(stat_and_dump(pfp, "/"), 0);
 

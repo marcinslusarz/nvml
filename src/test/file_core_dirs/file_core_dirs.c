@@ -34,18 +34,8 @@
  * file_core_dirs.c -- unit test for directories
  */
 
+#include "pmemfile_test.h"
 #include "unittest.h"
-
-static PMEMfilepool *
-create_pool(const char *path)
-{
-	PMEMfilepool *pfp = pmemfile_mkfs(path,
-			1024 * 1024 * 1024 /* PMEMOBJ_MIN_POOL */,
-			S_IWUSR | S_IRUSR);
-	if (!pfp)
-		UT_FATAL("!pmemfile_mkfs: %s", path);
-	return pfp;
-}
 
 static const char *
 timespec_to_str(const struct timespec *t)
@@ -101,8 +91,7 @@ struct linux_dirent64 {
 static void
 list_root(PMEMfilepool *pfp, int expected_files)
 {
-	PMEMfile *f = pmemfile_open(pfp, "/", O_DIRECTORY | O_RDONLY);
-	UT_ASSERTne(f, NULL);
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_DIRECTORY | O_RDONLY);
 
 	char buf[32 * 1024];
 	char path[PATH_MAX];
@@ -120,7 +109,7 @@ list_root(PMEMfilepool *pfp, int expected_files)
 		d = (void *)(((char *)d) + d->d_reclen);
 	}
 
-	pmemfile_close(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
 	UT_ASSERTeq(num_files, expected_files);
 }
@@ -128,6 +117,7 @@ list_root(PMEMfilepool *pfp, int expected_files)
 static void
 test1(PMEMfilepool *pfp)
 {
+	PMEMfile *f;
 	char buf[1001];
 	_pmemfile_list_root(pfp, "before");
 	memset(buf, 0xff, sizeof(buf));
@@ -135,14 +125,11 @@ test1(PMEMfilepool *pfp)
 	for (int i = 0; i < 100; ++i) {
 		sprintf(buf, "/file%04d", i);
 
-		PMEMfile *f = pmemfile_open(pfp, buf,
-				O_CREAT | O_EXCL | O_WRONLY, 0644);
-		UT_ASSERTne(f, NULL);
+		f = PMEMFILE_OPEN(pfp, buf, O_CREAT | O_EXCL | O_WRONLY, 0644);
 
-		int ret = pmemfile_write(pfp, f, buf, i);
-		UT_ASSERTeq(ret, i);
+		PMEMFILE_WRITE(pfp, f, buf, i, i);
 
-		pmemfile_close(pfp, f);
+		PMEMFILE_CLOSE(pfp, f);
 
 		list_root(pfp, i + 1 + 2);
 	}
@@ -159,7 +146,7 @@ main(int argc, char *argv[])
 
 	const char *path = argv[1];
 
-	PMEMfilepool *pfp = create_pool(path);
+	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	test1(pfp);
 
