@@ -33,8 +33,9 @@
 /*
  * file_core_basic.c -- unit test for pmemfile_*
  */
-
+#define _GNU_SOURCE
 #include "unittest.h"
+#include "pmemfile_test.h"
 
 static PMEMfilepool *
 create_pool(const char *path)
@@ -266,6 +267,36 @@ test_unlink(const char *path)
 			"test_unlink end, files: . .. aaa aaa.link aaa2.link");
 	_pmemfile_stats(pfp);
 
+	PMEMFILE_UNLINK(pfp, "/aaa");
+	PMEMFILE_UNLINK(pfp, "/aaa.link");
+	PMEMFILE_UNLINK(pfp, "/aaa2.link");
+
+	pmemfile_pool_close(pfp);
+}
+
+static void
+test_tmpfile(const char *path)
+{
+	PMEMfilepool *pfp = open_pool(path);
+
+	_pmemfile_stats(pfp);
+
+	_pmemfile_list_root(pfp,
+			"test_O_TMPFILE before, files: . .. ");
+
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_TMPFILE | O_WRONLY, 0644);
+	PMEMFILE_WRITE(pfp, f, "qwerty", 6, 6);
+
+	_pmemfile_list_root(pfp,
+			"test_O_TMPFILE middle, files: . .. ");
+	_pmemfile_stats(pfp);
+
+	PMEMFILE_CLOSE(pfp, f);
+
+	_pmemfile_list_root(pfp,
+			"test_O_TMPFILE end, files: . .. ");
+	_pmemfile_stats(pfp);
+
 	pmemfile_pool_close(pfp);
 }
 
@@ -300,6 +331,8 @@ main(int argc, char *argv[])
 	test_link(path);
 
 	test_unlink(path);
+
+	test_tmpfile(path);
 
 	DONE(NULL);
 }

@@ -471,6 +471,33 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 }
 
 /*
+ * file_register_orphaned_inode -- (internal) register specified inode in
+ * orphaned_inodes array
+ */
+void
+file_register_orphaned_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
+{
+	LOG(LDBG, "inode 0x%lx path %s", vinode->inode.oid.off,
+			pmfi_path(vinode));
+
+	ASSERTeq(vinode->orphaned.arr, NULL);
+
+	rwlock_tx_wlock(&pfp->rwlock);
+
+	TOID(struct pmemfile_inode_array) orphaned =
+			D_RW(pfp->super)->orphaned_inodes;
+	if (TOID_IS_NULL(orphaned)) {
+		orphaned = TX_ZNEW(struct pmemfile_inode_array);
+		TX_SET(pfp->super, orphaned_inodes, orphaned);
+	}
+
+	file_inode_array_add(pfp, orphaned, vinode,
+			&vinode->orphaned.arr, &vinode->orphaned.idx);
+
+	rwlock_tx_unlock_on_commit(&pfp->rwlock);
+}
+
+/*
  * file_assert_no_dentries -- checks that directory has no entries
  */
 static void
