@@ -289,6 +289,37 @@ test_trunc(PMEMfilepool *pfp)
 	PMEMFILE_UNLINK(pfp, "/file2");
 }
 
+static void
+test_o_append(PMEMfilepool *pfp)
+{
+	char bufFF[128], bufDD[128];
+	PMEMfile *f;
+
+	memset(bufFF, 0xFF, sizeof(bufFF));
+	memset(bufDD, 0xDD, sizeof(bufDD));
+
+	f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY | O_APPEND,
+			0644);
+	PMEMFILE_WRITE(pfp, f, bufFF, 128, 128);
+	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_PATH_SIZE(pfp, "/file1", 128);
+
+	f = PMEMFILE_OPEN(pfp, "/file1", O_WRONLY);
+	PMEMFILE_WRITE(pfp, f, bufFF, 128, 128);
+	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_PATH_SIZE(pfp, "/file1", 128);
+
+	f = PMEMFILE_OPEN(pfp, "/file1", O_WRONLY | O_APPEND);
+	PMEMFILE_WRITE(pfp, f, bufDD, 128, 128);
+	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_PATH_SIZE(pfp, "/file1", 256);
+
+	PMEMFILE_UNLINK(pfp, "/file1");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -314,6 +345,10 @@ main(int argc, char *argv[])
 	_pmemfile_stats(pfp);
 
 	test_trunc(pfp);
+	_pmemfile_list_root(pfp, "no files");
+	_pmemfile_stats(pfp);
+
+	test_o_append(pfp);
 	_pmemfile_list_root(pfp, "no files");
 	_pmemfile_stats(pfp);
 
