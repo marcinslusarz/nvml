@@ -70,6 +70,11 @@ file_initialize_super(PMEMfilepool *pfp)
 			super->root_inode = pfp->root->inode;
 			super->initialized = 1;
 		}
+		pfp->cwd = pfp->root;
+		file_inode_ref(pfp, pfp->cwd);
+#ifdef DEBUG
+		pfp->cwd->path = Strdup(pfp->root->path);
+#endif
 	} TX_ONABORT {
 		err = -1;
 	} TX_END
@@ -252,6 +257,7 @@ pmemfile_pool_close(PMEMfilepool *pfp)
 	LOG(LDBG, "pfp %p", pfp);
 
 	file_vinode_unref_tx(pfp, pfp->root);
+	file_vinode_unref_tx(pfp, pfp->cwd);
 	file_inode_map_free(pfp->inode_map);
 	util_rwlock_destroy(&pfp->rwlock);
 

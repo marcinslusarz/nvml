@@ -119,4 +119,10 @@ void file_vinode_unref_tx(PMEMfilepool *pfp,
 void file_register_orphaned_inode(PMEMfilepool *pfp,
 		struct pmemfile_vinode *vinode);
 
+int file_fill_stat(struct pmemfile_vinode *vinode, struct stat *buf);
+
+int file_stat_at_vinode(PMEMfilepool *pfp,
+			struct pmemfile_vinode *parent_vinode,
+			const char *path, struct stat *buf);
+
 #endif

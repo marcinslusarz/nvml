@@ -93,4 +93,18 @@ struct pmemfile_file {
 
 const char *file_check_pathname(const char *pathname);
 
+PMEMfile *file_open_at_vinode(PMEMfilepool *pfp,
+			struct pmemfile_vinode *parent_vinode,
+			const char *pathname, int flags, mode_t mode);
+
+void file_close(PMEMfilepool *pfp, PMEMfile *file);
+
+int file_link_at_vinodes(PMEMfilepool *pfp,
+		struct pmemfile_vinode *parent1, const char *oldpath,
+		struct pmemfile_vinode *parent2, const char *newpath);
+
+
+int file_unlink_at_vinode(PMEMfilepool *pfp,
+		struct pmemfile_vinode *parent_vinode, const char *pathname);
+
 #endif

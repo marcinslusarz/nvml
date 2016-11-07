@@ -170,36 +170,12 @@ file_check_flags(int flags)
 }
 
 /*
- * file_check_pathname -- (internal) validates pathname
- */
-const char *
-file_check_pathname(const char *pathname)
-{
-	const char *orig_pathname = pathname;
-	if (pathname[0] != '/') {
-		LOG(LUSR, "pathname %s does not start with /", orig_pathname);
-		errno = EINVAL;
-		return NULL;
-	}
-
-	while (*pathname == '/')
-		pathname++;
-
-	if (strchr(pathname, '/')) {
-		LOG(LSUP, "opening files in subdirectories is not supported yet"
-			" (%s)", orig_pathname);
-		errno = EISDIR;
-		return NULL;
-	}
-
-	return pathname;
-}
-
-/*
- * pmemfile_open -- open file
+ * file_open_at_vinode -- open file at vinode
  */
 PMEMfile *
-pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
+file_open_at_vinode(PMEMfilepool *pfp,
+			struct pmemfile_vinode *parent_vinode,
+			const char *pathname, int flags, mode_t mode)
 {
 	if (!pathname) {
 		LOG(LUSR, "NULL pathname");
@@ -214,13 +190,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	if (file_check_flags(flags))
 		return NULL;
 
-	va_list ap;
-	va_start(ap, flags);
-	mode_t mode;
-
-	/* NOTE: O_TMPFILE contains O_DIRECTORY */
-	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
-		mode = va_arg(ap, mode_t);
+	if (flags & O_CREAT) {
 		LOG(LDBG, "mode %o", mode);
 		if (mode & ~(mode_t)(S_IRWXU | S_IRWXG | S_IRWXO)) {
 			LOG(LUSR, "invalid mode 0%o", mode);
@@ -233,20 +203,16 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 			mode = mode & ~(mode_t)(S_IXUSR | S_IXGRP | S_IXOTH);
 		}
 	}
-	va_end(ap);
 
-	pathname = file_check_pathname(pathname);
 	if (!pathname)
 		return NULL;
 
 	int error = 0;
 	PMEMfile *file = NULL;
 
-	struct pmemfile_vinode *parent_vinode = pfp->root;
 	struct pmemfile_vinode *volatile old_vinode;
 	struct pmemfile_vinode *vinode;
 
-	file_inode_ref(pfp, parent_vinode);
 	old_vinode = vinode =
 			file_lookup_dentry(pfp, parent_vinode, pathname);
 
@@ -353,8 +319,6 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 		error = 1;
 	} TX_END
 
-	file_vinode_unref_tx(pfp, parent_vinode);
-
 	if (error) {
 		int oerrno = errno;
 
@@ -378,10 +342,10 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 }
 
 /*
- * pmemfile_close -- close file
+ * file_close -- close file
  */
 void
-pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
+file_close(PMEMfilepool *pfp, PMEMfile *file)
 {
 	LOG(LDBG, "inode 0x%lx path %s", file->vinode->inode.oid.off,
 			pmfi_path(file->vinode));
@@ -394,67 +358,52 @@ pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
 }
 
 /*
- * pmemfile_link -- make a new name for a file
+ * file_link_at_vinodes -- make a new name for a file
  */
 int
-pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
+file_link_at_vinodes(PMEMfilepool *pfp,
+		struct pmemfile_vinode *parent1, const char *oldpath,
+		struct pmemfile_vinode *parent2, const char *newpath)
 {
-	if (!oldpath || !newpath) {
-		LOG(LUSR, "NULL pathname");
-		errno = EFAULT;
-		return -1;
-	}
-
 	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
 
-	oldpath = file_check_pathname(oldpath);
-	if (!oldpath)
-		return -1;
-
-	newpath = file_check_pathname(newpath);
-	if (!newpath)
-		return -1;
-
-	struct pmemfile_vinode *parent_vinode = pfp->root;
 	struct pmemfile_vinode *src_vinode;
 	struct pmemfile_vinode *dst_vinode = NULL;
 
 	int oerrno = 0;
-	file_inode_ref(pfp, parent_vinode);
 
-	src_vinode = file_lookup_dentry(pfp, parent_vinode, oldpath);
+	src_vinode = file_lookup_dentry(pfp, parent1, oldpath);
 	if (src_vinode == NULL) {
 		oerrno = errno;
 		goto end;
 	}
 
-	dst_vinode = file_lookup_dentry(pfp, parent_vinode, newpath);
+	dst_vinode = file_lookup_dentry(pfp, parent2, newpath);
 	if (dst_vinode != NULL) {
 		oerrno = EEXIST;
 		goto end;
 	}
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		rwlock_tx_wlock(&parent_vinode->rwlock);
+		rwlock_tx_wlock(&parent2->rwlock);
 
 		struct pmemfile_time t;
 		file_get_time(&t);
-		file_add_dentry(pfp, parent_vinode, newpath, src_vinode, &t);
+		file_add_dentry(pfp, parent2, newpath, src_vinode, &t);
 
-		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
+		rwlock_tx_unlock_on_commit(&parent2->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
 	} TX_END
 
 	if (oerrno == 0)
-		file_set_path_debug(pfp, parent_vinode, src_vinode, newpath);
+		file_set_path_debug(pfp, parent1, src_vinode, newpath);
 
 end:
 	if (dst_vinode != NULL)
 		file_vinode_unref_tx(pfp, dst_vinode);
 	if (src_vinode != NULL)
 		file_vinode_unref_tx(pfp, src_vinode);
-	file_vinode_unref_tx(pfp, parent_vinode);
 
 	if (oerrno) {
 		errno = oerrno;
@@ -468,25 +417,13 @@ end:
  * pmemfile_unlink -- delete a name and possibly the file it refers to
  */
 int
-pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
+file_unlink_at_vinode(PMEMfilepool *pfp,
+		struct pmemfile_vinode *parent_vinode, const char *pathname)
 {
-	if (!pathname) {
-		LOG(LUSR, "NULL pathname");
-		errno = EFAULT;
-		return -1;
-	}
-
 	LOG(LDBG, "pathname %s", pathname);
-
-	pathname = file_check_pathname(pathname);
-	if (!pathname)
-		return -1;
-
-	struct pmemfile_vinode *parent_vinode = pfp->root;
 
 	int oerrno, ret = 0;
 
-	file_inode_ref(pfp, parent_vinode);
 	struct pmemfile_vinode *volatile vinode = NULL;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -500,8 +437,6 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 
 	if (vinode)
 		file_vinode_unref_tx(pfp, vinode);
-
-	file_vinode_unref_tx(pfp, parent_vinode);
 
 	if (ret)
 		errno = oerrno;

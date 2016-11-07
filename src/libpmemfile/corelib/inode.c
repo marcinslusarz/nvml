@@ -566,7 +566,7 @@ pmemfile_time_to_timespec(const struct pmemfile_time *t)
 /*
  * file_fill_stat
  */
-static int
+int
 file_fill_stat(struct pmemfile_vinode *vinode, struct stat *buf)
 {
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
@@ -598,32 +598,19 @@ file_fill_stat(struct pmemfile_vinode *vinode, struct stat *buf)
 }
 
 /*
- * pmemfile_stat
+ * file_stat_at_vinode
  */
 int
-pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
+file_stat_at_vinode(PMEMfilepool *pfp, struct pmemfile_vinode *parent_vinode,
+		const char *path, struct stat *buf)
 {
-	if (!path || !buf) {
-		errno = EFAULT;
-		return -1;
-	}
-
 	LOG(LDBG, "path %s", path);
-
-	path = file_check_pathname(path);
-	if (!path)
-		return -1;
-
-	struct pmemfile_vinode *parent_vinode = pfp->root;
-
-	file_inode_ref(pfp, parent_vinode);
 
 	struct pmemfile_vinode *vinode =
 			file_lookup_dentry(pfp, parent_vinode, path);
 
 	if (!vinode) {
 		int oerrno = errno;
-		file_vinode_unref_tx(pfp, parent_vinode);
 		errno = oerrno;
 		return -1;
 	}
@@ -631,31 +618,6 @@ pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 	int ret = file_fill_stat(vinode, buf);
 
 	file_vinode_unref_tx(pfp, vinode);
-	file_vinode_unref_tx(pfp, parent_vinode);
 
 	return ret;
-}
-
-/*
- * pmemfile_fstat
- */
-int
-pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
-{
-	if (!file || !buf) {
-		errno = EFAULT;
-		return -1;
-	}
-
-	return file_fill_stat(file->vinode, buf);
-}
-
-/*
- * pmemfile_lstat
- */
-int
-pmemfile_lstat(PMEMfilepool *pfp, const char *path, struct stat *buf)
-{
-	// XXX because symlinks are not yet implemented
-	return pmemfile_stat(pfp, path, buf);
 }
