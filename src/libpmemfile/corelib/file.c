@@ -170,32 +170,6 @@ file_check_flags(int flags)
 }
 
 /*
- * file_check_pathname -- (internal) validates pathname
- */
-const char *
-file_check_pathname(const char *pathname)
-{
-	const char *orig_pathname = pathname;
-	if (pathname[0] != '/') {
-		LOG(LUSR, "pathname %s does not start with /", orig_pathname);
-		errno = EINVAL;
-		return NULL;
-	}
-
-	while (*pathname == '/')
-		pathname++;
-
-	if (strchr(pathname, '/')) {
-		LOG(LSUP, "opening files in subdirectories is not supported yet"
-			" (%s)", orig_pathname);
-		errno = EISDIR;
-		return NULL;
-	}
-
-	return pathname;
-}
-
-/*
  * file_open_at_vinode -- open file at vinode
  */
 PMEMfile *
@@ -230,7 +204,6 @@ file_open_at_vinode(PMEMfilepool *pfp,
 		}
 	}
 
-	pathname = file_check_pathname(pathname);
 	if (!pathname)
 		return NULL;
 
@@ -392,21 +365,7 @@ file_link_at_vinodes(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent1, const char *oldpath,
 		struct pmemfile_vinode *parent2, const char *newpath)
 {
-	if (!oldpath || !newpath) {
-		LOG(LUSR, "NULL pathname");
-		errno = EFAULT;
-		return -1;
-	}
-
 	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
-
-	oldpath = file_check_pathname(oldpath);
-	if (!oldpath)
-		return -1;
-
-	newpath = file_check_pathname(newpath);
-	if (!newpath)
-		return -1;
 
 	struct pmemfile_vinode *src_vinode;
 	struct pmemfile_vinode *dst_vinode = NULL;
@@ -461,17 +420,7 @@ int
 file_unlink_at_vinode(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode, const char *pathname)
 {
-	if (!pathname) {
-		LOG(LUSR, "NULL pathname");
-		errno = EFAULT;
-		return -1;
-	}
-
 	LOG(LDBG, "pathname %s", pathname);
-
-	pathname = file_check_pathname(pathname);
-	if (!pathname)
-		return -1;
 
 	int oerrno, ret = 0;
 

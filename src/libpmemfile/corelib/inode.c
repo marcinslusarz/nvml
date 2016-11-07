@@ -604,23 +604,13 @@ int
 file_stat_at_vinode(PMEMfilepool *pfp, struct pmemfile_vinode *parent_vinode,
 		const char *path, struct stat *buf)
 {
-	if (!path || !buf) {
-		errno = EFAULT;
-		return -1;
-	}
-
 	LOG(LDBG, "path %s", path);
-
-	path = file_check_pathname(path);
-	if (!path)
-		return -1;
 
 	struct pmemfile_vinode *vinode =
 			file_lookup_dentry(pfp, parent_vinode, path);
 
 	if (!vinode) {
 		int oerrno = errno;
-		file_vinode_unref_tx(pfp, parent_vinode);
 		errno = oerrno;
 		return -1;
 	}
