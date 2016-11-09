@@ -46,7 +46,7 @@ if [[ -z "$TRAVIS" ]]; then
 	exit 1
 fi
 
-if [[ $TRAVIS_REPO_SLUG != "pmem/nvml" \
+if [[ $TRAVIS_REPO_SLUG != "marcinslusarz/nvml" \
 	|| $TRAVIS_EVENT_TYPE != "pull_request" ]];
 then
 	echo "SKIP: $0 can only be executed for pull requests to pmem/nvml"
