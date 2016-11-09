@@ -69,10 +69,7 @@ for commit in $commits;	do
 
 	files=$(git diff-tree --no-commit-id --name-only -r $commit)
 	fail=$(echo $files | grep ^$directory | wc -l)
-	if [ fail -ne 0 ]; then
-		echo aaa$files
-		echo bbb$fail
-		echo ccc$directory
+	if [ $fail -ne 0 ]; then
 		echo "go away"
 		exit 1
 	fi
