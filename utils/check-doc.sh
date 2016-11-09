@@ -60,26 +60,16 @@ else
 	commits=$TRAVIS_COMMIT
 fi
 
-# Get the list of files modified by the commits
-files=$(for commit in $commits; do git diff-tree --no-commit-id --name-only \
-	-r $commit; done | sort -u)
-
-if [[ "$1" == "-v" ]]; then
-	echo "Commits in the commit range:"
-	for commit in $commits; do echo $commit; done
-	echo "Files modified within the commit range:"
-	for file in $files; do echo $file; done
-fi
-
 # Check for changes in the generated docs directory
-for file in $files; do
-	# Check if modified files are relevant to the current build
-	if [[ $file =~ ^($directory)\/* ]];
-	then
-		last_author=$(git --no-pager show -s --format='%aN <%aE>')
-		if [ "$last_author" != "$allowed_user" ]; then
-			echo "FAIL: changes to ${directory} allowed only by \"${allowed_user}\""
-			exit -1
-		fi
+for commit in $commits;	do
+	last_author=$(git --no-pager show -s --format='%aN <%aE>')
+	if [ "$last_author" == "$allowed_user" ]; then
+		continue
+	fi
+		
+	fail=$(git diff-tree --no-commit-id --name-only -r $commit | grep ^$directory | wc -l)
+	if [ fail -ne 0 ]; then
+		echo "go away"
+		exit 1
 	fi
 done
