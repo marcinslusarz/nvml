@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # Copyright 2016, Intel Corporation
 #
@@ -66,9 +66,13 @@ for commit in $commits;	do
 	if [ "$last_author" == "$allowed_user" ]; then
 		continue
 	fi
-		
-	fail=$(git diff-tree --no-commit-id --name-only -r $commit | grep ^$directory | wc -l)
+
+	files=$(git diff-tree --no-commit-id --name-only -r $commit)
+	fail=$(echo $files | grep ^$directory | wc -l)
 	if [ $fail -ne 0 ]; then
+		echo aaa$files
+		echo bbb$fail
+		echo ccc$directory
 		echo "go away"
 		exit 1
 	fi
