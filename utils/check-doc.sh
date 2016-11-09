@@ -62,7 +62,7 @@ fi
 
 # Check for changes in the generated docs directory
 for commit in $commits;	do
-	last_author=$(git --no-pager show -s --format='%aN <%aE>')
+	last_author=$(git --no-pager show -s --format='%aN <%aE>' $commit)
 	if [ "$last_author" == "$allowed_user" ]; then
 		continue
 	fi
