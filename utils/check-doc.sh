@@ -68,7 +68,7 @@ for commit in $commits;	do
 	fi
 		
 	fail=$(git diff-tree --no-commit-id --name-only -r $commit | grep ^$directory | wc -l)
-	if [ fail -ne 0 ]; then
+	if [ $fail -ne 0 ]; then
 		echo "go away"
 		exit 1
 	fi
