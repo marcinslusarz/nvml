@@ -43,7 +43,7 @@
 #define OPS_PER_THREAD 1000
 #define ALLOC_SIZE 100
 #define REALLOC_SIZE (ALLOC_SIZE * 3)
-#define FRAGMENTATION 3
+#define FRAGMENTATION 6
 #define MIX_RERUNS 2
 
 struct root {
@@ -176,7 +176,7 @@ main(int argc, char *argv[])
 
 	if (access(argv[1], F_OK) != 0) {
 		pop = pmemobj_create(argv[1], "TEST",
-		PMEMOBJ_MIN_POOL +
+		(PMEMOBJ_MIN_POOL) +
 		(THREADS * OPS_PER_THREAD * ALLOC_SIZE * FRAGMENTATION),
 		0666);
 	} else {

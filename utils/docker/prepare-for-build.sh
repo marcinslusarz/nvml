@@ -43,4 +43,4 @@ echo $USERPASS | sudo -S mount -t tmpfs none /tmp -osize=6G
 ./configure-tests.sh
 
 # Check for changes in automatically generated docs
-../check-doc.sh
+../check-doc.sh -v
