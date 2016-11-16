@@ -603,7 +603,12 @@ file_fill_stat(struct pmemfile_vinode *vinode, struct stat *buf)
 int
 pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 {
-	if (!path || !buf) {
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (!buf) {
 		errno = EFAULT;
 		return -1;
 	}
@@ -642,7 +647,12 @@ pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 int
 pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
 {
-	if (!file || !buf) {
+	if (!file) {
+		errno = EBADF;
+		return -1;
+	}
+
+	if (!buf) {
 		errno = EFAULT;
 		return -1;
 	}

@@ -31,6 +31,7 @@
  */
 
 #include <fcntl.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -513,10 +514,8 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 		return -1;
 	}
 
-	if ((ssize_t)count < 0) {
-		errno = EFBIG;
-		return -1;
-	}
+	if ((ssize_t)count < 0)
+		count = SSIZE_MAX;
 
 	int error = 0;
 
@@ -752,10 +751,8 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 		return -1;
 	}
 
-	if ((ssize_t)count < 0) {
-		errno = EFBIG;
-		return -1;
-	}
+	if ((ssize_t)count < 0)
+		count = SSIZE_MAX;
 
 	size_t bytes_read = 0;
 

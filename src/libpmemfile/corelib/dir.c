@@ -36,6 +36,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 
 #include "dir.h"
@@ -531,10 +532,8 @@ pmemfile_getdents(PMEMfilepool *pfp, PMEMfile *file,
 		return -1;
 	}
 
-	if ((int)count < 0) {
-		errno = EFBIG;
-		return -1;
-	}
+	if ((int)count < 0)
+		count = INT_MAX;
 
 	int bytes_read = 0;
 
@@ -638,10 +637,8 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 		return -1;
 	}
 
-	if ((int)count < 0) {
-		errno = EFBIG;
-		return -1;
-	}
+	if ((int)count < 0)
+		count = INT_MAX;
 
 	int bytes_read = 0;
 
