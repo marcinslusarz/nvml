@@ -195,6 +195,81 @@ file_check_pathname(const char *pathname)
 	return pathname;
 }
 
+static struct pmemfile_vinode *
+create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
+		struct pmemfile_vinode *parent_vinode, int flags, mode_t mode)
+{
+	if ((flags & O_TMPFILE) == O_TMPFILE) {
+		if (parent_vinode == NULL)
+			pmemobj_tx_abort(ENOENT);
+
+		if (!file_is_dir(parent_vinode))
+			pmemobj_tx_abort(ENOTDIR);
+
+		if ((flags & O_ACCMODE) == O_RDONLY)
+			pmemobj_tx_abort(EINVAL);
+	} else {
+		if (errno != ENOENT) {
+			ERR("!pmemfile_lookup_dentry failed in unexpected way");
+			pmemobj_tx_abort(errno);
+		}
+
+		if (!(flags & O_CREAT)) {
+			LOG(LUSR, "file %s does not exist", full_path);
+			pmemobj_tx_abort(ENOENT);
+		}
+
+		if (flags & O_DIRECTORY)
+			LOG(LDBG, "O_DIRECTORY is ignored for O_CREAT");
+	}
+
+	struct pmemfile_time t;
+
+	rwlock_tx_wlock(&parent_vinode->rwlock);
+
+	struct pmemfile_vinode *vinode =
+			file_inode_alloc(pfp, S_IFREG | mode, &t);
+
+	if ((flags & O_TMPFILE) == O_TMPFILE)
+		file_register_orphaned_inode(pfp, vinode);
+	else
+		file_add_dentry(pfp, parent_vinode, filename, vinode, &t);
+
+	rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
+
+	return vinode;
+}
+
+static void
+open_file(const char *orig_pathname, struct pmemfile_vinode *vinode, int flags)
+{
+	if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+		LOG(LUSR, "file %s already exists", orig_pathname);
+		pmemobj_tx_abort(EEXIST);
+	}
+
+	if ((flags & O_DIRECTORY) && !file_is_dir(vinode))
+		pmemobj_tx_abort(ENOTDIR);
+
+	if (flags & O_TRUNC) {
+		if (!file_is_regular_file(vinode)) {
+			LOG(LUSR, "truncating non regular file");
+			pmemobj_tx_abort(EINVAL);
+		}
+
+		if ((flags & O_ACCMODE) == O_RDONLY) {
+			LOG(LUSR, "O_TRUNC without write permissions");
+			pmemobj_tx_abort(EACCES);
+		}
+
+		rwlock_tx_wlock(&vinode->rwlock);
+
+		file_truncate(vinode);
+
+		rwlock_tx_unlock_on_commit(&vinode->rwlock);
+	}
+}
+
 /*
  * pmemfile_open -- open file
  */
@@ -260,76 +335,10 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (vinode == NULL) {
-			if ((flags & O_TMPFILE) == O_TMPFILE) {
-				if (parent_vinode == NULL)
-					pmemobj_tx_abort(ENOENT);
-				if (!file_is_dir(parent_vinode))
-					pmemobj_tx_abort(ENOTDIR);
-				if ((flags & O_ACCMODE) == O_RDONLY)
-					pmemobj_tx_abort(EINVAL);
-			} else {
-				if (errno != ENOENT) {
-					ERR("!pmemfile_lookup_dentry failed in "
-							"unexpected way");
-					pmemobj_tx_abort(errno);
-				}
-
-				if (!(flags & O_CREAT)) {
-					LOG(LUSR, "file %s does not exist",
-							orig_pathname);
-					pmemobj_tx_abort(ENOENT);
-				}
-
-				if (flags & O_DIRECTORY)
-					LOG(LDBG, "O_DIRECTORY is ignored for "
-							"O_CREAT");
-			}
-
-			// create file
-			struct pmemfile_time t;
-
-			rwlock_tx_wlock(&parent_vinode->rwlock);
-
-			vinode = file_inode_alloc(pfp, S_IFREG | mode, &t);
-
-			if ((flags & O_TMPFILE) == O_TMPFILE) {
-				file_register_orphaned_inode(pfp, vinode);
-			} else {
-				file_add_dentry(pfp, parent_vinode, pathname,
-						vinode, &t);
-			}
-
-			rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
+			vinode = create_file(pfp, pathname, orig_pathname,
+					parent_vinode, flags, mode);
 		} else {
-			if ((flags & (O_CREAT | O_EXCL)) ==
-					(O_CREAT | O_EXCL)) {
-				LOG(LUSR, "file %s already exists",
-						orig_pathname);
-				pmemobj_tx_abort(EEXIST);
-			}
-
-			if ((flags & O_DIRECTORY) && !file_is_dir(vinode))
-				pmemobj_tx_abort(ENOTDIR);
-
-			if (flags & O_TRUNC) {
-				if (!file_is_regular_file(vinode)) {
-					LOG(LUSR, "truncating non regular "
-							"file");
-					pmemobj_tx_abort(EINVAL);
-				}
-
-				if ((flags & O_ACCMODE) == O_RDONLY) {
-					LOG(LUSR, "O_TRUNC without write "
-							"permissions");
-					pmemobj_tx_abort(EACCES);
-				}
-
-				rwlock_tx_wlock(&vinode->rwlock);
-
-				file_truncate(vinode);
-
-				rwlock_tx_unlock_on_commit(&vinode->rwlock);
-			}
+			open_file(orig_pathname, vinode, flags);
 		}
 
 		file = Zalloc(sizeof(*file));
