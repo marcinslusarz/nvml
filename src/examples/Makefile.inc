@@ -95,9 +95,11 @@ clean-progs clean-libraries:
 	$(RM) *.o
 
 .c.o:
+	@$(call check-cstyle, $<)
 	$(CC) -c -o $@ $(CFLAGS) $(INCS) $<
 
 .cpp.o:
+	@$(call check-cstyle, $<)
 	$(CXX) -c -o $@ $(CXXFLAGS) $(INCS) $<
 
 $(PROGS):
