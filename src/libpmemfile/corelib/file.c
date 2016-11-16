@@ -67,7 +67,7 @@ file_check_flags(int flags)
 
 	if (flags & O_ASYNC) {
 		LOG(LSUP, "O_ASYNC is not supported");
-		errno = ENOTSUP;
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -131,7 +131,7 @@ file_check_flags(int flags)
 
 	if (flags & O_PATH) {
 		LOG(LSUP, "O_PATH is not supported (yet)");
-		errno = ENOTSUP;
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -162,7 +162,7 @@ file_check_flags(int flags)
 
 	if (flags) {
 		ERR("unknown flag 0x%x\n", flags);
-		errno = ENOTSUP;
+		errno = EINVAL;
 		return -1;
 	}
 
