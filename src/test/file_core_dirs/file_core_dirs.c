@@ -81,11 +81,11 @@ stat_and_dump(PMEMfilepool *pfp, const char *path)
 }
 
 struct linux_dirent64 {
-	uint64_t       d_ino;
-	uint64_t       d_off;
-	unsigned short d_reclen;
-	unsigned char  d_type;
-	char           d_name[];
+	uint64_t	d_ino;
+	uint64_t	d_off;
+	unsigned short	d_reclen;
+	unsigned char	d_type;
+	char		d_name[];
 };
 
 static void
@@ -101,7 +101,8 @@ list_root(PMEMfilepool *pfp, int expected_files)
 
 	while ((uintptr_t)d < (uintptr_t)&buf[r]) {
 		num_files++;
-		UT_OUT("ino: 0x%lx, off: 0x%lx, len: %d, type: %d, name: \"%s\"",
+		UT_OUT("ino: 0x%lx, off: 0x%lx, len: %d, type: %d, "
+				"name: \"%s\"",
 				d->d_ino, d->d_off, d->d_reclen, d->d_type,
 				d->d_name);
 		sprintf(path, "/%s", d->d_name);

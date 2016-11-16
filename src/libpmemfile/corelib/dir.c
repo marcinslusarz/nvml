@@ -151,7 +151,7 @@ file_add_dentry(PMEMfilepool *pfp,
 			TX_ADD_DIRECT(&parent->size);
 			parent->size += sz;
 
-			D_RW(dir->next)->num_elements = (uint32_t) (sz /
+			D_RW(dir->next)->num_elements = (uint32_t)(sz /
 					sizeof(struct pmemfile_dirent));
 		}
 
