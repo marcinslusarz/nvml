@@ -245,6 +245,15 @@ _file_vinode_get(PMEMfilepool *pfp,
 	struct pmemfile_inode_map *c = pfp->inode_map;
 	int tx = 0;
 
+	if (D_RO(inode)->version != PMEMFILE_INODE_VERSION(1)) {
+		ERR("unknown inode version 0x%x for inode 0x%lx",
+				D_RO(inode)->version, inode.oid.off);
+		if (pmemobj_tx_stage() == TX_STAGE_WORK)
+			pmemobj_tx_abort(EINVAL);
+		else
+			return NULL;
+	}
+
 	util_rwlock_rdlock(&c->rwlock);
 	size_t idx = file_hash_inode(c, inode) % c->sz;
 
@@ -446,6 +455,7 @@ file_inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 
 	file_get_time(t);
 
+	inode->version = PMEMFILE_INODE_VERSION(1);
 	inode->flags = flags;
 	inode->ctime = *t;
 	inode->mtime = *t;

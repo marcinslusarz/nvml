@@ -278,7 +278,8 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 			file_lookup_dentry_locked(pfp, parent, name, NULL);
 		if (dentry) {
 			vinode = file_vinode_ref(pfp, dentry->inode);
-			file_set_path_debug(pfp, parent, vinode, name);
+			if (vinode)
+				file_set_path_debug(pfp, parent, vinode, name);
 		}
 	}
 
@@ -377,14 +378,18 @@ _pmemfile_list(PMEMfilepool *pfp, struct pmemfile_vinode *parent)
 				vinode = file_vinode_get(pfp, d->inode, false);
 			else {
 				vinode = file_vinode_get(pfp, d->inode, true);
-				file_set_path_debug(pfp, parent, vinode,
-						d->name);
+				if (vinode)
+					file_set_path_debug(pfp, parent, vinode,
+							d->name);
 			}
 
-			LOG(LINF, "* %3d 0x%6lx %5lu %6lu 0%06lo %s",
-				vinode->ref, d->inode.oid.off,
-				inode->nlink, inode->size, inode->flags,
-				d->name);
+			if (vinode == NULL)
+				LOG(LINF, "0x%lx %d", d->inode.oid.off, errno);
+			else
+				LOG(LINF, "* %3d 0x%6lx %5lu %6lu 0%06lo %s",
+					vinode->ref, d->inode.oid.off,
+					inode->nlink, inode->size, inode->flags,
+					d->name);
 
 			if (!TOID_EQUALS(parent->inode, d->inode))
 				file_vinode_unref_tx(pfp, vinode);
