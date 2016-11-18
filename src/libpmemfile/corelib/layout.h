@@ -75,6 +75,7 @@ struct pmemfile_dirent {
 /* Directory */
 struct pmemfile_dir {
 	uint32_t num_elements;
+	uint32_t padding;
 	TOID(struct pmemfile_dir) next;
 	struct pmemfile_dirent dentries[];
 };
@@ -153,10 +154,11 @@ struct pmemfile_inode_array {
 	TOID(struct pmemfile_inode_array) next;
 
 	/* Number of used entries, <0, NUMINODES_PER_ENTRY>. */
-	uint64_t used;
+	uint32_t used;
+
+	char padding[12];
 
 	TOID(struct pmemfile_inode) inodes[NUMINODES_PER_ENTRY];
-	char padding[8];
 };
 
 /* Superblock */
