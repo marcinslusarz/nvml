@@ -157,9 +157,12 @@ struct pmemfile_inode_array {
 	TOID(struct pmemfile_inode) inodes[NUMINODES_PER_ENTRY];
 };
 
+#define PMEMFILE_SUPER_VERSION(a, b) ((uint64_t)0x000056454C494650 | \
+		((uint64_t)(a + '0') << 48) | ((uint64_t)(b + '0') << 56))
+
 /* Superblock */
 struct pmemfile_super {
-	/* XXX unused */
+	/* Superblock version */
 	uint64_t version;
 
 	/* Root directory inode */

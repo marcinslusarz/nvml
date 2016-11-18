@@ -67,6 +67,7 @@ file_initialize_super(PMEMfilepool *pfp)
 			pfp->root = file_new_dir(pfp, NULL, "/");
 
 			TX_ADD(pfp->super);
+			super->version = PMEMFILE_SUPER_VERSION(0, 1);
 			super->root_inode = pfp->root->inode;
 		}
 	} TX_ONABORT {
@@ -76,6 +77,12 @@ file_initialize_super(PMEMfilepool *pfp)
 	if (err) {
 		ERR("cannot initialize super block");
 		return err;
+	}
+
+	if (super->version != PMEMFILE_SUPER_VERSION(0, 1)) {
+		ERR("unknown superblock version: 0x%lx", super->version);
+		errno = EINVAL;
+		return -1;
 	}
 
 	return 0;
