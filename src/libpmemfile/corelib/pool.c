@@ -58,7 +58,7 @@ file_initialize_super(PMEMfilepool *pfp)
 	struct pmemfile_super *super = D_RW(pfp->super);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		if (super->initialized) {
+		if (!TOID_IS_NULL(super->root_inode)) {
 			pfp->root = file_vinode_ref(pfp, super->root_inode);
 #ifdef DEBUG
 			pfp->root->path = Strdup("/");
@@ -68,7 +68,6 @@ file_initialize_super(PMEMfilepool *pfp)
 
 			TX_ADD(pfp->super);
 			super->root_inode = pfp->root->inode;
-			super->initialized = 1;
 		}
 	} TX_ONABORT {
 		err = -1;
