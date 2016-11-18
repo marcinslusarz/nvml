@@ -151,7 +151,7 @@ file_allocate_block(PMEMfile *file,
 {
 	struct pmemfile_block_array *block_array = pos->block_array;
 
-	size_t sz = pmemfile_core_block_size;
+	size_t sz = min(pmemfile_core_block_size, 1U << 31);
 	if (sz == 0) {
 		if (count < 4096)
 			sz = 16 * 1024;
@@ -165,7 +165,9 @@ file_allocate_block(PMEMfile *file,
 
 	TX_ADD_DIRECT(block);
 	block->data = TX_XALLOC(char, sz, POBJ_XALLOC_NO_FLUSH);
-	block->size = pmemobj_alloc_usable_size(block->data.oid);
+	sz = pmemobj_alloc_usable_size(block->data.oid);
+	ASSERT(sz <= UINT32_MAX);
+	block->size = (uint32_t)sz;
 
 	TX_ADD_DIRECT(&inode->last_block_fill);
 	inode->last_block_fill = 0;
@@ -182,7 +184,7 @@ static void
 file_extend_block_meta_data(struct pmemfile_inode *inode,
 		struct pmemfile_block_array *block_array,
 		struct pmemfile_block *block,
-		size_t len)
+		uint32_t len)
 {
 	TX_ADD_FIELD_DIRECT(inode, last_block_fill);
 	inode->last_block_fill += len;
@@ -199,7 +201,7 @@ file_zero_extend_block(PMEMfilepool *pfp,
 		struct pmemfile_inode *inode,
 		struct pmemfile_block_array *block_array,
 		struct pmemfile_block *block,
-		size_t len)
+		uint32_t len)
 {
 	char *addr = D_RW(block->data) + inode->last_block_fill;
 
@@ -269,6 +271,7 @@ file_seek_within_block(PMEMfilepool *pfp,
 	 * Is anticipated position within the current block?
 	 */
 	if (pos->block_offset + offset_left < block->size) {
+		ASSERT(offset_left <= UINT32_MAX);
 		/*
 		 * Is anticipated position between the end of
 		 * used space and the end of block?
@@ -276,7 +279,7 @@ file_seek_within_block(PMEMfilepool *pfp,
 		if (is_last && pos->block_offset + offset_left
 				> inode->last_block_fill) {
 			if (!extend) {
-				size_t sz = inode->last_block_fill -
+				uint32_t sz = inode->last_block_fill -
 						pos->block_offset;
 				pos->block_offset += sz;
 				pos->global_offset += sz;
@@ -285,13 +288,13 @@ file_seek_within_block(PMEMfilepool *pfp,
 			}
 
 			file_zero_extend_block(pfp, inode, pos->block_array,
-					block, offset_left -
-					inode->last_block_fill);
+					block, (uint32_t)(offset_left -
+					inode->last_block_fill));
 
 			ASSERT(inode->last_block_fill <= block->size);
 		}
 
-		pos->block_offset += offset_left;
+		pos->block_offset += (uint32_t)offset_left;
 		pos->global_offset += offset_left;
 
 		ASSERTeq(pos->global_offset, file->offset);
@@ -303,7 +306,7 @@ file_seek_within_block(PMEMfilepool *pfp,
 	 * Now we know offset lies in one of the consecutive blocks.
 	 * So we can go to the next block.
 	 */
-	size_t sz = block->size - pos->block_offset;
+	uint32_t sz = block->size - pos->block_offset;
 	pos->block_offset += sz;
 	pos->global_offset += sz;
 
@@ -327,7 +330,8 @@ file_write_within_block(PMEMfilepool *pfp,
 		file_allocate_block(file, inode, pos, block, count_left);
 
 	/* How much data should we write to this block? */
-	size_t len = min(block->size - pos->block_offset, count_left);
+	uint32_t len = (uint32_t)min((size_t)block->size - pos->block_offset,
+			count_left);
 
 	pmemobj_memcpy_persist(pfp->pop, D_RW(block->data) + pos->block_offset,
 			buf, len);
@@ -338,7 +342,7 @@ file_write_within_block(PMEMfilepool *pfp,
 		 * have to update all metadata.
 		 */
 		if (pos->block_offset + len > inode->last_block_fill) {
-			size_t new_used = pos->block_offset + len
+			uint32_t new_used = pos->block_offset + len
 					- inode->last_block_fill;
 
 			file_extend_block_meta_data(inode, pos->block_array,
@@ -369,8 +373,8 @@ file_read_from_block(struct pmemfile_inode *inode,
 		return 0;
 
 	/* How much data should we read from this block? */
-	size_t len = is_last ? inode->last_block_fill : block->size;
-	len = min(len - pos->block_offset, count_left);
+	uint32_t len = is_last ? inode->last_block_fill : block->size;
+	len = (uint32_t)min((size_t)len - pos->block_offset, count_left);
 
 	if (len == 0)
 		return 0;
@@ -636,7 +640,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 				block, offset_left, false, is_last);
 
 		if (seeked == 0) {
-			uint64_t used = is_last ?
+			uint32_t used = is_last ?
 					inode->last_block_fill : block->size;
 			bool block_boundary =
 					block->size > 0 &&
@@ -684,7 +688,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 				count_left, is_last);
 
 		if (read1 == 0) {
-			uint64_t used = is_last ?
+			uint32_t used = is_last ?
 					inode->last_block_fill : block->size;
 			bool block_boundary =
 					block->size > 0 &&

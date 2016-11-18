@@ -50,7 +50,7 @@ POBJ_LAYOUT_END(pmemfile);
 
 struct pmemfile_block {
 	TOID(char) data;
-	uint64_t size;
+	uint32_t size;
 };
 
 /* File */
@@ -99,8 +99,8 @@ struct pmemfile_inode {
 	/* Group */
 	uint32_t gid;
 
-	/* Padding */
-	uint32_t padding;
+	/* Number of bytes written in the last block */
+	uint32_t last_block_fill;
 
 	/* Time of last access. */
 	struct pmemfile_time atime;
@@ -120,9 +120,6 @@ struct pmemfile_inode {
 	/* File flags. */
 	uint64_t flags;
 
-	/* Number of bytes written in the last block */
-	uint64_t last_block_fill;
-
 	/* Data! */
 	union {
 		/* File specific data. */
@@ -135,14 +132,13 @@ struct pmemfile_inode {
 				- 4  /* version */
 				- 4  /* uid */
 				- 4  /* gid */
-				- 4  /* padding */
+				- 4  /* last_block_fill */
 				- 16 /* atime */
 				- 16 /* ctime */
 				- 16 /* mtime */
 				- 8  /* nlink */
 				- 8  /* size */
-				- 8  /* flags */
-				- 8  /* last_block_fill */];
+				- 8  /* flags */];
 	} file_data;
 };
 
