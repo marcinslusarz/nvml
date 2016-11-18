@@ -74,7 +74,7 @@ struct pmemfile_file {
 		unsigned block_id;
 
 		/* Offset from the beginning of current block. */
-		size_t block_offset;
+		uint32_t block_offset;
 
 		/* Above maps to below. */
 
