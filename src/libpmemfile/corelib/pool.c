@@ -98,8 +98,8 @@ file_cleanup_inode_array_single(PMEMfilepool *pfp,
 
 		LOG(LINF, "closing inode left by previous run");
 
-		if (D_RW(op->inodes[i])->nlink == 0)
-			file_inode_free(pfp, op->inodes[i]);
+		ASSERTeq(D_RW(op->inodes[i])->nlink, 0);
+		file_inode_free(pfp, op->inodes[i]);
 
 		op->inodes[i] = TOID_NULL(struct pmemfile_inode);
 
