@@ -291,7 +291,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 	va_list ap;
 	va_start(ap, flags);
-	mode_t mode;
+	mode_t mode = 0;
 
 	/* NOTE: O_TMPFILE contains O_DIRECTORY */
 	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
