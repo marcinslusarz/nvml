@@ -170,14 +170,10 @@ struct pmemfile_super {
 	/* List of arrays of inodes that were deleted, but are still opened. */
 	TOID(struct pmemfile_inode_array) orphaned_inodes;
 
-	/* Flag indicating mkfs finished its work. */
-	char initialized;
-
 	char padding[4096
 			- 8  /* version */
 			- 16 /* toid */
-			- 16 /* toid */
-			- 1  /* init */];
+			- 16 /* toid */];
 };
 
 #endif
