@@ -88,6 +88,9 @@ struct pmemfile_time {
 	int64_t nsec;
 };
 
+#define PMEMFILE_INODE_VERSION(a) ((uint32_t)0x00444E49 | \
+		((uint32_t)(a + '0') << 24))
+
 /* Inode */
 struct pmemfile_inode {
 	/* Layout version */
