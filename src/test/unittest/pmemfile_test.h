@@ -54,6 +54,7 @@ ssize_t PMEMFILE_FILE_SIZE(PMEMfilepool *pfp, PMEMfile *file,
 		ssize_t expected_size);
 ssize_t PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path,
 		ssize_t expected_size);
+void PMEMFILE_MKDIR(PMEMfilepool *pfp, const char *path, mode_t mode);
 
 #ifdef __cplusplus
 }

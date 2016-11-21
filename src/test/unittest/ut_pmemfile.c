@@ -148,3 +148,10 @@ PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path, ssize_t expected_size)
 		UT_ASSERTeq(buf.st_size, expected_size);
 	return buf.st_size;
 }
+
+void
+PMEMFILE_MKDIR(PMEMfilepool *pfp, const char *path, mode_t mode)
+{
+	int ret = pmemfile_mkdir(pfp, path, mode);
+	UT_ASSERTeq(ret, 0);
+}

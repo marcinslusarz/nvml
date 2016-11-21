@@ -70,7 +70,6 @@ int pmemfile_openat(PMEMfilepool *, PMEMfile *at,
 int pmemfile_flock(PMEMfilepool *, PMEMfile *file, int operation);
 int pmemfile_truncate(PMEMfilepool *, const char *path, off_t length);
 int pmemfile_ftruncate(PMEMfilepool *, PMEMfile *file, off_t length);
-int pmemfile_mkdir(PMEMfilepool *, const char *path, mode_t mode);
 int pmemfile_mkdirat(PMEMfilepool *, PMEMfile *file,
 			const char *path, mode_t mode);
 int pmemfile_rmdir(PMEMfilepool *, const char *path);

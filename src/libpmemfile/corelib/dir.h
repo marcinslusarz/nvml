@@ -35,7 +35,8 @@
 #include "inode.h"
 
 struct pmemfile_vinode *file_new_dir(PMEMfilepool *pfp,
-		struct pmemfile_vinode *parent, const char *name);
+		struct pmemfile_vinode *parent, const char *name, mode_t mode,
+		bool add_to_parent);
 
 void file_add_dentry(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
