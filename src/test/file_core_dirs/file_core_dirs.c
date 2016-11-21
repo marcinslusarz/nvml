@@ -89,7 +89,7 @@ struct linux_dirent64 {
 };
 
 static void
-list_root(PMEMfilepool *pfp, int expected_files)
+list_root(PMEMfilepool *pfp, int expected_files, int just_count)
 {
 	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_DIRECTORY | O_RDONLY);
 
@@ -101,12 +101,14 @@ list_root(PMEMfilepool *pfp, int expected_files)
 
 	while ((uintptr_t)d < (uintptr_t)&buf[r]) {
 		num_files++;
-		UT_OUT("ino: 0x%lx, off: 0x%lx, len: %d, type: %d, "
-				"name: \"%s\"",
-				d->d_ino, d->d_off, d->d_reclen, d->d_type,
-				d->d_name);
-		sprintf(path, "/%s", d->d_name);
-		stat_and_dump(pfp, path);
+		if (!just_count) {
+			UT_OUT("ino: 0x%lx, off: 0x%lx, len: %d, type: %d, "
+					"name: \"%s\"",
+					d->d_ino, d->d_off, d->d_reclen,
+					d->d_type, d->d_name);
+			sprintf(path, "/%s", d->d_name);
+			stat_and_dump(pfp, path);
+		}
 		d = (void *)(((char *)d) + d->d_reclen);
 	}
 
@@ -122,6 +124,7 @@ test1(PMEMfilepool *pfp)
 	char buf[1001];
 	_pmemfile_list_root(pfp, "before");
 	memset(buf, 0xff, sizeof(buf));
+	UT_OUT("test1");
 
 	for (int i = 0; i < 100; ++i) {
 		sprintf(buf, "/file%04d", i);
@@ -132,7 +135,7 @@ test1(PMEMfilepool *pfp)
 
 		PMEMFILE_CLOSE(pfp, f);
 
-		list_root(pfp, i + 1 + 2);
+		list_root(pfp, i + 1 + 2, 0);
 	}
 
 	for (int i = 0; i < 100; ++i) {
@@ -140,6 +143,46 @@ test1(PMEMfilepool *pfp)
 
 		PMEMFILE_UNLINK(pfp, buf);
 	}
+}
+
+static void
+test2(PMEMfilepool *pfp)
+{
+	char buf[1001];
+	_pmemfile_list_root(pfp, "before");
+	UT_OUT("test2");
+
+	for (int i = 0; i < 100; ++i) {
+		sprintf(buf, "/dir%04d", i);
+
+		PMEMFILE_MKDIR(pfp, buf, 0755);
+
+		list_root(pfp, i + 1 + 2, 0);
+	}
+
+	list_root(pfp, 100 + 2, 1);
+	PMEMFILE_MKDIR(pfp, "/dir0007/another_directory", 0755);
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_mkdir(pfp, "/dir0007", 0755), -1);
+	UT_ASSERTeq(errno, EEXIST);
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_mkdir(pfp, "/dir2333/aaaa", 0755), -1);
+	UT_ASSERTeq(errno, ENOENT);
+
+	list_root(pfp, 100 + 2, 1);
+
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/file",
+			O_CREAT | O_EXCL | O_WRONLY, 0644));
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_mkdir(pfp, "/file/aaaa", 0755), -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	PMEMFILE_UNLINK(pfp, "/file");
+
+	list_root(pfp, 100 + 2, 1);
 }
 
 int
@@ -155,6 +198,8 @@ main(int argc, char *argv[])
 	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	test1(pfp);
+	list_root(pfp, 2, 1);
+	test2(pfp);
 
 	pmemfile_pool_close(pfp);
 

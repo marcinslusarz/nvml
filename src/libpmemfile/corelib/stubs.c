@@ -250,18 +250,6 @@ pmemfile_fchdir(PMEMfilepool *pfp, PMEMfile *file)
 }
 
 int
-pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
-{
-	check_pfp(pfp);
-
-	(void) path;
-	(void) mode;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *file,
 			const char *path, mode_t mode)
 {

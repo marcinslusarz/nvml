@@ -65,7 +65,7 @@ file_initialize_super(PMEMfilepool *pfp)
 			pfp->root->path = Strdup("/");
 #endif
 		} else {
-			pfp->root = file_new_dir(pfp, NULL, "/");
+			pfp->root = file_new_dir(pfp, NULL, "/", 0777, false);
 
 			TX_ADD(pfp->super);
 			super->version = PMEMFILE_SUPER_VERSION(0, 1);

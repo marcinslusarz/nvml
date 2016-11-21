@@ -39,6 +39,7 @@
 #include <limits.h>
 #include <stdio.h>
 
+#include "callbacks.h"
 #include "dir.h"
 #include "file.h"
 #include "inode.h"
@@ -191,7 +192,7 @@ file_add_dentry(PMEMfilepool *pfp,
  */
 struct pmemfile_vinode *
 file_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *name)
+		const char *name, mode_t mode, bool add_to_parent)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s new_name %s",
 			parent ? parent->inode.oid.off : 0,
@@ -199,9 +200,15 @@ file_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
 
+	if (mode & ~(mode_t)0777) {
+		/* TODO: what kernel does? */
+		ERR("invalid mode flags 0%o", mode);
+		pmemobj_tx_abort(EINVAL);
+	}
+
 	struct pmemfile_time t;
 	struct pmemfile_vinode *child =
-			file_inode_alloc(pfp, S_IFDIR | 0777, &t);
+			file_inode_alloc(pfp, S_IFDIR | mode, &t);
 	file_set_path_debug_locked(pfp, parent, child, name);
 
 	/* add . and .. to new directory */
@@ -211,6 +218,9 @@ file_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		file_add_dentry(pfp, child, "..", child, &t);
 	else
 		file_add_dentry(pfp, child, "..", parent, &t);
+
+	if (add_to_parent)
+		file_add_dentry(pfp, parent, name, child, &t);
 
 	return child;
 }
@@ -661,4 +671,129 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 
 	ASSERT((unsigned)bytes_read <= count);
 	return bytes_read;
+}
+
+/*
+ * traverse_pathat - traverses directory structure
+ *
+ * Traverses directory structure starting from parent using pathname
+ * components from path.
+ * Returns the deepest inode reachable and sets *name to the remaining path
+ * that was unreachable.
+ *
+ * Takes reference on returned inode.
+ */
+static struct pmemfile_vinode *
+traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+		const char *path, const char **name)
+{
+	char tmp[PATH_MAX];
+	file_inode_ref(pfp, parent);
+
+	while (1) {
+		struct pmemfile_vinode *child;
+		const char *slash = strchr(path, '/');
+
+		if (slash == NULL) {
+			child = file_lookup_dentry(pfp, parent, path);
+			if (child) {
+				file_vinode_unref_tx(pfp, parent);
+				while (path[0])
+					path++;
+
+				*name = path;
+				return child;
+			} else {
+				*name = path;
+				return parent;
+			}
+		} else {
+			strncpy(tmp, path, (uintptr_t)slash - (uintptr_t)path);
+			tmp[slash - path] = 0;
+
+			if (tmp[0] == 0) // workaround for file_lookup_dentry
+				child = NULL;
+			else
+				child = file_lookup_dentry(pfp, parent, tmp);
+			if (child) {
+				file_vinode_unref_tx(pfp, parent);
+				parent = child;
+				path = slash + 1;
+				while (path[0] == '/')
+					path++;
+			} else {
+				*name = path;
+				return parent;
+			}
+		}
+	}
+}
+
+static struct pmemfile_vinode *
+traverse_path(PMEMfilepool *pfp, const char *path, const char **name)
+{
+	if (path[0] != '/')
+		return NULL;
+
+	while (path[0] == '/')
+		path++;
+
+	return traverse_pathat(pfp, pfp->root, path, name);
+}
+
+int
+pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
+{
+	const char *name;
+	struct pmemfile_vinode *parent = traverse_path(pfp, path, &name);
+
+	if (!parent) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (name[0] == 0) {
+		file_vinode_unref_tx(pfp, parent);
+		errno = EEXIST;
+		return -1;
+	}
+
+	if (!file_is_dir(parent)) {
+		file_vinode_unref_tx(pfp, parent);
+		errno = ENOTDIR;
+		return -1;
+	}
+
+	if (strchr(name, '/')) {
+		file_vinode_unref_tx(pfp, parent);
+		errno = ENOENT;
+		return -1;
+	}
+
+	int error = 0;
+	int txerrno = 0;
+	struct pmemfile_vinode *child = NULL;
+
+	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
+		rwlock_tx_wlock(&parent->rwlock);
+
+		child = file_new_dir(pfp, parent, name, mode, true);
+
+		rwlock_tx_unlock_on_commit(&parent->rwlock);
+	} TX_ONABORT {
+		error = 1;
+		txerrno = errno;
+	} TX_END
+
+	if (!error)
+		file_vinode_unref_tx(pfp, child);
+
+	file_vinode_unref_tx(pfp, parent);
+
+	if (error) {
+		errno = txerrno;
+		return -1;
+	}
+
+	return 0;
 }
