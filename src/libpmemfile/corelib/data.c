@@ -530,6 +530,7 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 	util_mutex_lock(&file->mutex);
 
 	memcpy(&pos, &file->pos, sizeof(pos));
+	int txerrno = 0;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&vinode->rwlock);
@@ -551,6 +552,7 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 		rwlock_tx_unlock_on_commit(&vinode->rwlock);
 	} TX_ONABORT {
 		error = 1;
+		txerrno = errno;
 		memcpy(&file->pos, &pos, sizeof(pos));
 	} TX_ONCOMMIT {
 		file->offset += count;
@@ -558,8 +560,10 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 
 	util_mutex_unlock(&file->mutex);
 
-	if (error)
+	if (error) {
+		errno = txerrno;
 		return -1;
+	}
 
 	return (ssize_t)count;
 }
