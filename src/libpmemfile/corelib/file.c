@@ -315,6 +315,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 		return NULL;
 
 	int error = 0;
+	int txerrno = 0;
 	PMEMfile *file = NULL;
 
 	struct pmemfile_vinode *parent_vinode = pfp->root;
@@ -360,17 +361,16 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 			file->flags |= PFILE_APPEND;
 	} TX_ONABORT {
 		error = 1;
+		txerrno = errno;
 	} TX_END
 
 	file_vinode_unref_tx(pfp, parent_vinode);
 
 	if (error) {
-		int oerrno = errno;
-
 		if (old_vinode != NULL)
 			file_vinode_unref_tx(pfp, old_vinode);
 
-		errno = oerrno;
+		errno = txerrno;
 		LOG(LDBG, "!");
 
 		return NULL;
