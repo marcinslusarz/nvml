@@ -44,6 +44,7 @@ DIRS = \
        pmemalloc\
        pmemobjcli\
        pmemdetect\
+       pmemfile-cat\
        ctrld\
        bttcreate\
        fip\
