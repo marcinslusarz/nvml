@@ -35,7 +35,7 @@ TOP = ../..
 
 TESTCONFIG=$(TOP)/src/test/testconfig.sh
 
-TARGETS = pmempool rpmemd
+TARGETS = pmempool rpmemd mkfs.pmemfile
 SCOPEDIRS=$(TARGETS)
 SCOPEFILES=$(foreach dir, $(SCOPEDIRS), $(shell find $(dir) -name *.[ch] ))
 
