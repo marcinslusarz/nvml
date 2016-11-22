@@ -135,6 +135,11 @@ test1(PMEMfilepool *pfp)
 		list_root(pfp, i + 1 + 2);
 	}
 
+	for (int i = 0; i < 100; ++i) {
+		sprintf(buf, "/file%04d", i);
+
+		PMEMFILE_UNLINK(pfp, buf);
+	}
 }
 
 int
