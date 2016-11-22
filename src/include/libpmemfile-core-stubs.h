@@ -72,7 +72,6 @@ int pmemfile_truncate(PMEMfilepool *, const char *path, off_t length);
 int pmemfile_ftruncate(PMEMfilepool *, PMEMfile *file, off_t length);
 int pmemfile_mkdirat(PMEMfilepool *, PMEMfile *file,
 			const char *path, mode_t mode);
-int pmemfile_rmdir(PMEMfilepool *, const char *path);
 int pmemfile_symlink(PMEMfilepool *, const char *path1, const char *path2);
 int pmemfile_symlinkat(PMEMfilepool *, const char *path1,
 				PMEMfile *at, const char *path2);

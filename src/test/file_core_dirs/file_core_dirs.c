@@ -183,6 +183,45 @@ test2(PMEMfilepool *pfp)
 	PMEMFILE_UNLINK(pfp, "/file");
 
 	list_root(pfp, 100 + 2, 1);
+
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir0100"), -1);
+	UT_ASSERTeq(errno, ENOENT);
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir0099/inside"), -1);
+	UT_ASSERTeq(errno, ENOENT);
+
+
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/file",
+			O_CREAT | O_EXCL | O_WRONLY, 0644));
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/file"), -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	PMEMFILE_UNLINK(pfp, "/file");
+
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_unlink(pfp, "/dir0000"), -1);
+	UT_ASSERTeq(errno, EISDIR);
+
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir0007"), -1);
+	UT_ASSERTeq(errno, ENOTEMPTY);
+
+	PMEMFILE_RMDIR(pfp, "/dir0007/another_directory");
+
+	for (int i = 0; i < 100; ++i) {
+		sprintf(buf, "/dir%04d", i);
+
+		PMEMFILE_RMDIR(pfp, buf);
+	}
+
+	list_root(pfp, 2, 0);
 }
 
 int

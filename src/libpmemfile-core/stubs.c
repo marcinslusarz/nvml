@@ -263,17 +263,6 @@ pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *file,
 }
 
 int
-pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
-{
-	check_pfp(pfp);
-
-	(void) path;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_symlink(PMEMfilepool *pfp, const char *path1, const char *path2)
 {
 	check_pfp(pfp);
