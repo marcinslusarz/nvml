@@ -50,3 +50,8 @@ test_libcintercept_libc_lpthread.o: test_libcintercept.c
 OBJS = test_libcintercept.o
 
 include ../Makefile.inc
+
+clobber-prv:
+	$(RM) test_libcintercept_libc test_libcintercept_libc_lpthread
+
+clobber: clobber-prv
