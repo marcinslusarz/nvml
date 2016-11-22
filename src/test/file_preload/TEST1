@@ -1,3 +1,5 @@
+#!/bin/bash -e
+#
 # Copyright 2016, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,57 +29,54 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-#
-# src/libpmemfile/Makefile -- Makefile for libpmemfile project
 #
 
-include ../common.inc
+export UNITTEST_NAME=file_preload/TEST1
+export UNITTEST_NUM=1
 
-TARGETS = corelib
+# standard unit test setup
+. ../unittest/unittest.sh
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
+require_test_type medium
+require_build_type debug nondebug
 
-ifeq ($(CAPSTONE_AVAILABLE),y)
-TARGETS += cintercept pmemfile_preload
-else
-$(info NOTE: Skipping pmemfile interposing library because \
-capstone is missing.)
-endif
+setup
 
+expect_normal_exit ../../tools/mkfs.pmemfile/mkfs.pmemfile $DIR/dummy_fs 16m
 
-CLEAN_TARGETS = $(TARGETS)
-CLOBBER_TARGETS = $(TARGETS)
-CSTYLE_TARGETS = $(TARGETS)
-INSTALL_TARGETS = $(TARGETS)
+mkdir -p $DIR/dummy_mount_point
 
-pmemfile_preload: corelib cintercept
+export TEST_LD_PRELOAD=libpmemfile_preload.so
+export PMEMFILE_POOLS=$DIR/dummy_mount_point:$DIR/dummy_fs
 
-all: $(TARGETS)
-install: $(INSTALL_TARGETS:=-install)
-uninstall: $(INSTALL_TARGETS:=-uninstall)
-clean: $(CLEAN_TARGETS:=-clean)
-clobber: $(CLOBBER_TARGETS:=-clobber)
-cstyle: $(CSTYLE_TARGETS:=-cstyle)
+export PMEMFILE_PRELOAD_LOG=pmemfile_preload.log
+export INTERCEPT_LOG=intercept.log
+export INTERCEPT_LOG_NO_PID=1
 
-%-install: %
-	$(MAKE) -C $* install
+expect_normal_exit cp dummy_file_a $DIR/dummy_mount_point/file_a
+expect_normal_exit cp dummy_file_b $DIR/dummy_mount_point/file_b
+expect_normal_exit cp $DIR/dummy_mount_point/file_a file_a.log
+expect_normal_exit cp $DIR/dummy_mount_point/file_b file_b.log
 
-%-uninstall: %
-	$(MAKE) -C $* uninstall
+cmp file_a.log dummy_file_a
+cmp file_b.log dummy_file_b
 
-%-clean:
-	$(MAKE) -C $* clean
+expect_normal_exit cat $DIR/dummy_mount_point/file_a > file_a_cat.log
 
-%-clobber:
-	$(MAKE) -C $* clobber
+cmp file_a_cat.log dummy_file_a
 
-%-cstyle:
-	$(MAKE) -C $* cstyle
+expect_normal_exit ls $DIR/dummy_mount_point > pmemfile_ls_root.log
 
-preload tools fuse: corelib
+cmp pmemfile_ls_root.log ls_root_expected_log
 
-$(TARGETS):
-	$(MAKE) -C $@
+expect_normal_exit ls -o --time-style=+"" $DIR/dummy_mount_point | sed 's/\s\+/ /g' > file_preload_lsl1.log
+expect_normal_exit ls -ao --time-style=+"" $DIR/dummy_mount_point | sed -e 's/\s\+/ /g' -e '/\.\./d' > file_preload_lsla1.log
 
-.PHONY: all install uninstall clean clobber cstyle $(TARGETS)
+check
+
+# todo: when rm works...
+# expect_normal_exit rm $DIR/dummy_mount_point/file_a
+# expect_normal_exit ls $DIR/dummy_mount_point > pmemfile_ls_root_after_rm.log
+# cmp pmemfile_ls_root_after_rm.log ls_root_after_rm_expected_log
+
+pass
