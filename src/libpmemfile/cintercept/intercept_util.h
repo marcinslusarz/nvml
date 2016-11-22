@@ -30,17 +30,60 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NVML_CPU_H
-#define NVML_CPU_H 1
+#ifndef INTERCEPT_UTIL_H
+#define INTERCEPT_UTIL_H
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <sys/types.h>
 
 /*
- * cpu.h -- definitions for "cpu" module
+ * syscall_no_intercept - syscall without interception
+ *
+ * Call syscall_no_intercept to make syscalls
+ * from the interceptor library, once glibc is already patched.
+ * Don't use the syscall function from glibc, that
+ * would just result in an infinite recursion.
  */
+long syscall_no_intercept(long syscall_number, ...);
 
-int is_cpu_genuine_intel(void);
-int is_cpu_clflush_present(void);
-int is_cpu_clflushopt_present(void);
-int is_cpu_clwb_present(void);
-int has_ymm_registers(void);
+/*
+ * xmmap_anon - get new memory mapping
+ *
+ * Not intercepted - does not call libc.
+ * Always succeds if returns - aborts the process on failure.
+ */
+void *xmmap_anon(size_t size);
+
+void *xmremap(void *addr, size_t old, size_t new);
+
+/*
+ * xlseek - get new memory mapping
+ *
+ * Not intercepted - does not call libc.
+ * Always succeds if returns - aborts the process on failure.
+ */
+long xlseek(long fd, unsigned long off, int whence);
+
+/*
+ * xread - get new memory mapping
+ *
+ * Not intercepted - does not call libc.
+ * Always succeds reading size bytes returns - aborts the process on failure.
+ */
+void xread(long fd, void *buffer, size_t size);
+
+char *xprint_escape(char *restrict dst, const char *restrict src,
+			size_t dst_size, bool zero_term, size_t src_size);
+
+void intercept_setup_log(const char *path_base);
+void intercept_log(const char *buffer, size_t len);
+void intercept_logs(const char *str);
+void intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
+			long arg2, long arg3,
+			long arg4, long arg5, uint64_t syscall_offset,
+			long result);
+void intercept_log_close(void);
 
 #endif

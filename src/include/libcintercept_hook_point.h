@@ -30,17 +30,43 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NVML_CPU_H
-#define NVML_CPU_H 1
+#ifndef INTERCEPT_HOOK_POINT_H
+#define INTERCEPT_HOOK_POINT_H
 
 /*
- * cpu.h -- definitions for "cpu" module
+ * The inteface for using the intercepting library.
+ * This callback function should be implemented by
+ * the code using the library.
+ *
+ * The syscall_number, and the six args describe the syscall
+ * currently being intercepted.
+ * For now, a zero return value means the interceptor exceute
+ * the original syscall, use its result. A non-zero return value
+ * means the interceptor should not execute the syscall, and
+ * use the integer stored to *result as the result of the syscall
+ * to be returned in RAX to libc.
  */
 
-int is_cpu_genuine_intel(void);
-int is_cpu_clflush_present(void);
-int is_cpu_clflushopt_present(void);
-int is_cpu_clwb_present(void);
-int has_ymm_registers(void);
+extern
+#ifdef __cplusplus
+"C"
+#endif
+int (*intercept_hook_point)(long syscall_number,
+			long arg0, long arg1,
+			long arg2, long arg3,
+			long arg4, long arg5,
+			long *result);
+
+/*
+ * syscall_no_intercept - syscall without interception
+ *
+ * Call syscall_no_intercept to make syscalls
+ * from the interceptor library, once glibc is already patched.
+ * Don't use the syscall function from glibc, that
+ * would just result in an infinite recursion.
+ */
+long syscall_no_intercept(long syscall_number, ...);
+
+int libc_hook_in_process_allowed(void);
 
 #endif

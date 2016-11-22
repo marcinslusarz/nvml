@@ -1,0 +1,23 @@
+
+To log syscalls made in the command 'make something':
+
+INTERCEPT_LOG=intercepting.log LD_PRELOAD=./libcintercept.so make something
+
+The environment variable INTERCEPT_LOG is used by the intercepting library
+to name the log files. Each logfile create has a pid number attached to
+the end of this given path. E.g. after make forking, creating three
+processes altogether, the result would be three log files:
+
+intercepting.log.3423
+intercepting.log.3424
+intercepting.log.3425
+
+These logs contain one line per each syscall intercepted.
+A line starts with the offset of the patched syscall instruction
+in glibc, and continues with a short description of the syscall.
+
+To decode each offset using addr2line, execute the logfile, e.g.:
+
+./intercepting.log.3425
+
+Currently, this is not easily readable, but that can change.
