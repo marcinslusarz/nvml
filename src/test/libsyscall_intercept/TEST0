@@ -38,7 +38,8 @@ export UNITTEST_NUM=0
 . ../unittest/unittest.sh
 
 require_test_type short
-require_build_type debug nondebug
+require_build_type debug
+require_fs_type none
 
 setup
 
