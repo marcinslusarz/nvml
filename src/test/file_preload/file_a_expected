@@ -1,3 +1,5 @@
+#!/bin/bash -e
+#
 # Copyright 2016, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,57 +29,29 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-#
-# src/libpmemfile/Makefile -- Makefile for libpmemfile project
 #
 
-include ../common.inc
+export UNITTEST_NAME=file_preload/TEST1
+export UNITTEST_NUM=1
 
-TARGETS = corelib
+# standard unit test setup
+. ../unittest/unittest.sh
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
+require_test_type short
+require_build_type debug nondebug
 
-ifeq ($(CAPSTONE_AVAILABLE),y)
-TARGETS += cintercept pmemfile_preload
-else
-$(info NOTE: Skipping pmemfile interposing library because \
-capstone is missing.)
-endif
+setup
 
+expect_normal_exit ../../tools/mkfs.pmemfile/mkfs.pmemfile $DIR/dummy_fs 16m
 
-CLEAN_TARGETS = $(TARGETS)
-CLOBBER_TARGETS = $(TARGETS)
-CSTYLE_TARGETS = $(TARGETS)
-INSTALL_TARGETS = $(TARGETS)
+mkdir -p $DIR/dummy_mount_point
 
-pmemfile_preload: corelib cintercept
+export TEST_LD_PRELOAD=libpmemfile_preload.so
+export PMEMFILE_POOLS=$DIR/dummy_mount_point:$DIR/dummy_fs
 
-all: $(TARGETS)
-install: $(INSTALL_TARGETS:=-install)
-uninstall: $(INSTALL_TARGETS:=-uninstall)
-clean: $(CLEAN_TARGETS:=-clean)
-clobber: $(CLOBBER_TARGETS:=-clobber)
-cstyle: $(CSTYLE_TARGETS:=-cstyle)
+expect_normal_exit cp TEST1 $DIR/dummy_mount_point/file_a
+expect_normal_exit cp $DIR/dummy_mount_point/file_a file_a_expected
 
-%-install: %
-	$(MAKE) -C $* install
+cmp file_a_expected TEST1
 
-%-uninstall: %
-	$(MAKE) -C $* uninstall
-
-%-clean:
-	$(MAKE) -C $* clean
-
-%-clobber:
-	$(MAKE) -C $* clobber
-
-%-cstyle:
-	$(MAKE) -C $* cstyle
-
-preload tools fuse: corelib
-
-$(TARGETS):
-	$(MAKE) -C $@
-
-.PHONY: all install uninstall clean clobber cstyle $(TARGETS)
+pass
