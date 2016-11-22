@@ -155,3 +155,10 @@ PMEMFILE_MKDIR(PMEMfilepool *pfp, const char *path, mode_t mode)
 	int ret = pmemfile_mkdir(pfp, path, mode);
 	UT_ASSERTeq(ret, 0);
 }
+
+void
+PMEMFILE_RMDIR(PMEMfilepool *pfp, const char *path)
+{
+	int ret = pmemfile_rmdir(pfp, path);
+	UT_ASSERTeq(ret, 0);
+}
