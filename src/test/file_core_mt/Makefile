@@ -38,6 +38,6 @@ OBJS = file_core_mt.o
 
 LIBPMEM=y
 LIBPMEMOBJ=y
-LIBPMEMFILE=y
+LIBPMEMFILE_CORE=y
 
 include ../Makefile.inc

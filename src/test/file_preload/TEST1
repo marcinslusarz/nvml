@@ -46,7 +46,7 @@ expect_normal_exit ../../tools/mkfs.pmemfile/mkfs.pmemfile $DIR/dummy_fs 16m
 
 mkdir -p $DIR/dummy_mount_point
 
-export TEST_LD_PRELOAD=libpmemfile_preload.so
+export TEST_LD_PRELOAD=libpmemfile.so
 export PMEMFILE_POOLS=$DIR/dummy_mount_point:$DIR/dummy_fs
 
 export PMEMFILE_PRELOAD_LOG=pmemfile_preload.log

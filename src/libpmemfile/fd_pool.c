@@ -33,7 +33,7 @@
 #define _GNU_SOURCE
 
 #include "fd_pool.h"
-#include "libcintercept_hook_point.h"
+#include "libsyscall_intercept_hook_point.h"
 
 #include <assert.h>
 #include <stdbool.h>

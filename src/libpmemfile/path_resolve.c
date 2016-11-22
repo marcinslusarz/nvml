@@ -45,7 +45,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "libcintercept_hook_point.h"
+#include "libsyscall_intercept_hook_point.h"
 #include "libpmemfile-core.h"
 
 #include "preload.h"

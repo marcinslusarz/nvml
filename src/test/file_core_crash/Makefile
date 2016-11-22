@@ -38,6 +38,6 @@ OBJS = file_core_crash.o
 
 LIBPMEM=y
 LIBPMEMOBJ=y
-LIBPMEMFILE=y
+LIBPMEMFILE_CORE=y
 
 include ../Makefile.inc

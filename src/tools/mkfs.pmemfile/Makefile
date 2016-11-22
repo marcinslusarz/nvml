@@ -39,6 +39,6 @@ OBJS = mkfs.pmemfile.o
 LIBPMEM=y
 LIBPMEMOBJ=y
 LIBPMEMPOOL=y
-LIBPMEMFILE=y
+LIBPMEMFILE_CORE=y
 
 include $(TOP)/src/tools/Makefile.inc

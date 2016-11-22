@@ -45,7 +45,7 @@
 #include "pool.h"
 #include "sys_util.h"
 #include "util.h"
-#include "../../libpmemobj/ctree.h"
+#include "../libpmemobj/ctree.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
