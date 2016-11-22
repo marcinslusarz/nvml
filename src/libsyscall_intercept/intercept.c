@@ -45,7 +45,7 @@
 
 #include "intercept.h"
 #include "intercept_util.h"
-#include "libcintercept_hook_point.h"
+#include "libsyscall_intercept_hook_point.h"
 #include "disasm_wrapper.h"
 
 int (*intercept_hook_point)(long syscall_number,

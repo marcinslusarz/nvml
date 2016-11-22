@@ -56,7 +56,7 @@
 
 #include <asm-generic/errno.h>
 
-#include "libcintercept_hook_point.h"
+#include "libsyscall_intercept_hook_point.h"
 #include "libpmemfile-core.h"
 #include "util.h"
 

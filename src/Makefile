@@ -37,12 +37,24 @@ include $(TOP)/src/common.inc
 
 TARGETS = libpmem libvmem libpmemblk libpmemlog libpmemobj libpmempool\
 	libvmmalloc tools
-ALL_TARGETS = $(TARGETS) common librpmem examples benchmarks libpmemfile
-SCOPE_DIRS = $(TARGETS) common librpmem rpmem_common libpmemfile
+
+ALL_TARGETS = $(TARGETS) common librpmem examples benchmarks libpmemfile-core
+SCOPE_DIRS = $(TARGETS) common librpmem rpmem_common libpmemfile-core\
+	libsyscall_intercept libpmemfile
 
 DEBUG_RELEASE_TARGETS = common libpmem libvmem libpmemblk libpmemlog libpmemobj\
-	libpmempool libvmmalloc librpmem libpmemfile
+	libpmempool libvmmalloc librpmem libpmemfile-core
 RELEASE_TARGETS = tools examples benchmarks
+
+CAPSTONE_AVAILABLE := $(call check_package, capstone)
+
+ifeq ($(CAPSTONE_AVAILABLE),y)
+ALL_TARGETS += libsyscall_intercept libpmemfile
+DEBUG_RELEASE_TARGETS += libsyscall_intercept libpmemfile
+else
+$(info NOTE: Skipping pmemfile interposing library because \
+capstone is missing.)
+endif
 
 CLEAN_NO_JE_TARGETS = $(ALL_TARGETS) rpmem_common test
 CLEAN_TARGETS = $(CLEAN_NO_JE_TARGETS) jemalloc
@@ -128,7 +140,8 @@ libvmmalloc libvmem: jemalloc
 tools: libpmem libpmemblk libpmemlog libpmemobj libpmemfile
 libpmemblk libpmemlog libpmemobj: libpmem
 benchmarks test tools: common
-libpmemfile: libpmemobj
+libpmemfile-core: libpmemobj
+libpmemfile: libpmemfile-core libsyscall_intercept
 
 pkg-config:
 	@$(MAKE_PKG_CONFIG) "$(prefix)" "$(libdir)" "$(SRCVERSION)"

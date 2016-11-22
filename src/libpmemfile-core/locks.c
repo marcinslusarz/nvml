@@ -36,7 +36,7 @@
 #include "locks.h"
 #include "out.h"
 #include "sys_util.h"
-#include "../../libpmemobj/sync.h"
+#include "../libpmemobj/sync.h"
 
 static void
 file_util_rwlock_unlock(PMEMfilepool *pfp, pthread_rwlock_t *arg)
