@@ -58,7 +58,17 @@ FILE_TESTS = \
 	file_core_getdents\
 	file_core_mt\
 	file_core_rw\
-	file_core_stat
+	file_core_stat\
+	file_core_rw
+
+CAPSTONE_AVAILABLE := $(call check_package, capstone)
+
+ifeq ($(CAPSTONE_AVAILABLE),y)
+FILE_TEST += libcintercept
+else
+$(info NOTE: Skipping pmemfile interposing library tests because \
+capstone is missing.)
+endif
 
 LOG_TESTS = \
 	log_basic\

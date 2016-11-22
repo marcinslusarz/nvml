@@ -1,3 +1,4 @@
+#
 # Copyright 2016, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,55 +28,25 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-#
-# src/libpmemfile/Makefile -- Makefile for libpmemfile project
 #
 
-include ../common.inc
+#
+# src/test/libcintercept/Makefile -- build libcintercept test programs
+#
+all: test_libcintercept_libc test_libcintercept_libc_lpthread
 
-TARGETS = corelib
+test_libcintercept_libc: test_libcintercept_libc.o
+	$(CC) -ggdb $< -o $@
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
+test_libcintercept_libc.o: test_libcintercept.c
+	$(CC) -ggdb $< -c -o $@
 
-ifeq ($(CAPSTONE_AVAILABLE),y)
-TARGETS += cintercept
-else
-$(info NOTE: Skipping pmemfile interposing library because \
-capstone is missing.)
-endif
+test_libcintercept_libc_lpthread: test_libcintercept_libc_lpthread.o
+	$(CC) -ggdb -lpthread $< -o $@
 
+test_libcintercept_libc_lpthread.o: test_libcintercept.c
+	$(CC) -ggdb -DUSE_CLONE=1 $< -c -o $@
 
-CLEAN_TARGETS = $(TARGETS)
-CLOBBER_TARGETS = $(TARGETS)
-CSTYLE_TARGETS = $(TARGETS)
-INSTALL_TARGETS = $(TARGETS)
+OBJS = test_libcintercept.o
 
-all: $(TARGETS)
-install: $(INSTALL_TARGETS:=-install)
-uninstall: $(INSTALL_TARGETS:=-uninstall)
-clean: $(CLEAN_TARGETS:=-clean)
-clobber: $(CLOBBER_TARGETS:=-clobber)
-cstyle: $(CSTYLE_TARGETS:=-cstyle)
-
-%-install: %
-	$(MAKE) -C $* install
-
-%-uninstall: %
-	$(MAKE) -C $* uninstall
-
-%-clean:
-	$(MAKE) -C $* clean
-
-%-clobber:
-	$(MAKE) -C $* clobber
-
-%-cstyle:
-	$(MAKE) -C $* cstyle
-
-preload tools fuse: corelib
-
-$(TARGETS):
-	$(MAKE) -C $@
-
-.PHONY: all install uninstall clean clobber cstyle $(TARGETS)
+include ../Makefile.inc
