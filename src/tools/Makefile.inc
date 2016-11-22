@@ -123,6 +123,12 @@ STATIC_DEBUG_LIBS += $(LIBSDIR_DEBUG)/libpmemlog.a
 STATIC_NONDEBUG_LIBS += $(LIBSDIR_NONDEBUG)/libpmemlog.a
 endif
 
+ifeq ($(LIBPMEMFILE), y)
+DYNAMIC_LIBS += -lpmemfile-core
+STATIC_DEBUG_LIBS += $(LIBSDIR_DEBUG)/libpmemfile-core.a
+STATIC_NONDEBUG_LIBS += $(LIBSDIR_NONDEBUG)/libpmemfile-core.a
+endif
+
 ifeq ($(LIBPMEMOBJ), y)
 LIBS += -ldl
 DYNAMIC_LIBS += -lpmemobj

@@ -27,57 +27,18 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #
-# src/libpmemfile/Makefile -- Makefile for libpmemfile project
+# Makefile -- top Makefile for mkfs.pmemfile
 #
+TOP = ../../../..
 
-include ../common.inc
+TARGET = pmemfile-cat
 
-TARGETS = corelib
+OBJS = pmemfile-cat.o
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
+LIBPMEM=y
+LIBPMEMOBJ=y
+LIBPMEMPOOL=y
+LIBPMEMFILE=y
 
-ifeq ($(CAPSTONE_AVAILABLE),y)
-TARGETS += cintercept pmemfile_preload
-else
-$(info NOTE: Skipping pmemfile interposing library because \
-capstone is missing.)
-endif
-
-
-CLEAN_TARGETS = $(TARGETS)
-CLOBBER_TARGETS = $(TARGETS)
-CSTYLE_TARGETS = $(TARGETS)
-INSTALL_TARGETS = $(TARGETS)
-
-pmemfile_preload: corelib cintercept
-
-all: $(TARGETS)
-install: $(INSTALL_TARGETS:=-install)
-uninstall: $(INSTALL_TARGETS:=-uninstall)
-clean: $(CLEAN_TARGETS:=-clean)
-clobber: $(CLOBBER_TARGETS:=-clobber)
-cstyle: $(CSTYLE_TARGETS:=-cstyle)
-
-%-install: %
-	$(MAKE) -C $* install
-
-%-uninstall: %
-	$(MAKE) -C $* uninstall
-
-%-clean:
-	$(MAKE) -C $* clean
-
-%-clobber:
-	$(MAKE) -C $* clobber
-
-%-cstyle:
-	$(MAKE) -C $* cstyle
-
-preload tools fuse: corelib
-
-$(TARGETS):
-	$(MAKE) -C $@
-
-.PHONY: all install uninstall clean clobber cstyle $(TARGETS)
+include $(TOP)/src/tools/Makefile.inc

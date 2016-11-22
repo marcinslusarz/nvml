@@ -1,3 +1,5 @@
+#!/bin/bash -e
+#
 # Copyright 2016, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,57 +29,40 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-#
-# src/libpmemfile/Makefile -- Makefile for libpmemfile project
 #
 
-include ../common.inc
+export UNITTEST_NAME=file_preload/TEST0
+export UNITTEST_NUM=0
 
-TARGETS = corelib
+# standard unit test setup
+. ../unittest/unittest.sh
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
+require_test_type short
+require_build_type debug nondebug
 
-ifeq ($(CAPSTONE_AVAILABLE),y)
-TARGETS += cintercept pmemfile_preload
-else
-$(info NOTE: Skipping pmemfile interposing library because \
-capstone is missing.)
-endif
+setup
 
+rm -f a.dump b.dump
 
-CLEAN_TARGETS = $(TARGETS)
-CLOBBER_TARGETS = $(TARGETS)
-CSTYLE_TARGETS = $(TARGETS)
-INSTALL_TARGETS = $(TARGETS)
+expect_normal_exit ../../tools/mkfs.pmemfile/mkfs.pmemfile $DIR/dummy_fs 16m
 
-pmemfile_preload: corelib cintercept
+mkdir -p $DIR/dummy_mount_point
+mkdir -p $DIR/some_dir
+ln -s ../dummy_mount_point $DIR/some_dir/some_link
 
-all: $(TARGETS)
-install: $(INSTALL_TARGETS:=-install)
-uninstall: $(INSTALL_TARGETS:=-uninstall)
-clean: $(CLEAN_TARGETS:=-clean)
-clobber: $(CLOBBER_TARGETS:=-clobber)
-cstyle: $(CSTYLE_TARGETS:=-cstyle)
+export TEST_LD_PRELOAD=libpmemfile_preload.so
+export PMEMFILE_POOLS=$DIR/dummy_mount_point:$DIR/dummy_fs
+export PMEMFILE_PRELOAD_LOG=pmemfile_preload.log
+export INTERCEPT_LOG=intercept.log
+export INTERCEPT_LOG_NO_PID=1
 
-%-install: %
-	$(MAKE) -C $* install
+expect_normal_exit ./dummy_prog$EXESUFFIX $DIR/some_dir/some_link/a $DIR dummy_mount_point/b dummy_mount_point > root_dir.log
 
-%-uninstall: %
-	$(MAKE) -C $* uninstall
+LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /a > a.dump
+LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /b > b.dump
 
-%-clean:
-	$(MAKE) -C $* clean
+cmp a.dump a.expected_dump
+cmp b.dump b.expected_dump
+cmp root_dir.log root_dir.expected_log
 
-%-clobber:
-	$(MAKE) -C $* clobber
-
-%-cstyle:
-	$(MAKE) -C $* cstyle
-
-preload tools fuse: corelib
-
-$(TARGETS):
-	$(MAKE) -C $@
-
-.PHONY: all install uninstall clean clobber cstyle $(TARGETS)
+pass
