@@ -508,13 +508,13 @@ file_register_orphaned_inode(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 }
 
 /*
- * file_assert_no_dentries -- checks that directory has no entries
+ * file_assert_no_dirents -- checks that directory has no entries
  */
 static void
-file_assert_no_dentries(struct pmemfile_dir *dir)
+file_assert_no_dirents(struct pmemfile_dir *dir)
 {
 	for (uint32_t i = 0; i < dir->num_elements; ++i)
-		if (dir->dentries[i].inode.oid.off)
+		if (dir->dirents[i].inode.oid.off)
 			FATAL("Trying to free non-empty directory");
 }
 
@@ -535,7 +535,7 @@ file_inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode)
 
 		while (dir != NULL) {
 			/* should have been catched earlier */
-			file_assert_no_dentries(dir);
+			file_assert_no_dirents(dir);
 
 			TOID(struct pmemfile_dir) next = dir->next;
 			if (!TOID_IS_NULL(tdir))
@@ -634,7 +634,7 @@ pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 	file_inode_ref(pfp, parent_vinode);
 
 	struct pmemfile_vinode *vinode =
-			file_lookup_dentry(pfp, parent_vinode, path);
+			file_lookup_dirent(pfp, parent_vinode, path);
 
 	if (!vinode) {
 		int oerrno = errno;

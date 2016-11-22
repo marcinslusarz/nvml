@@ -210,7 +210,7 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 			pmemobj_tx_abort(EINVAL);
 	} else {
 		if (errno != ENOENT) {
-			ERR("!pmemfile_lookup_dentry failed in unexpected way");
+			ERR("!pmemfile_lookup_dirent failed in unexpected way");
 			pmemobj_tx_abort(errno);
 		}
 
@@ -233,7 +233,7 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 	if ((flags & O_TMPFILE) == O_TMPFILE)
 		file_register_orphaned_inode(pfp, vinode);
 	else
-		file_add_dentry(pfp, parent_vinode, filename, vinode, &t);
+		file_add_dirent(pfp, parent_vinode, filename, vinode, &t);
 
 	rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 
@@ -324,7 +324,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 	file_inode_ref(pfp, parent_vinode);
 	old_vinode = vinode =
-			file_lookup_dentry(pfp, parent_vinode, pathname);
+			file_lookup_dirent(pfp, parent_vinode, pathname);
 
 	if ((flags & O_TMPFILE) == O_TMPFILE) {
 		int oerrno = errno;
@@ -431,13 +431,13 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 	int oerrno = 0;
 	file_inode_ref(pfp, parent_vinode);
 
-	src_vinode = file_lookup_dentry(pfp, parent_vinode, oldpath);
+	src_vinode = file_lookup_dirent(pfp, parent_vinode, oldpath);
 	if (src_vinode == NULL) {
 		oerrno = errno;
 		goto end;
 	}
 
-	dst_vinode = file_lookup_dentry(pfp, parent_vinode, newpath);
+	dst_vinode = file_lookup_dirent(pfp, parent_vinode, newpath);
 	if (dst_vinode != NULL) {
 		oerrno = EEXIST;
 		goto end;
@@ -448,7 +448,7 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 
 		struct pmemfile_time t;
 		file_get_time(&t);
-		file_add_dentry(pfp, parent_vinode, newpath, src_vinode, &t);
+		file_add_dirent(pfp, parent_vinode, newpath, src_vinode, &t);
 
 		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 	} TX_ONABORT {
@@ -500,7 +500,7 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&parent_vinode->rwlock);
-		file_unlink_dentry(pfp, parent_vinode, pathname, &vinode);
+		file_unlink_dirent(pfp, parent_vinode, pathname, &vinode);
 		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;

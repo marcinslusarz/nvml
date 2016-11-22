@@ -38,7 +38,7 @@ struct pmemfile_vinode *file_new_dir(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name, mode_t mode,
 		bool add_to_parent);
 
-void file_add_dentry(PMEMfilepool *pfp,
+void file_add_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		const char *name,
 		struct pmemfile_vinode *child_vinode,
@@ -49,10 +49,10 @@ void file_set_path_debug(PMEMfilepool *pfp,
 		struct pmemfile_vinode *child_vinode,
 		const char *name);
 
-struct pmemfile_vinode *file_lookup_dentry(PMEMfilepool *pfp,
+struct pmemfile_vinode *file_lookup_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name);
 
-void file_unlink_dentry(PMEMfilepool *pfp,
+void file_unlink_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent,
 		const char *name,
 		struct pmemfile_vinode *volatile *vinode);
