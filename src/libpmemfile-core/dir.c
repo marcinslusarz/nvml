@@ -102,13 +102,13 @@ file_set_path_debug(PMEMfilepool *pfp,
 }
 
 /*
- * file_add_dentry -- adds child inode to parent directory
+ * file_add_dirent -- adds child inode to parent directory
  *
  * Must be called in transaction. Caller must have exclusive access to parent
  * inode, by locking parent in WRITE mode.
  */
 void
-file_add_dentry(PMEMfilepool *pfp,
+file_add_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		const char *name,
 		struct pmemfile_vinode *child_vinode,
@@ -129,16 +129,16 @@ file_add_dentry(PMEMfilepool *pfp,
 
 	struct pmemfile_dir *dir = &parent->file_data.dir;
 
-	struct pmemfile_dirent *dentry = NULL;
+	struct pmemfile_dirent *dirent = NULL;
 	bool found = false;
 
 	do {
 		for (uint32_t i = 0; i < dir->num_elements; ++i) {
-			if (strcmp(dir->dentries[i].name, name) == 0)
+			if (strcmp(dir->dirents[i].name, name) == 0)
 				pmemobj_tx_abort(EEXIST);
 
-			if (!found && dir->dentries[i].name[0] == 0) {
-				dentry = &dir->dentries[i];
+			if (!found && dir->dirents[i].name[0] == 0) {
+				dirent = &dir->dirents[i];
 				found = true;
 			}
 		}
@@ -160,12 +160,12 @@ file_add_dentry(PMEMfilepool *pfp,
 		dir = D_RW(dir->next);
 	} while (dir);
 
-	TX_ADD_DIRECT(dentry);
+	TX_ADD_DIRECT(dirent);
 
-	dentry->inode = child_vinode->inode;
+	dirent->inode = child_vinode->inode;
 
-	strncpy(dentry->name, name, PMEMFILE_MAX_FILE_NAME);
-	dentry->name[PMEMFILE_MAX_FILE_NAME] = '\0';
+	strncpy(dirent->name, name, PMEMFILE_MAX_FILE_NAME);
+	dirent->name[PMEMFILE_MAX_FILE_NAME] = '\0';
 
 	TX_ADD_FIELD(child_vinode->inode, nlink);
 	D_RW(child_vinode->inode)->nlink++;
@@ -212,26 +212,26 @@ file_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	file_set_path_debug_locked(pfp, parent, child, name);
 
 	/* add . and .. to new directory */
-	file_add_dentry(pfp, child, ".", child, &t);
+	file_add_dirent(pfp, child, ".", child, &t);
 
 	if (parent == NULL) /* special case - root directory */
-		file_add_dentry(pfp, child, "..", child, &t);
+		file_add_dirent(pfp, child, "..", child, &t);
 	else
-		file_add_dentry(pfp, child, "..", parent, &t);
+		file_add_dirent(pfp, child, "..", parent, &t);
 
 	if (add_to_parent)
-		file_add_dentry(pfp, parent, name, child, &t);
+		file_add_dirent(pfp, parent, name, child, &t);
 
 	return child;
 }
 
 /*
- * file_lookup_dentry_locked -- looks up file name in passed directory
+ * file_lookup_dirent_locked -- looks up file name in passed directory
  *
  * Caller must hold lock on parent.
  */
 static struct pmemfile_dirent *
-file_lookup_dentry_locked(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+file_lookup_dirent_locked(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *name, struct pmemfile_dir **outdir)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
@@ -247,7 +247,7 @@ file_lookup_dentry_locked(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	while (dir != NULL) {
 		for (uint32_t i = 0; i < dir->num_elements; ++i) {
-			struct pmemfile_dirent *d = &dir->dentries[i];
+			struct pmemfile_dirent *d = &dir->dirents[i];
 
 			if (strcmp(d->name, name) == 0) {
 				if (outdir)
@@ -264,13 +264,13 @@ file_lookup_dentry_locked(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 }
 
 /*
- * file_lookup_dentry -- looks up file name in passed directory
+ * file_lookup_dirent -- looks up file name in passed directory
  *
  * Takes reference on found inode. Caller must hold reference to parent inode.
  * Does not need transaction.
  */
 struct pmemfile_vinode *
-file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+file_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *name)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
@@ -285,10 +285,10 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 			(name[1] == '.' && name[2] == 0)))) {
 		vinode = file_vinode_ref(pfp, parent->inode);
 	} else {
-		struct pmemfile_dirent *dentry =
-			file_lookup_dentry_locked(pfp, parent, name, NULL);
-		if (dentry) {
-			vinode = file_vinode_ref(pfp, dentry->inode);
+		struct pmemfile_dirent *dirent =
+			file_lookup_dirent_locked(pfp, parent, name, NULL);
+		if (dirent) {
+			vinode = file_vinode_ref(pfp, dirent->inode);
 			if (vinode)
 				file_set_path_debug(pfp, parent, vinode, name);
 		}
@@ -300,26 +300,26 @@ file_lookup_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 }
 
 /*
- * file_unlink_dentry -- removes dentry from directory
+ * file_unlink_dirent -- removes dirent from directory
  *
  * Must be called in transaction. Caller must have exclusive access to parent
  * inode, eg by locking parent in WRITE mode.
  */
 void
-file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+file_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *name, struct pmemfile_vinode *volatile *vinode)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
 			pmfi_path(parent), name);
 
 	struct pmemfile_dir *dir;
-	struct pmemfile_dirent *dentry =
-			file_lookup_dentry_locked(pfp, parent, name, &dir);
+	struct pmemfile_dirent *dirent =
+			file_lookup_dirent_locked(pfp, parent, name, &dir);
 
-	if (!dentry)
+	if (!dirent)
 		pmemobj_tx_abort(errno);
 
-	TOID(struct pmemfile_inode) tinode = dentry->inode;
+	TOID(struct pmemfile_inode) tinode = dirent->inode;
 	struct pmemfile_inode *inode = D_RW(tinode);
 
 	if (_file_is_dir(inode))
@@ -331,7 +331,7 @@ file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	ASSERT(inode->nlink > 0);
 
 	TX_ADD_FIELD(tinode, nlink);
-	TX_ADD_DIRECT(dentry);
+	TX_ADD_DIRECT(dirent);
 
 	struct pmemfile_time tm;
 	file_get_time(&tm);
@@ -355,8 +355,8 @@ file_unlink_dentry(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	rwlock_tx_unlock_on_commit(&(*vinode)->rwlock);
 
-	dentry->name[0] = '\0';
-	dentry->inode = TOID_NULL(struct pmemfile_inode);
+	dirent->name[0] = '\0';
+	dirent->inode = TOID_NULL(struct pmemfile_inode);
 }
 
 /*
@@ -378,7 +378,7 @@ _pmemfile_list(PMEMfilepool *pfp, struct pmemfile_vinode *parent)
 
 	while (dir != NULL) {
 		for (uint32_t i = 0; i < dir->num_elements; ++i) {
-			const struct pmemfile_dirent *d = &dir->dentries[i];
+			const struct pmemfile_dirent *d = &dir->dirents[i];
 			if (d->name[0] == 0)
 				continue;
 
@@ -410,20 +410,20 @@ _pmemfile_list(PMEMfilepool *pfp, struct pmemfile_vinode *parent)
 	}
 }
 
-#define DENTRY_ID_MASK 0xffffffffULL
+#define DIRENT_ID_MASK 0xffffffffULL
 
 #define DIR_ID(offset) ((offset) >> 32)
-#define DENTRY_ID(offset) ((offset) & DENTRY_ID_MASK)
+#define DIRENT_ID(offset) ((offset) & DIRENT_ID_MASK)
 
 /*
- * file_seek_dir - translates between file->offset and dir/dentry
+ * file_seek_dir - translates between file->offset and dir/dirent
  *
  * returns 0 on EOF
  * returns !0 on successful translation
  */
 static int
 file_seek_dir(PMEMfile *file, struct pmemfile_inode *inode,
-		struct pmemfile_dir **dir, unsigned *dentry)
+		struct pmemfile_dir **dir, unsigned *dirent)
 {
 	if (file->offset == 0) {
 		*dir = &inode->file_data.dir;
@@ -445,20 +445,20 @@ file_seek_dir(PMEMfile *file, struct pmemfile_inode *inode,
 		file->dir_pos.dir = *dir;
 		file->dir_pos.dir_id = dir_id;
 	}
-	*dentry = DENTRY_ID(file->offset);
+	*dirent = DIRENT_ID(file->offset);
 
-	while (*dentry >= (*dir)->num_elements) {
+	while (*dirent >= (*dir)->num_elements) {
 		if (TOID_IS_NULL((*dir)->next))
 			return 0;
 
-		*dentry -= (*dir)->num_elements;
+		*dirent -= (*dir)->num_elements;
 		*dir = D_RW((*dir)->next);
 
 		file->dir_pos.dir = *dir;
 		file->dir_pos.dir_id++;
 	}
 
-	file->offset = ((size_t)file->dir_pos.dir_id) << 32 | *dentry;
+	file->offset = ((size_t)file->dir_pos.dir_id) << 32 | *dirent;
 
 	return 1;
 }
@@ -468,29 +468,29 @@ file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		struct linux_dirent *dirp, unsigned count)
 {
 	struct pmemfile_dir *dir;
-	unsigned dentry;
+	unsigned dirent_id;
 
-	if (file_seek_dir(file, inode, &dir, &dentry) == 0)
+	if (file_seek_dir(file, inode, &dir, &dirent_id) == 0)
 		return 0;
 
 	int read1 = 0;
 	char *data = (void *)dirp;
 
 	while (true) {
-		if (dentry >= dir->num_elements) {
+		if (dirent_id >= dir->num_elements) {
 			if (TOID_IS_NULL(dir->next))
 				break;
 
 			dir = D_RW(dir->next);
 			file->dir_pos.dir = dir;
 			file->dir_pos.dir_id++;
-			dentry = 0;
+			dirent_id = 0;
 			file->offset = ((size_t)file->dir_pos.dir_id) << 32 | 0;
 		}
 
-		struct pmemfile_dirent *dirent = &dir->dentries[dentry];
+		struct pmemfile_dirent *dirent = &dir->dirents[dirent_id];
 		if (TOID_IS_NULL(dirent->inode)) {
-			++dentry;
+			++dirent_id;
 			++file->offset;
 			continue;
 		}
@@ -499,7 +499,7 @@ file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		unsigned short slen = (unsigned short)
 				(8 + 8 + 2 + namelen + 1 + 1);
 		uint64_t next_off = file->offset + 1;
-		if (dentry + 1 >= dir->num_elements)
+		if (dirent_id + 1 >= dir->num_elements)
 			next_off = ((next_off >> 32) + 1) << 32;
 
 		if (count < slen)
@@ -525,7 +525,7 @@ file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 
 		read1 += slen;
 
-		++dentry;
+		++dirent_id;
 		++file->offset;
 	}
 
@@ -573,29 +573,29 @@ file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		struct linux_dirent64 *dirp, unsigned count)
 {
 	struct pmemfile_dir *dir;
-	unsigned dentry;
+	unsigned dirent_id;
 
-	if (file_seek_dir(file, inode, &dir, &dentry) == 0)
+	if (file_seek_dir(file, inode, &dir, &dirent_id) == 0)
 		return 0;
 
 	int read1 = 0;
 	char *data = (void *)dirp;
 
 	while (true) {
-		if (dentry >= dir->num_elements) {
+		if (dirent_id >= dir->num_elements) {
 			if (TOID_IS_NULL(dir->next))
 				break;
 
 			dir = D_RW(dir->next);
 			file->dir_pos.dir = dir;
 			file->dir_pos.dir_id++;
-			dentry = 0;
+			dirent_id = 0;
 			file->offset = ((size_t)file->dir_pos.dir_id) << 32 | 0;
 		}
 
-		struct pmemfile_dirent *dirent = &dir->dentries[dentry];
+		struct pmemfile_dirent *dirent = &dir->dirents[dirent_id];
 		if (TOID_IS_NULL(dirent->inode)) {
-			++dentry;
+			++dirent_id;
 			++file->offset;
 			continue;
 		}
@@ -604,7 +604,7 @@ file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		unsigned short slen = (unsigned short)
 				(8 + 8 + 2 + 1 + namelen + 1);
 		uint64_t next_off = file->offset + 1;
-		if (dentry + 1 >= dir->num_elements)
+		if (dirent_id + 1 >= dir->num_elements)
 			next_off = ((next_off >> 32) + 1) << 32;
 
 		if (count < slen)
@@ -630,7 +630,7 @@ file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 
 		read1 += slen;
 
-		++dentry;
+		++dirent_id;
 		++file->offset;
 	}
 
@@ -695,7 +695,7 @@ traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *slash = strchr(path, '/');
 
 		if (slash == NULL) {
-			child = file_lookup_dentry(pfp, parent, path);
+			child = file_lookup_dirent(pfp, parent, path);
 			if (child) {
 				file_vinode_unref_tx(pfp, parent);
 				while (path[0])
@@ -711,10 +711,10 @@ traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 			strncpy(tmp, path, (uintptr_t)slash - (uintptr_t)path);
 			tmp[slash - path] = 0;
 
-			if (tmp[0] == 0) // workaround for file_lookup_dentry
+			if (tmp[0] == 0) // workaround for file_lookup_dirent
 				child = NULL;
 			else
-				child = file_lookup_dentry(pfp, parent, tmp);
+				child = file_lookup_dirent(pfp, parent, tmp);
 			if (child) {
 				file_vinode_unref_tx(pfp, parent);
 				parent = child;

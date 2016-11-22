@@ -77,7 +77,7 @@ struct pmemfile_dir {
 	uint32_t num_elements;
 	uint32_t padding;
 	TOID(struct pmemfile_dir) next;
-	struct pmemfile_dirent dentries[];
+	struct pmemfile_dirent dirents[];
 };
 
 struct pmemfile_time {

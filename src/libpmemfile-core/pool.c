@@ -120,7 +120,7 @@ file_cleanup_inode_array_single(PMEMfilepool *pfp,
 
 /*
  * file_cleanup_inode_array -- (internal) removes inodes (and frees if there are
- * no dentries referencing it) from specified list
+ * no dirents referencing it) from specified list
  */
 static void
 file_cleanup_inode_array(PMEMfilepool *pfp,
