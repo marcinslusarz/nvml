@@ -1,3 +1,4 @@
+#!/bin/bash -e
 #
 # Copyright 2016, Intel Corporation
 #
@@ -29,59 +30,47 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-#
-# src/libpmemfile/corelib/libpmemfile-core.map -- linker map file for libpmemfile-core
-#
-{
-	global:
-		pmemfile_errormsg;
-		pmemfile_mkfs;
-		pmemfile_pool_open;
-		pmemfile_pool_close;
-		pmemfile_open;
-		pmemfile_close;
-		pmemfile_link;
-		pmemfile_unlink;
-		pmemfile_read;
-		pmemfile_write;
-		pmemfile_lseek;
-		pmemfile_lseek64;
-		pmemfile_stat;
-		pmemfile_fstat;
-		pmemfile_lstat;
 
-		pmemfile_chdir;
-		pmemfile_lstat;
-		pmemfile_readlink;
-		pmemfile_getcwd;
-		pmemfile_pread;
-		pmemfile_pwrite;
-		pmemfile_access;
-		pmemfile_sync;
-		pmemfile_fdatasync;
-		pmemfile_rename;
-		pmemfile_renameat;
-		pmemfile_openat;
-		pmemfile_flock;
-		pmemfile_truncate;
-		pmemfile_ftruncate;
-		pmemfile_getdents;
-		pmemfile_getdents64;
-		pmemfile_fchdir;
-		pmemfile_mkdir;
-		pmemfile_mkdirat;
-		pmemfile_rmdir;
-		pmemfile_symlink;
-		pmemfile_symlinkat;
-		pmemfile_chmod;
-		pmemfile_fchmod;
-		pmemfile_dup;
-		pmemfile_dup2;
+export UNITTEST_NAME=libcintercept/TEST0
+export UNITTEST_NUM=0
 
-		# temporary, do NOT use
-		_pmemfile_list_root;
-		_pmemfile_stats;
-		_pmemfile_file_size;
-	local:
-		*;
-};
+# standard unit test setup
+. ../unittest/unittest.sh
+
+require_test_type short
+require_build_type debug nondebug
+
+setup
+
+rm -f libcintercept0.all.log
+
+export TEST_LD_PRELOAD=libsyscall_intercept.so
+export INTERCEPT_LOG=libcintercept$UNITTEST_NUM.all.log
+export INTERCEPT_LOG_NO_PID=1
+
+# The test_libcintercept executable is only a dummy program,
+# doing a few file operations. The EXESUFFIX isn't really needed here right now.
+# This is actually testing the intercepting library, not this executable.
+expect_normal_exit ./test_libcintercept_libc$EXESUFFIX \
+	test_libcintercept.c > /dev/null
+
+export INTERCEPT_LOG=libcintercept_pthread$UNITTEST_NUM.all.log
+
+expect_normal_exit ./test_libcintercept_libc_lpthread$EXESUFFIX \
+	test_libcintercept.c > /dev/null
+
+# Filter for file operations in the log, before running check.
+# The local libc implementation can do other things, e.g. brk syscalls while
+# initializing, and we can't write a portable enough match file
+# to match such implementation specific syscalls line-by-line
+grep "\<open\>\|\<write\>\|\<read\>\|\<close\>\|\<fstat\>\|\<clone\>\|\<wait4\>" \
+	libcintercept$UNITTEST_NUM.all.log > \
+	libcintercept$UNITTEST_NUM.log
+
+grep "\<open\>\|\<write\>\|\<read\>\|\<close\>\|\<fstat\>\|\<clone\>\|\<wait4\>" \
+	libcintercept_pthread$UNITTEST_NUM.all.log > \
+	libcintercept_pthread$UNITTEST_NUM.log
+
+check
+
+pass

@@ -37,7 +37,7 @@
 #include "inode.h"
 #include "inode_array.h"
 #include "locks.h"
-#include "../../libpmemobj/sync.h"
+#include "../libpmemobj/sync.h"
 
 /*
  * file_inode_array_add_single -- finds space for 1 inode in specified

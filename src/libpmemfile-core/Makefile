@@ -29,25 +29,33 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #
-# src/libpmemfile/pmemfile_preload/Makefile
-# Makefile for pmemfile's preloadable library
+# src/libpmemfile-core/Makefile -- Makefile for libpmemfile-core
 #
 
-
-LIBRARY_NAME = pmemfile_preload
+LIBRARY_NAME = pmemfile-core
 LIBRARY_SO_VERSION = 1
 LIBRARY_VERSION = 0.0
-
 SOURCE = \
-	preload.c \
-	fd_pool.c \
-	path_resolve.c \
-	$(COMMON)/out.c \
-	$(COMMON)/util.c
+	callbacks.c\
+	data.c\
+	dir.c\
+	file.c\
+	inode.c\
+	inode_array.c\
+	locks.c \
+	pmemfile-core.c\
+	stubs.c\
+	pool.c\
+	$(COMMON)/out.c\
+	$(COMMON)/util.c\
+	$(COMMON)/util_linux.c\
+	../libpmemobj/ctree.c
 
-EXTRA_OBJS += $(LIB_OUTDIR)/libcintercept.a $(LIB_OUTDIR)/libpmemfile-core.a
+LIBS += -lpmemobj
+CFLAGS += -DPOBJ_TX_CRASH_ON_NO_ONABORT
 
-LIBS += -lpmemobj -lcapstone
+include ../Makefile.inc
 
-include ../../Makefile.inc
+$(objdir)/data.o: CFLAGS+=-D_GNU_SOURCE
 
+$(objdir)/file.o: CFLAGS+=-D_GNU_SOURCE

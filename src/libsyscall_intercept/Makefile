@@ -1,4 +1,3 @@
-#
 # Copyright 2016, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,13 +27,29 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #
+# src/libsyscall_intercept/Makefile
+# Makefile for the syscall intercepting library
 #
-# src/libpmemfile/pmemfile_preload/libpmemfile_preload.map
-#
-# linker map file for libpmemfile_preload
-#
-{
-	local:
-		*;
-};
+
+LIBRARY_NAME = syscall_intercept
+LIBRARY_SO_VERSION = 1
+LIBRARY_VERSION = 0.0
+
+SOURCE = \
+	intercept.c \
+	patcher.c \
+	intercept_util.c \
+	intercept_desc.c \
+	disasm_wrapper.c \
+	../libpmem/cpu.c
+
+ASMSOURCE = \
+	intercept_template.s \
+	syscall_no_intercept.s
+
+include ../Makefile.inc
+
+CFLAGS += -Wextra
+LIBS += -ldl -lcapstone

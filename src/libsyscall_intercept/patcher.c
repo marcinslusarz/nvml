@@ -32,7 +32,7 @@
 
 #include "intercept.h"
 #include "intercept_util.h"
-#include "../../libpmem/cpu.h"
+#include "../libpmem/cpu.h"
 
 #include <cpuid.h>
 #include <stdint.h>
