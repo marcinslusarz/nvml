@@ -30,17 +30,26 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NVML_CPU_H
-#define NVML_CPU_H 1
-
 /*
- * cpu.h -- definitions for "cpu" module
+ * syscall_no_intercept.s
+ *
+ * Provide an easy way to do syscalls from
+ * the intercepting call. The syscall function
+ * from glibc is likely also intercepted,
+ * so using that would just lead to infinite recursion.
  */
 
-int is_cpu_genuine_intel(void);
-int is_cpu_clflush_present(void);
-int is_cpu_clflushopt_present(void);
-int is_cpu_clwb_present(void);
-int has_ymm_registers(void);
+.globl syscall_no_intercept;
 
-#endif
+.text
+
+syscall_no_intercept:
+	movq        %rdi, %rax  /* convert from linux ABI calling */
+	movq        %rsi, %rdi  /* convention to syscall calling convention */
+	movq        %rdx, %rsi
+	movq        %rcx, %rdx
+	movq        %r8, %r10
+	movq        %r9, %r8
+	movq        8(%rsp), %r9
+	syscall
+	ret

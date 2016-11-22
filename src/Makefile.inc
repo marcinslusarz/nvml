@@ -118,6 +118,10 @@ _OBJS_RPMEM_COMMON = $(patsubst $(RPMEM_COMMON)/%, %, $(_OBJS_COMMON))
 OBJS += $(addprefix $(objdir)/, $(_OBJS_RPMEM_COMMON))
 endif
 
+ifneq ($(ASMSOURCE),)
+OBJS += $(addprefix $(objdir)/, $(patsubst $(COMMON)/%, %, $(ASMSOURCE:.s=.o)))
+endif
+
 ifneq ($(HEADERS),)
 ifneq ($(filter 1 2, $(CSTYLEON)),)
 TMP_HEADERS := $(addsuffix tmp, $(HEADERS))
@@ -225,6 +229,9 @@ ifneq ($(LIBRARY_NAME),)
 endif
 
 $(eval $(cstyle-rule))
+
+$(objdir)/%.o: %.s $(MAKEFILE_DEPS)
+	$(AS) -g -o $@ $<
 
 $(objdir)/%.o: %.c $(MAKEFILE_DEPS)
 	$(call check-cstyle, $<)
