@@ -29,53 +29,27 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #
-# src/libpmemfile/Makefile -- Makefile for libpmemfile project
+# src/libpmemfile/cinterceptlib/Makefile
+# Makefile for libpmemfile's intercepting code
 #
 
-include ../common.inc
+LIBRARY_NAME = cintercept
+LIBRARY_SO_VERSION = 1
+LIBRARY_VERSION = 0.0
 
-TARGETS = corelib
+SOURCE = \
+	intercept.c \
+	patcher.c \
+	intercept_util.c \
+	intercept_desc.c \
+	disasm_wrapper.c \
+	../../libpmem/cpu.c
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
+ASMSOURCE = \
+	intercept_template.s \
+	syscall_no_intercept.s
 
-ifeq ($(CAPSTONE_AVAILABLE),y)
-TARGETS += cintercept
-else
-$(info NOTE: Skipping pmemfile interposing library because \
-capstone is missing.)
-endif
+include ../../Makefile.inc
 
-
-CLEAN_TARGETS = $(TARGETS)
-CLOBBER_TARGETS = $(TARGETS)
-CSTYLE_TARGETS = $(TARGETS)
-INSTALL_TARGETS = $(TARGETS)
-
-all: $(TARGETS)
-install: $(INSTALL_TARGETS:=-install)
-uninstall: $(INSTALL_TARGETS:=-uninstall)
-clean: $(CLEAN_TARGETS:=-clean)
-clobber: $(CLOBBER_TARGETS:=-clobber)
-cstyle: $(CSTYLE_TARGETS:=-cstyle)
-
-%-install: %
-	$(MAKE) -C $* install
-
-%-uninstall: %
-	$(MAKE) -C $* uninstall
-
-%-clean:
-	$(MAKE) -C $* clean
-
-%-clobber:
-	$(MAKE) -C $* clobber
-
-%-cstyle:
-	$(MAKE) -C $* cstyle
-
-preload tools fuse: corelib
-
-$(TARGETS):
-	$(MAKE) -C $@
-
-.PHONY: all install uninstall clean clobber cstyle $(TARGETS)
+CFLAGS += -Wextra
+LIBS += -ldl -lcapstone

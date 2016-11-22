@@ -125,7 +125,7 @@ benchmarks: examples
 custom_build = $(DEBUG)$(OBJDIR)
 
 libvmmalloc libvmem: jemalloc
-tools: libpmem libpmemblk libpmemlog libpmemobj
+tools: libpmem libpmemblk libpmemlog libpmemobj libpmemfile
 libpmemblk libpmemlog libpmemobj: libpmem
 benchmarks test tools: common
 libpmemfile: libpmemobj

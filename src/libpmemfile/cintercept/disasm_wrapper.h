@@ -30,17 +30,73 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef NVML_CPU_H
-#define NVML_CPU_H 1
 
 /*
- * cpu.h -- definitions for "cpu" module
+ * Wrapper function to use with the disassembler.
+ * This should allow us to use a different disassembler,
+ * without changing the intercept.c source file.
+ *
+ * The result of disassembling deliberately lacks a lot
+ * of information about the instruction seen, to make it
+ * easy to interface a new disassembler.
  */
 
-int is_cpu_genuine_intel(void);
-int is_cpu_clflush_present(void);
-int is_cpu_clflushopt_present(void);
-int is_cpu_clwb_present(void);
-int has_ymm_registers(void);
+#ifndef INTERCEPT_DISASM_WRAPPER_H
+#define INTERCEPT_DISASM_WRAPPER_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+struct intercept_disasm_result {
+
+	bool is_syscall;
+
+	/* Length in bytes, zero if disasm was not successfull. */
+	unsigned length;
+
+	/*
+	 * Flag marking instructions that have a RIP relative address
+	 * as an operand.
+	 */
+	bool has_ip_relative_opr;
+
+	/* call instruction */
+	bool is_call;
+
+	bool is_jump;
+
+	/*
+	 * The flag is_rel_jump marks any instruction that jumps, to
+	 * a relative address encoded in its operand.
+	 * This includes call as well.
+	 */
+	bool is_rel_jump;
+
+	bool is_indirect_jump;
+
+	bool is_ret;
+
+	/*
+	 * Optional fields:
+	 * The jump_delta is the relative jump target of
+	 * jump instruction, jump_target is the absolute
+	 * address of the jump target.
+	 * These are only valid, when is_rel_jump is true.
+	 */
+	ptrdiff_t jump_delta;
+	const unsigned char *jump_target;
+};
+
+struct intercept_disasm_context;
+
+struct intercept_disasm_context *
+intercept_disasm_init(const unsigned char *begin, const unsigned char *end);
+
+void intercept_disasm_destroy(struct intercept_disasm_context *context);
+
+struct intercept_disasm_result
+intercept_disasm_next_instruction(struct intercept_disasm_context *context,
+					const unsigned char *code);
 
 #endif
