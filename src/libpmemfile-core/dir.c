@@ -226,13 +226,13 @@ file_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 }
 
 /*
- * file_lookup_dirent_locked -- looks up file name in passed directory
+ * file_lookup_dirent_by_name_locked -- looks up file name in passed directory
  *
  * Caller must hold lock on parent.
  */
 static struct pmemfile_dirent *
-file_lookup_dirent_locked(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *name)
+file_lookup_dirent_by_name_locked(PMEMfilepool *pfp,
+		struct pmemfile_vinode *parent, const char *name)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
 			pmfi_path(parent), name);
@@ -283,7 +283,7 @@ file_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		vinode = file_vinode_ref(pfp, parent->inode);
 	} else {
 		struct pmemfile_dirent *dirent =
-			file_lookup_dirent_locked(pfp, parent, name);
+			file_lookup_dirent_by_name_locked(pfp, parent, name);
 		if (dirent) {
 			vinode = file_vinode_ref(pfp, dirent->inode);
 			if (vinode)
@@ -310,7 +310,7 @@ file_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 			pmfi_path(parent), name);
 
 	struct pmemfile_dirent *dirent =
-			file_lookup_dirent_locked(pfp, parent, name);
+			file_lookup_dirent_by_name_locked(pfp, parent, name);
 
 	if (!dirent)
 		pmemobj_tx_abort(errno);
