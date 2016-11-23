@@ -199,30 +199,6 @@ static struct pmemfile_vinode *
 create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 		struct pmemfile_vinode *parent_vinode, int flags, mode_t mode)
 {
-	if ((flags & O_TMPFILE) == O_TMPFILE) {
-		if (parent_vinode == NULL)
-			pmemobj_tx_abort(ENOENT);
-
-		if (!file_is_dir(parent_vinode))
-			pmemobj_tx_abort(ENOTDIR);
-
-		if ((flags & O_ACCMODE) == O_RDONLY)
-			pmemobj_tx_abort(EINVAL);
-	} else {
-		if (errno != ENOENT) {
-			ERR("!pmemfile_lookup_dirent failed in unexpected way");
-			pmemobj_tx_abort(errno);
-		}
-
-		if (!(flags & O_CREAT)) {
-			LOG(LUSR, "file %s does not exist", full_path);
-			pmemobj_tx_abort(ENOENT);
-		}
-
-		if (flags & O_DIRECTORY)
-			LOG(LDBG, "O_DIRECTORY is ignored for O_CREAT");
-	}
-
 	struct pmemfile_time t;
 
 	rwlock_tx_wlock(&parent_vinode->rwlock);
@@ -243,11 +219,6 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 static void
 open_file(const char *orig_pathname, struct pmemfile_vinode *vinode, int flags)
 {
-	if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
-		LOG(LUSR, "file %s already exists", orig_pathname);
-		pmemobj_tx_abort(EEXIST);
-	}
-
 	if ((flags & O_DIRECTORY) && !file_is_dir(vinode))
 		pmemobj_tx_abort(ENOTDIR);
 
@@ -310,34 +281,53 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	}
 	va_end(ap);
 
-	pathname = file_check_pathname(pathname);
-	if (!pathname)
-		return NULL;
-
 	int error = 0;
 	int txerrno = 0;
 	PMEMfile *file = NULL;
 
-	struct pmemfile_vinode *parent_vinode = pfp->root;
-	struct pmemfile_vinode *volatile old_vinode;
-	struct pmemfile_vinode *vinode;
+	struct pmemfile_path_info info;
 
-	file_inode_ref(pfp, parent_vinode);
-	old_vinode = vinode =
-			file_lookup_dirent(pfp, parent_vinode, pathname);
-
-	if ((flags & O_TMPFILE) == O_TMPFILE) {
-		int oerrno = errno;
-		file_vinode_unref_tx(pfp, parent_vinode);
-		parent_vinode = vinode;
-		old_vinode = vinode = NULL;
-		errno = oerrno;
-	}
+	struct pmemfile_vinode *volatile vparent = NULL;
+	struct pmemfile_vinode *volatile vinode;
+	traverse_path(pfp, pathname, false, &info);
+	vinode = info.vinode;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
+		// TODO: remove once relative paths work
+		if (vinode == NULL)
+			pmemobj_tx_abort(EINVAL);
+
+		if (strchr(info.remaining, '/'))
+			pmemobj_tx_abort(ENOENT);
+
+		if ((flags & O_TMPFILE) == O_TMPFILE) {
+			if (!file_is_dir(vinode))
+				pmemobj_tx_abort(ENOTDIR);
+			if (info.remaining[0])
+				pmemobj_tx_abort(ENOENT);
+			if ((flags & O_ACCMODE) == O_RDONLY)
+				pmemobj_tx_abort(EINVAL);
+
+			vparent = vinode;
+			vinode = NULL;
+		} else if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+			if (info.remaining[0] == 0) {
+				LOG(LUSR, "file %s already exists", pathname);
+				pmemobj_tx_abort(EEXIST);
+			}
+			vparent = vinode;
+			vinode = NULL;
+		} else if (flags & O_CREAT) {
+			if (info.remaining[0] != 0) {
+				vparent = vinode;
+				vinode = NULL;
+			}
+		} else if (info.remaining[0] != 0)
+			pmemobj_tx_abort(ENOENT);
+
 		if (vinode == NULL) {
-			vinode = create_file(pfp, pathname, orig_pathname,
-					parent_vinode, flags, mode);
+			vinode = create_file(pfp, info.remaining,
+					orig_pathname, vparent, flags, mode);
 		} else {
 			open_file(orig_pathname, vinode, flags);
 		}
@@ -364,20 +354,21 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 		txerrno = errno;
 	} TX_END
 
-	file_vinode_unref_tx(pfp, parent_vinode);
+	if (!error)
+		file_set_path_debug(pfp, vparent, vinode, pathname);
+
+	if (vparent)
+		file_vinode_unref_tx(pfp, vparent);
 
 	if (error) {
-		if (old_vinode != NULL)
-			file_vinode_unref_tx(pfp, old_vinode);
+		if (vinode != NULL)
+			file_vinode_unref_tx(pfp, vinode);
 
 		errno = txerrno;
 		LOG(LDBG, "!");
 
 		return NULL;
 	}
-
-	if (old_vinode == NULL)
-		file_set_path_debug(pfp, parent_vinode, vinode, pathname);
 
 	util_mutex_init(&file->mutex, NULL);
 
@@ -487,30 +478,37 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 
 	LOG(LDBG, "pathname %s", pathname);
 
-	pathname = file_check_pathname(pathname);
-	if (!pathname)
-		return -1;
-
-	struct pmemfile_vinode *parent_vinode = pfp->root;
-
 	int oerrno, ret = 0;
 
-	file_inode_ref(pfp, parent_vinode);
-	struct pmemfile_vinode *volatile vinode = NULL;
+	struct pmemfile_path_info info;
+	traverse_path(pfp, pathname, true, &info);
+	struct pmemfile_vinode *vparent = info.parent;
+	struct pmemfile_vinode *volatile vinode2 = NULL;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		rwlock_tx_wlock(&parent_vinode->rwlock);
-		file_unlink_dirent(pfp, parent_vinode, pathname, &vinode);
-		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
+		if (info.vinode == NULL)
+			pmemobj_tx_abort(EINVAL);
+
+		if (info.remaining[0])
+			pmemobj_tx_abort(ENOENT);
+
+		if (file_is_dir(info.vinode))
+			pmemobj_tx_abort(EISDIR);
+
+		rwlock_tx_wlock(&vparent->rwlock);
+		file_unlink_dirent(pfp, vparent, info.name, &vinode2);
+		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
 		ret = -1;
 	} TX_END
 
-	if (vinode)
-		file_vinode_unref_tx(pfp, vinode);
-
-	file_vinode_unref_tx(pfp, parent_vinode);
+	if (info.vinode)
+		file_vinode_unref_tx(pfp, info.vinode);
+	if (vinode2)
+		file_vinode_unref_tx(pfp, vinode2);
+	if (vparent)
+		file_vinode_unref_tx(pfp, vparent);
 
 	if (ret)
 		errno = oerrno;
