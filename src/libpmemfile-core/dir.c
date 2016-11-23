@@ -869,7 +869,7 @@ int
 pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 {
 	struct pmemfile_path_info info;
-	traverse_path(pfp, path, false /* XXX */, &info);
+	traverse_path(pfp, path, true, &info);
 
 	if (!info.vinode) {
 		errno = ENOENT;
@@ -878,6 +878,8 @@ pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 
 	if (info.remaining[0] != 0) {
 		file_vinode_unref_tx(pfp, info.vinode);
+		if (info.parent)
+			file_vinode_unref_tx(pfp, info.parent);
 		errno = ENOENT;
 		return -1;
 	}
@@ -885,29 +887,16 @@ pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 	struct pmemfile_vinode *vdir = info.vinode;
 	if (!file_is_dir(vdir)) {
 		file_vinode_unref_tx(pfp, vdir);
+		if (info.parent)
+			file_vinode_unref_tx(pfp, info.parent);
 		errno = ENOTDIR;
 		return -1;
 	}
 
 	int error = 0;
 	int txerrno = 0;
-	struct pmemfile_vinode *vparent;
-	struct pmemfile_inode *iparent;
-
-	util_rwlock_rdlock(&vdir->rwlock);
-
-	vparent = file_lookup_dirent(pfp, vdir, "..");
-
-	util_rwlock_unlock(&vdir->rwlock);
-
-	/* race between multiple rmdirs */
-	if (!vparent) {
-		error = 1;
-		txerrno = EBUSY;
-		LOG(LUSR, "rmdir race 1");
-		goto end;
-	}
-	iparent = D_RW(vparent->inode);
+	struct pmemfile_vinode *vparent = info.parent;
+	struct pmemfile_inode *iparent = D_RW(vparent->inode);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&vparent->rwlock);
@@ -917,7 +906,7 @@ pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 			file_lookup_dirent_by_vinode_locked(pfp, vparent, vdir);
 
 		if (!dirent) {
-			LOG(LUSR, "rmdir race 2");
+			LOG(LUSR, "rmdir race");
 			pmemobj_tx_abort(EBUSY);
 		}
 
@@ -995,7 +984,6 @@ pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 
 	file_vinode_unref_tx(pfp, vparent);
 
-end:
 	file_vinode_unref_tx(pfp, vdir);
 
 	if (error) {
