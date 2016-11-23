@@ -237,6 +237,14 @@ test3(PMEMfilepool *pfp)
 
 	PMEMFILE_UNLINK(pfp, "/dir1/file");
 
+	PMEMFILE_MKDIR(pfp, "/dir1/dir2", 0755);
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir1"), -1);
+	UT_ASSERTeq(errno, ENOTEMPTY);
+
+	PMEMFILE_RMDIR(pfp, "/dir1/dir2");
+
 	PMEMFILE_RMDIR(pfp, "/dir1");
 }
 
