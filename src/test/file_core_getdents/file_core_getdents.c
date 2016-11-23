@@ -173,6 +173,41 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 }
 
+static void
+test2(PMEMfilepool *pfp)
+{
+	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
+
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/dir1", O_DIRECTORY | O_RDONLY);
+
+	char buf[32758];
+
+	int r = pmemfile_getdents(pfp, f, (void *)buf, sizeof(buf));
+	UT_ASSERT(r > 0);
+	dump_linux_dirents(buf, r);
+
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file1",
+			O_CREAT | O_EXCL | O_WRONLY, 0644));
+
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file2",
+			O_CREAT | O_EXCL | O_WRONLY, 0644));
+
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file3",
+			O_CREAT | O_EXCL | O_WRONLY, 0644));
+
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_SET, 0);
+	r = pmemfile_getdents(pfp, f, (void *)buf, sizeof(buf));
+	UT_ASSERT(r > 0);
+	dump_linux_dirents(buf, r);
+
+	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_UNLINK(pfp, "/dir1/file1");
+	PMEMFILE_UNLINK(pfp, "/dir1/file2");
+	PMEMFILE_UNLINK(pfp, "/dir1/file3");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -186,6 +221,7 @@ main(int argc, char *argv[])
 	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	test1(pfp);
+	test2(pfp);
 
 	pmemfile_pool_close(pfp);
 
