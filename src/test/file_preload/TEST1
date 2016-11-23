@@ -72,6 +72,11 @@ cmp pmemfile_ls_root.log ls_root_expected_log
 
 expect_normal_exit ls -o --time-style=+"" $DIR/dummy_mount_point | sed 's/\s\+/ /g' > file_preload_lsl1.log
 expect_normal_exit ls -ao --time-style=+"" $DIR/dummy_mount_point | sed -e 's/\s\+/ /g' -e '/\.\./d' > file_preload_lsla1.log
+expect_abnormal_exit mkdir $DIR/dummy_mount_point/nonexistent/dummy_dir_a &> /dev/null
+expect_normal_exit mkdir $DIR/dummy_mount_point/dummy_dir_a
+expect_normal_exit ls -o --time-style=+"" $DIR/dummy_mount_point | sed 's/\s\+/ /g' > file_preload_lsl_with_dir1.log
+expect_normal_exit rmdir $DIR/dummy_mount_point/dummy_dir_a
+expect_normal_exit ls -o --time-style=+"" $DIR/dummy_mount_point | sed 's/\s\+/ /g' > file_preload_lsl_with_nodir1.log
 
 check
 

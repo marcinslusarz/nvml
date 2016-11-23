@@ -187,6 +187,8 @@ init_hooking(void)
 	syscall_number_filter[SYS_setxattr] = true;
 	syscall_number_filter[SYS_fsetxattr] = true;
 	syscall_number_filter[SYS_lsetxattr] = true;
+	syscall_number_filter[SYS_mkdir] = true;
+	syscall_number_filter[SYS_rmdir] = true;
 
 	// Install the callback to be calleb by the syscall intercepting library
 	intercept_hook_point = &hook;
@@ -351,6 +353,8 @@ static int hook_getxattr(long *result, long arg0);
 static int hook_lgetxattr(long *result, long arg0);
 static int hook_setxattr(long *result, long arg0, long arg3);
 static int hook_lsetxattr(long *result, long arg0, long arg3);
+static int hook_mkdir(long *result, const char *path, long arg1);
+static int hook_rmdir(long *result, const char *path);
 
 static long hook_write(struct fd_association *file, char *buffer, size_t count);
 static long hook_read(struct fd_association *file, char *buffer, size_t count);
@@ -467,6 +471,10 @@ hook(long syscall_number,
 		return hook_setxattr(result, arg0, arg3);
 	if (syscall_number == SYS_lsetxattr)
 		return hook_lsetxattr(result, arg0, arg3);
+	if (syscall_number == SYS_mkdir)
+		return hook_mkdir(result, (const char *)arg0, arg1);
+	if (syscall_number == SYS_rmdir)
+		return hook_rmdir(result, (const char *)arg0);
 
 	if (syscall_number == SYS_close)
 		return hook_close(result, arg0);
@@ -1030,6 +1038,48 @@ hook_lsetxattr(long *result, long arg0, long arg3)
 		*result = -ENOTSUP;
 	else
 		*result = 0;
+
+	return HOOKED;
+}
+
+static int
+hook_mkdir(long *result, const char *path, long arg1)
+{
+	struct path_component where;
+
+	resolve_path(get_cwd_pool(), path, &where, no_resolve_last_slink);
+
+	if (where.pool == NULL)
+		return NOT_HOOKED;
+
+	*result = pmemfile_mkdir(where.pool->pool, where.path, (mode_t)arg1);
+
+	log_write("pmemfile_mkdir(%p, \"%s\", %ld) = %ld",
+	    (void *)where.pool->pool, where.path, arg1, *result);
+
+	if (*result < 0)
+		*result = -errno;
+
+	return HOOKED;
+}
+
+static int
+hook_rmdir(long *result, const char *path)
+{
+	struct path_component where;
+
+	resolve_path(get_cwd_pool(), path, &where, resolve_last_slink);
+
+	if (where.pool == NULL)
+		return NOT_HOOKED;
+
+	*result = pmemfile_rmdir(where.pool->pool, where.path);
+
+	log_write("pmemfile_rmdir(%p, \"%s\") = %ld",
+	    (void *)where.pool->pool, where.path, *result);
+
+	if (*result < 0)
+		*result = -errno;
 
 	return HOOKED;
 }
