@@ -120,6 +120,23 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 }
 
+static void
+test2(PMEMfilepool *pfp)
+{
+	PMEMFILE_MKDIR(pfp, "/dir", 0755);
+
+	UT_ASSERTeq(stat_and_dump(pfp, "/dir"), 0);
+
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir/file1",
+			O_CREAT | O_EXCL | O_WRONLY, 0644));
+
+	UT_ASSERTeq(stat_and_dump(pfp, "/dir/file1"), 0);
+
+	PMEMFILE_UNLINK(pfp, "/dir/file1");
+
+	PMEMFILE_RMDIR(pfp, "/dir");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -139,6 +156,7 @@ main(int argc, char *argv[])
 	UT_ASSERTeq(errno, ENOENT);
 
 	test1(pfp);
+	test2(pfp);
 
 	pmemfile_pool_close(pfp);
 

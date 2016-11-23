@@ -625,28 +625,22 @@ pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 
 	LOG(LDBG, "path %s", path);
 
-	path = file_check_pathname(path);
-	if (!path)
+	struct pmemfile_path_info info;
+	traverse_path(pfp, path, false, &info);
+
+	if (!info.vinode) {
+		errno = EINVAL; /* XXX: remove */
 		return -1;
-
-	struct pmemfile_vinode *parent_vinode = pfp->root;
-
-	file_inode_ref(pfp, parent_vinode);
-
-	struct pmemfile_vinode *vinode =
-			file_lookup_dirent(pfp, parent_vinode, path);
-
-	if (!vinode) {
-		int oerrno = errno;
-		file_vinode_unref_tx(pfp, parent_vinode);
-		errno = oerrno;
+	}
+	if (info.remaining[0] != 0) {
+		file_vinode_unref_tx(pfp, info.vinode);
+		errno = ENOENT;
 		return -1;
 	}
 
-	int ret = file_fill_stat(vinode, buf);
+	int ret = file_fill_stat(info.vinode, buf);
 
-	file_vinode_unref_tx(pfp, vinode);
-	file_vinode_unref_tx(pfp, parent_vinode);
+	file_vinode_unref_tx(pfp, info.vinode);
 
 	return ret;
 }
