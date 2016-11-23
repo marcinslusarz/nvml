@@ -122,4 +122,69 @@ d_name.txt: "file4"
 d_name.bin: 0x66 (f) 0x69 (i) 0x6c (l) 0x65 (e) 0x34 (4) 0x00 (?)  
 -
 ---
+d_ino.txt: $(*)
+d_ino.bin: $(*)
+d_off.txt: $(*)
+d_off.bin: $(*)
+d_reclen.txt: 21
+d_reclen.bin: 0x15 0x00  
+d_name.txt: "."
+d_name.bin: 0x2e (.) 0x00 (?) 0x04 (?)  
+-
+d_ino.txt: $(*)
+d_ino.bin: $(*)
+d_off.txt: $(*)
+d_off.bin: $(*)
+d_reclen.txt: 22
+d_reclen.bin: 0x16 0x00  
+d_name.txt: ".."
+d_name.bin: 0x2e (.) 0x2e (.) 0x00 (?) 0x04 (?)  
+-
+---
+d_ino.txt: $(*)
+d_ino.bin: $(*)
+d_off.txt: $(*)
+d_off.bin: $(*)
+d_reclen.txt: 21
+d_reclen.bin: 0x15 0x00  
+d_name.txt: "."
+d_name.bin: 0x2e (.) 0x00 (?) 0x04 (?)  
+-
+d_ino.txt: $(*)
+d_ino.bin: $(*)
+d_off.txt: $(*)
+d_off.bin: $(*)
+d_reclen.txt: 22
+d_reclen.bin: 0x16 0x00  
+d_name.txt: ".."
+d_name.bin: 0x2e (.) 0x2e (.) 0x00 (?) 0x04 (?)  
+-
+d_ino.txt: $(*)
+d_ino.bin: $(*)
+d_off.txt: $(*)
+d_off.bin: $(*)
+d_reclen.txt: 25
+d_reclen.bin: 0x19 0x00  
+d_name.txt: "file1"
+d_name.bin: 0x66 (f) 0x69 (i) 0x6c (l) 0x65 (e) 0x31 (1) 0x00 (?) 0x08 (?)  
+-
+d_ino.txt: $(*)
+d_ino.bin: $(*)
+d_off.txt: $(*)
+d_off.bin: $(*)
+d_reclen.txt: 25
+d_reclen.bin: 0x19 0x00  
+d_name.txt: "file2"
+d_name.bin: 0x66 (f) 0x69 (i) 0x6c (l) 0x65 (e) 0x32 (2) 0x00 (?) 0x08 (?)  
+-
+d_ino.txt: $(*)
+d_ino.bin: $(*)
+d_off.txt: $(*)
+d_off.bin: $(*)
+d_reclen.txt: 25
+d_reclen.bin: 0x19 0x00  
+d_name.txt: "file3"
+d_name.bin: 0x66 (f) 0x69 (i) 0x6c (l) 0x65 (e) 0x33 (3) 0x00 (?) 0x08 (?)  
+-
+---
 file_core_getdents/TEST0: Done
