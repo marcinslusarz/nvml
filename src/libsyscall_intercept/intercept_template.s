@@ -35,22 +35,166 @@
  *
  * The syscall instructions in glbic are
  * overwritten with a call instruction, which
- * jumps here. This assembly wrapper has two jobs:
- * Make sure none of the registers are clobbered
- * from the caller's point of view, and convert
- * between calling conventions -- the syscall
- * arguments are expected to be set up already
- * at the point of call.
+ * jumps here. This assembly wrapper has to achieve multiple things
+ * that can not be achieved in C:
  *
- * This code is a template, it is going to copied,
- * and modified to fit particularities of each call.
- * The prefix, postfix labels are there to make it
- * easy to find the placeholder nops.
+ * libc expects the registers not clobberred by a syscall to have the
+ * same value before and after a syscall instruction. C function calls
+ * clobber a different set of registers. To make sure this doesn't cause
+ * problems, all registers are saved on the stack before calling the
+ * C function, and these register values are restored after the function
+ * returns. This gives the following steps:
  *
- * Excerpts from http://wiki.osdev.org/System_V_ABI#x86-64 :
- * "Functions preserve the registers rbx, rsp, rbp, r12, r13, r14, and r15;
- * while rax, rdi, rsi, rdx, rcx, r8, r9, r10, r11 are scratch registers."
- * "The stack is 16-byte aligned just before the call instruction is called."
+ * - save registers
+ * - call C function
+ * - restore registers
+ * - jump back to libc
+ *
+ * Besides this, many syscall instructions in libc are present in leaf
+ * functions. These don't necessarily have to set up the stack pointer,
+ * leaf functions can just use e.g. the address (RSP - 16) to store
+ * local variables. But they definitely can not use the memory more than
+ * 128 bytes below the stack pointer ( todo: verify this information ).
+ * Signal handlers are exmaples of code that can use the stack of current
+ * thread between any two instructions, like this code does. This leaves us
+ * with the following steps ( new steps are marked with an asterisk ) :
+ *
+ * - * decrement the stack pointer by 128
+ * - save registers
+ * - call C function
+ * - restore registers
+ * - * increment the stack pointer by 128
+ * - jump back to libc
+ *
+ * When patching libc, sometimes some instructions surrounding the original
+ * syscall instruction need to be relocated, to make space for a jump
+ * instruction that would otherwise not fit in the two byte of the syscall
+ * instruction. These instructions are moved into this assembly template.
+ * Considering these additional steps:
+ *
+ * - * execute instructions relocated from before the original syscall
+ * - decrement the stack pointer by 128
+ * - save registers
+ * - call C function
+ * - restore registers
+ * - increment the stack pointer by 128
+ * - * execute instructions relocated from after the original syscall
+ * - jump back to libc
+ *
+ * Note: the relocated instructions need to be executed while the
+ * stack pointer is not altered. This way, they can still use RSP.
+ * The only register these instructions can't rely on, is RIP. Therefore
+ * instructions such as 'mov $5, 6(%rip)', 'jmp 4', etc... can not be
+ * relocated.
+ *
+ * The arguments in the C function call ABI are passed in a way
+ * that is different from the syscall ABI. E.g. when calling the libc
+ * function called 'syscall', the first argument is the syscall number,
+ * and it is passed in RDI. A syscall instruction expects the syscall number
+ * in RAX. A conversion between the two calling conventions must be done
+ * before calling the C function.
+ *
+ * - execute instructions relocated from before the original syscall
+ * - decrement the stack pointer by 128
+ * - save registers
+ * - * rearrange arguments to use the appropriate calling convention
+ * - call C function
+ * - restore registers
+ * - increment the stack pointer by 128
+ * - execute instructions relocated from after the original syscall
+ * - jump back to libc
+ *
+ * Sometimes the C function executes the actual syscall, sometimes
+ * it calls a hook function to provide a user space implementation.
+ * In case of createing a thread ( using SYS_clone ), none of these
+ * two approaches can work. The new thread is start execution on a
+ * new stack - therefore the 'restore registers' step would fail.
+ * So creating a new thread can not be hook, and this assembly
+ * template provides a way to execute such a syscall while avoiding
+ * any stack related issues. This is achieved by actually executing the
+ * syscall instruction *after* all the registers are already restored.
+ *
+ * - execute instructions relocated from before the original syscall
+ * - decrement the stack pointer by 128
+ * - save registers
+ * - rearrange arguments to use the appropriate calling convention
+ * - call C function
+ * - restore registers
+ * - increment the stack pointer by 128
+ * - * if(special_syscall) execute syscall
+ * - execute instructions relocated from after the original syscall
+ * - jump back to libc
+ *
+ * Since there is a separate copy of this assembly template made in the
+ * data segment for each patched syscall, a debugger is generally not able to
+ * unwind the stack -- it needs debug information which can only be supplied
+ * for code in the stack segment, not for code generated dynamically. This
+ * lack of complete callstack information can make debugging very difficult.
+ * To address this problem, a trick is introduced that supplies a 'fake'
+ * return address when calling the C function. This fake return address points
+ * to a function in the text segment, for which appropriate debug information
+ * is available for debuggers. This is the 'magic_routine' seen in the code
+ * below, and seen in the callstack. So instead calling the C function with
+ * call instruction, and address inside a magic_routine is pushed on the stack,
+ * and a jump instruction jumps to the C function -- this makes a debugger
+ * believe that the C function was called from the said magic_routine.
+ * Appropriate debug information is provided using the cfi_def_cfa_offset
+ * assembler directive as follows:
+ *
+ * magic_routine:
+ *	.cfi_startproc
+ *	.cfi_def_cfa_offset 0x580
+ *	nop
+ *	nop
+ *	nop
+ *	nop
+ *	.cfi_endproc
+ *
+ * Whenever a debugger sees the instruction pointer pointing to an instruction
+ * inside this routine, it assumes the routine uses 0x580 bytes of stack space.
+ * This matches the stack space used by the assembly code generated from this
+ * template, so a debugger can look for the stack of original libc routine
+ * at the correct place. This brings up a new problem: The C function can't
+ * just return once it has all it needs to do, as the return address it would
+ * normally return to is a faked return address. To handle this problem, the C
+ * function recieves the real return address as an argument, and jumps to this
+ * address instead of returning. The xlongjmp routine serves this purpose:
+ * xlongjmp sets the RAX register ( the return value of the C function ), the
+ * RSP register ( to restore the stack pointer after the C function ), and the
+ * RIP register ( instead of using a ret instruction ).
+ * This mechanism is also used for deciding if the original syscall instruction
+ * should be executed in this assembly code or not ( remember SYS_clone ).
+ * So the additional arguments passed to the C funtion are as follows:
+ *
+ * long return_to_asm_wrapper_syscall
+ * long return_to_asm_wrapper
+ * long rsp_in_asm_wrapper
+ *
+ * Where return_to_asm_wrapper_syscall is address to jump back to if
+ * original syscall instruction must be executed once the original stack is
+ * not used anymore.
+ * The return_to_asm_wrapper argument is address to jump back to if that is
+ * not needed.
+ * The rsp_in_asm_wrapper is the value RSP held before calling the function,
+ * and should be restored to after the function 'returns'. Normally this would
+ * be achieved by the function prologe generated by the compiler.
+ * The R11 register used as a flag to signal a special syscall.
+ * The resulting steps are:
+ *
+ * - execute instructions relocated from before the original syscall
+ * - decrement the stack pointer by 128
+ * - save registers
+ * - * pass additional argument to the C function
+ * - rearrange syscall arguments to use the appropriate calling convention
+ * - * call the C function using the faked return address
+ * - * C function returns, and doesn't ask for the syscall, R11 := 1
+ * - * C function returns, and does ask for the syscall, R11 := 0
+ * - restore registers
+ * - increment the stack pointer by 128
+ * - if(R11 == 0) execute syscall
+ * - execute instructions relocated from after the original syscall
+ * - jump back to libc
+ *
  */
 
 .global xlongjmp;
