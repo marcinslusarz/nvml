@@ -169,32 +169,6 @@ file_check_flags(int flags)
 	return 0;
 }
 
-/*
- * file_check_pathname -- (internal) validates pathname
- */
-const char *
-file_check_pathname(const char *pathname)
-{
-	const char *orig_pathname = pathname;
-	if (pathname[0] != '/') {
-		LOG(LUSR, "pathname %s does not start with /", orig_pathname);
-		errno = EINVAL;
-		return NULL;
-	}
-
-	while (*pathname == '/')
-		pathname++;
-
-	if (strchr(pathname, '/')) {
-		LOG(LSUP, "opening files in subdirectories is not supported yet"
-			" (%s)", orig_pathname);
-		errno = EISDIR;
-		return NULL;
-	}
-
-	return pathname;
-}
-
 static struct pmemfile_vinode *
 create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 		struct pmemfile_vinode *parent_vinode, int flags, mode_t mode)
@@ -407,54 +381,41 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 
 	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
 
-	oldpath = file_check_pathname(oldpath);
-	if (!oldpath)
-		return -1;
-
-	newpath = file_check_pathname(newpath);
-	if (!newpath)
-		return -1;
-
-	struct pmemfile_vinode *parent_vinode = pfp->root;
-	struct pmemfile_vinode *src_vinode;
-	struct pmemfile_vinode *dst_vinode = NULL;
+	struct pmemfile_path_info src, dst;
+	traverse_path(pfp, oldpath, false, &src);
+	traverse_path(pfp, newpath, false, &dst);
 
 	int oerrno = 0;
-	file_inode_ref(pfp, parent_vinode);
-
-	src_vinode = file_lookup_dirent(pfp, parent_vinode, oldpath);
-	if (src_vinode == NULL) {
-		oerrno = errno;
+	if (dst.vinode == NULL || src.vinode == NULL || src.remaining[0] != 0 ||
+			strchr(dst.remaining, '/')) {
+		oerrno = ENOENT;
 		goto end;
 	}
-
-	dst_vinode = file_lookup_dirent(pfp, parent_vinode, newpath);
-	if (dst_vinode != NULL) {
+	if (dst.remaining[0] == 0) {
 		oerrno = EEXIST;
 		goto end;
 	}
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		rwlock_tx_wlock(&parent_vinode->rwlock);
+		rwlock_tx_wlock(&dst.vinode->rwlock);
 
 		struct pmemfile_time t;
 		file_get_time(&t);
-		file_add_dirent(pfp, parent_vinode, newpath, src_vinode, &t);
+		file_add_dirent(pfp, dst.vinode, dst.remaining, src.vinode, &t);
 
-		rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
+		rwlock_tx_unlock_on_commit(&dst.vinode->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
 	} TX_END
 
 	if (oerrno == 0)
-		file_set_path_debug(pfp, parent_vinode, src_vinode, newpath);
+		file_set_path_debug(pfp, dst.vinode, src.vinode, newpath);
 
 end:
-	if (dst_vinode != NULL)
-		file_vinode_unref_tx(pfp, dst_vinode);
-	if (src_vinode != NULL)
-		file_vinode_unref_tx(pfp, src_vinode);
-	file_vinode_unref_tx(pfp, parent_vinode);
+	if (dst.vinode != NULL)
+		file_vinode_unref_tx(pfp, dst.vinode);
+	if (src.vinode != NULL)
+		file_vinode_unref_tx(pfp, src.vinode);
 
 	if (oerrno) {
 		errno = oerrno;

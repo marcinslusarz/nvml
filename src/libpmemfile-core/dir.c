@@ -125,6 +125,9 @@ file_add_dirent(PMEMfilepool *pfp,
 		pmemobj_tx_abort(EINVAL);
 	}
 
+	if (strchr(name, '/') != NULL)
+		FATAL("trying to add dirent with slash: %s", name);
+
 	struct pmemfile_inode *parent = D_RW(parent_vinode->inode);
 
 	struct pmemfile_dir *dir = &parent->file_data.dir;
