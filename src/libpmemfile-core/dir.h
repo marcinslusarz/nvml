@@ -34,6 +34,21 @@
 
 #include "inode.h"
 
+struct pmemfile_path_info {
+	/* Vinode of the last reachable component in the path. */
+	struct pmemfile_vinode *vinode;
+	/* Remaining part of the path that was not reachable. */
+	const char *remaining;
+
+	/* Parent of the found vinode. */
+	struct pmemfile_vinode *parent;
+	/* Name of the found file. Valid only when remaining[0] == 0. */
+	const char *name;
+};
+
+void traverse_path(PMEMfilepool *pfp, const char *path, bool get_parent,
+		struct pmemfile_path_info *path_info);
+
 struct pmemfile_vinode *file_new_dir(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name, mode_t mode,
 		bool add_to_parent);

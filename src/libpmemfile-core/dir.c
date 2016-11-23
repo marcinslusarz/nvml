@@ -715,12 +715,16 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
  *
  * Takes reference on returned inode.
  */
-static struct pmemfile_vinode *
+static void
 traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *path, const char **name)
+		const char *path, bool get_parent,
+		struct pmemfile_path_info *path_info)
 {
 	char tmp[PATH_MAX];
 	file_inode_ref(pfp, parent);
+	struct pmemfile_vinode *prev_parent = NULL;
+
+	memset(path_info, 0, sizeof(*path_info));
 
 	while (1) {
 		struct pmemfile_vinode *child;
@@ -729,15 +733,30 @@ traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		if (slash == NULL) {
 			child = file_lookup_dirent(pfp, parent, path);
 			if (child) {
-				file_vinode_unref_tx(pfp, parent);
+				if (get_parent) {
+					path_info->parent = parent;
+					path_info->name = path;
+				} else
+					file_vinode_unref_tx(pfp, parent);
+
 				while (path[0])
 					path++;
 
-				*name = path;
-				return child;
+				if (prev_parent)
+					file_vinode_unref_tx(pfp, prev_parent);
+
+				path_info->remaining = path;
+				path_info->vinode = child;
+				return;
 			} else {
-				*name = path;
-				return parent;
+				if (get_parent)
+					path_info->parent = prev_parent;
+				else if (prev_parent)
+					file_vinode_unref_tx(pfp, prev_parent);
+
+				path_info->remaining = path;
+				path_info->vinode = parent;
+				return;
 			}
 		} else {
 			strncpy(tmp, path, (uintptr_t)slash - (uintptr_t)path);
@@ -747,48 +766,64 @@ traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 				child = NULL;
 			else
 				child = file_lookup_dirent(pfp, parent, tmp);
+
 			if (child) {
-				file_vinode_unref_tx(pfp, parent);
+				if (prev_parent)
+					file_vinode_unref_tx(pfp, prev_parent);
+				prev_parent = parent;
+
 				parent = child;
 				path = slash + 1;
+
 				while (path[0] == '/')
 					path++;
 			} else {
-				*name = path;
-				return parent;
+				if (get_parent)
+					path_info->parent = prev_parent;
+				else if (prev_parent)
+					file_vinode_unref_tx(pfp, prev_parent);
+
+				path_info->remaining = path;
+				path_info->vinode = parent;
+				return;
 			}
 		}
 	}
 }
 
-static struct pmemfile_vinode *
-traverse_path(PMEMfilepool *pfp, const char *path, const char **name)
+void
+traverse_path(PMEMfilepool *pfp, const char *path, bool get_parent,
+		struct pmemfile_path_info *path_info)
 {
-	if (path[0] != '/')
-		return NULL;
+	if (path[0] != '/') {
+		memset(path_info, 0, sizeof(*path_info));
+		return;
+	}
 
 	while (path[0] == '/')
 		path++;
 
-	return traverse_pathat(pfp, pfp->root, path, name);
+	traverse_pathat(pfp, pfp->root, path, get_parent, path_info);
 }
 
 int
 pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 {
-	const char *name;
-	struct pmemfile_vinode *parent = traverse_path(pfp, path, &name);
+	struct pmemfile_path_info info;
+	traverse_path(pfp, path, false, &info);
 
-	if (!parent) {
+	if (!info.vinode) {
 		errno = ENOENT;
 		return -1;
 	}
 
-	if (name[0] == 0) {
-		file_vinode_unref_tx(pfp, parent);
+	if (info.remaining[0] == 0) {
+		file_vinode_unref_tx(pfp, info.vinode);
 		errno = EEXIST;
 		return -1;
 	}
+
+	struct pmemfile_vinode *parent = info.vinode;
 
 	if (!file_is_dir(parent)) {
 		file_vinode_unref_tx(pfp, parent);
@@ -796,7 +831,7 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 		return -1;
 	}
 
-	if (strchr(name, '/')) {
+	if (strchr(info.remaining, '/')) {
 		file_vinode_unref_tx(pfp, parent);
 		errno = ENOENT;
 		return -1;
@@ -809,7 +844,7 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&parent->rwlock);
 
-		child = file_new_dir(pfp, parent, name, mode, true);
+		child = file_new_dir(pfp, parent, info.remaining, mode, true);
 
 		rwlock_tx_unlock_on_commit(&parent->rwlock);
 	} TX_ONABORT {
@@ -833,20 +868,21 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 int
 pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 {
-	const char *name;
-	struct pmemfile_vinode *vdir = traverse_path(pfp, path, &name);
+	struct pmemfile_path_info info;
+	traverse_path(pfp, path, false /* XXX */, &info);
 
-	if (!vdir) {
+	if (!info.vinode) {
 		errno = ENOENT;
 		return -1;
 	}
 
-	if (name[0] != 0) {
-		file_vinode_unref_tx(pfp, vdir);
+	if (info.remaining[0] != 0) {
+		file_vinode_unref_tx(pfp, info.vinode);
 		errno = ENOENT;
 		return -1;
 	}
 
+	struct pmemfile_vinode *vdir = info.vinode;
 	if (!file_is_dir(vdir)) {
 		file_vinode_unref_tx(pfp, vdir);
 		errno = ENOTDIR;

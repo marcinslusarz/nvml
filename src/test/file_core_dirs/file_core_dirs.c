@@ -220,8 +220,24 @@ test2(PMEMfilepool *pfp)
 
 		PMEMFILE_RMDIR(pfp, buf);
 	}
+}
 
-	list_root(pfp, 2, 0);
+static void
+test3(PMEMfilepool *pfp)
+{
+	UT_OUT("test2");
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file",
+			O_WRONLY | O_CREAT | O_EXCL, 0644));
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir1"), -1);
+	UT_ASSERTeq(errno, ENOTEMPTY);
+
+	PMEMFILE_UNLINK(pfp, "/dir1/file");
+
+	PMEMFILE_RMDIR(pfp, "/dir1");
 }
 
 int
@@ -239,6 +255,9 @@ main(int argc, char *argv[])
 	test1(pfp);
 	list_root(pfp, 2, 1);
 	test2(pfp);
+	list_root(pfp, 2, 1);
+	test3(pfp);
+	list_root(pfp, 2, 1);
 
 	pmemfile_pool_close(pfp);
 
