@@ -118,6 +118,38 @@ list_root(PMEMfilepool *pfp, int expected_files, int just_count)
 }
 
 static void
+test0(PMEMfilepool *pfp)
+{
+	PMEMFILE_CREATE(pfp, "/file", O_EXCL, 0644);
+
+	PMEMfile *f;
+
+	f = PMEMFILE_OPEN(pfp, "//file", 0);
+	PMEMFILE_CLOSE(pfp, f);
+
+	f = PMEMFILE_OPEN(pfp, "/../file", 0);
+	PMEMFILE_CLOSE(pfp, f);
+
+	f = PMEMFILE_OPEN(pfp, "/../../file", 0);
+	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_UNLINK(pfp, "/file");
+
+
+	PMEMFILE_MKDIR(pfp, "/dir////", 0755);
+	PMEMFILE_CREATE(pfp, "/dir//../dir/.//file", O_EXCL, 0644);
+
+	f = PMEMFILE_OPEN(pfp, "/dir/file", 0);
+	PMEMFILE_CLOSE(pfp, f);
+
+	f = PMEMFILE_OPEN(pfp, "/dir/../dir////file", 0);
+	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_UNLINK(pfp, "/dir//file");
+	PMEMFILE_RMDIR(pfp, "/dir//////");
+}
+
+static void
 test1(PMEMfilepool *pfp)
 {
 	PMEMfile *f;
@@ -257,6 +289,8 @@ main(int argc, char *argv[])
 
 	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
+	test0(pfp);
+	list_root(pfp, 2, 1);
 	test1(pfp);
 	list_root(pfp, 2, 1);
 	test2(pfp);
