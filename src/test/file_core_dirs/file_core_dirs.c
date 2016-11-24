@@ -89,9 +89,11 @@ struct linux_dirent64 {
 };
 
 static void
-list_root(PMEMfilepool *pfp, int expected_files, int just_count)
+list_files(PMEMfilepool *pfp, const char *dir, int expected_files,
+		int just_count, const char *name)
 {
-	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_DIRECTORY | O_RDONLY);
+	UT_OUT("\"%s\" start", name);
+	PMEMfile *f = PMEMFILE_OPEN(pfp, dir, O_DIRECTORY | O_RDONLY);
 
 	char buf[32 * 1024];
 	char path[PATH_MAX];
@@ -114,6 +116,7 @@ list_root(PMEMfilepool *pfp, int expected_files, int just_count)
 
 	PMEMFILE_CLOSE(pfp, f);
 
+	UT_OUT("\"%s\" end", name);
 	UT_ASSERTeq(num_files, expected_files);
 }
 
@@ -137,7 +140,10 @@ test0(PMEMfilepool *pfp)
 
 
 	PMEMFILE_MKDIR(pfp, "/dir////", 0755);
+	list_files(pfp, "/", 3, 0, ". .. dir");
+	list_files(pfp, "/dir", 2, 0, ". ..");
 	PMEMFILE_CREATE(pfp, "/dir//../dir/.//file", O_EXCL, 0644);
+	list_files(pfp, "/dir", 3, 0, ". .. file");
 
 	f = PMEMFILE_OPEN(pfp, "/dir/file", 0);
 	PMEMFILE_CLOSE(pfp, f);
@@ -167,7 +173,7 @@ test1(PMEMfilepool *pfp)
 
 		PMEMFILE_CLOSE(pfp, f);
 
-		list_root(pfp, i + 1 + 2, 0);
+		list_files(pfp, "/", i + 1 + 2, 0, "test1: after one iter");
 	}
 
 	for (int i = 0; i < 100; ++i) {
@@ -189,10 +195,10 @@ test2(PMEMfilepool *pfp)
 
 		PMEMFILE_MKDIR(pfp, buf, 0755);
 
-		list_root(pfp, i + 1 + 2, 0);
+		list_files(pfp, "/", i + 1 + 2, 0, "test2: after one iter");
 	}
 
-	list_root(pfp, 100 + 2, 1);
+	list_files(pfp, "/", 100 + 2, 1, "test2: after loop");
 	PMEMFILE_MKDIR(pfp, "/dir0007/another_directory", 0755);
 
 	errno = 0;
@@ -203,7 +209,7 @@ test2(PMEMfilepool *pfp)
 	UT_ASSERTeq(pmemfile_mkdir(pfp, "/dir2333/aaaa", 0755), -1);
 	UT_ASSERTeq(errno, ENOENT);
 
-	list_root(pfp, 100 + 2, 1);
+	list_files(pfp, "/", 100 + 2, 1, "test2: after2");
 
 	PMEMFILE_CREATE(pfp, "/file", O_EXCL, 0644);
 
@@ -213,7 +219,7 @@ test2(PMEMfilepool *pfp)
 
 	PMEMFILE_UNLINK(pfp, "/file");
 
-	list_root(pfp, 100 + 2, 1);
+	list_files(pfp, "/", 100 + 2, 1, "test2: after3");
 
 
 	errno = 0;
@@ -290,13 +296,13 @@ main(int argc, char *argv[])
 	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	test0(pfp);
-	list_root(pfp, 2, 1);
+	list_files(pfp, "/", 2, 1, "after test0");
 	test1(pfp);
-	list_root(pfp, 2, 1);
+	list_files(pfp, "/", 2, 1, "after test1");
 	test2(pfp);
-	list_root(pfp, 2, 1);
+	list_files(pfp, "/", 2, 1, "after test2");
 	test3(pfp);
-	list_root(pfp, 2, 1);
+	list_files(pfp, "/", 2, 1, "after test3");
 
 	pmemfile_pool_close(pfp);
 
