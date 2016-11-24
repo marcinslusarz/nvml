@@ -90,6 +90,12 @@ PMEMFILE_CLOSE(PMEMfilepool *pfp, PMEMfile *file)
 }
 
 void
+PMEMFILE_CREATE(PMEMfilepool *pfp, const char *path, int flags, mode_t mode)
+{
+	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, path, flags | O_CREAT, mode));
+}
+
+void
 PMEMFILE_UNLINK(PMEMfilepool *pfp, const char *path)
 {
 	int ret = pmemfile_unlink(pfp, path);

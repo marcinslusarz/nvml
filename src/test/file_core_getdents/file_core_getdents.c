@@ -123,32 +123,21 @@ dump_linux_dirents64(void *dirp, unsigned length)
 static void
 test1(PMEMfilepool *pfp)
 {
-	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
-			0644);
-	PMEMFILE_CLOSE(pfp, f);
+	PMEMFILE_CREATE(pfp, "/file1", O_EXCL, 0644);
 
-	f = PMEMFILE_OPEN(pfp, "/file2with_long_name",
-			O_CREAT | O_EXCL | O_WRONLY,
-			0644);
-	PMEMFILE_CLOSE(pfp, f);
+	PMEMFILE_CREATE(pfp, "/file2with_long_name", O_EXCL, 0644);
 
-	f = PMEMFILE_OPEN(pfp, "/file3with_very_long_name"
+	PMEMFILE_CREATE(pfp, "/file3with_very_long_name"
 			"_1234567890_1234567890_1234567890_1234567890"
 			"_1234567890_1234567890_1234567890_1234567890"
 			"_1234567890_1234567890_1234567890_1234567890"
 			"_1234567890_1234567890_1234567890_1234567890"
 			"_1234567890_1234567890_1234567890_1234567890"
-			"_qwertyuiop",
-			O_CREAT | O_EXCL | O_WRONLY,
-			0644);
-	PMEMFILE_CLOSE(pfp, f);
+			"_qwertyuiop", O_EXCL, 0644);
 
+	PMEMFILE_CREATE(pfp, "/file4", O_EXCL, 0644);
 
-	f = PMEMFILE_OPEN(pfp, "/file4", O_CREAT | O_EXCL | O_WRONLY,
-			0644);
-	PMEMFILE_CLOSE(pfp, f);
-
-	f = PMEMFILE_OPEN(pfp, "/", O_DIRECTORY | O_RDONLY);
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_DIRECTORY | O_RDONLY);
 
 	char buf[32758];
 	int r = pmemfile_getdents(pfp, f, (void *)buf, sizeof(buf));
@@ -186,14 +175,11 @@ test2(PMEMfilepool *pfp)
 	UT_ASSERT(r > 0);
 	dump_linux_dirents(buf, r);
 
-	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file1",
-			O_CREAT | O_EXCL | O_WRONLY, 0644));
+	PMEMFILE_CREATE(pfp, "/dir1/file1", O_EXCL, 0644);
 
-	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file2",
-			O_CREAT | O_EXCL | O_WRONLY, 0644));
+	PMEMFILE_CREATE(pfp, "/dir1/file2", O_EXCL, 0644);
 
-	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file3",
-			O_CREAT | O_EXCL | O_WRONLY, 0644));
+	PMEMFILE_CREATE(pfp, "/dir1/file3", O_EXCL, 0644);
 
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_SET, 0);
 	r = pmemfile_getdents(pfp, f, (void *)buf, sizeof(buf));

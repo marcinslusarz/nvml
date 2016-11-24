@@ -127,8 +127,7 @@ test2(PMEMfilepool *pfp)
 
 	UT_ASSERTeq(stat_and_dump(pfp, "/dir"), 0);
 
-	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir/file1",
-			O_CREAT | O_EXCL | O_WRONLY, 0644));
+	PMEMFILE_CREATE(pfp, "/dir/file1", O_EXCL, 0644);
 
 	UT_ASSERTeq(stat_and_dump(pfp, "/dir/file1"), 0);
 

@@ -173,8 +173,7 @@ test2(PMEMfilepool *pfp)
 
 	list_root(pfp, 100 + 2, 1);
 
-	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/file",
-			O_CREAT | O_EXCL | O_WRONLY, 0644));
+	PMEMFILE_CREATE(pfp, "/file", O_EXCL, 0644);
 
 	errno = 0;
 	UT_ASSERTeq(pmemfile_mkdir(pfp, "/file/aaaa", 0755), -1);
@@ -194,8 +193,7 @@ test2(PMEMfilepool *pfp)
 	UT_ASSERTeq(errno, ENOENT);
 
 
-	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/file",
-			O_CREAT | O_EXCL | O_WRONLY, 0644));
+	PMEMFILE_CREATE(pfp, "/file", O_EXCL, 0644);
 
 	errno = 0;
 	UT_ASSERTeq(pmemfile_rmdir(pfp, "/file"), -1);
@@ -228,8 +226,7 @@ test3(PMEMfilepool *pfp)
 	UT_OUT("test2");
 
 	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
-	PMEMFILE_CLOSE(pfp, PMEMFILE_OPEN(pfp, "/dir1/file",
-			O_WRONLY | O_CREAT | O_EXCL, 0644));
+	PMEMFILE_CREATE(pfp, "/dir1/file", O_EXCL, 0644);
 
 	errno = 0;
 	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir1"), -1);
