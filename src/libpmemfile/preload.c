@@ -736,7 +736,7 @@ log_init(const char *path)
 {
 	if (path != NULL)
 		log_fd = syscall_no_intercept(SYS_open, path,
-				O_CREAT | O_RDWR, 0700);
+				O_CREAT | O_RDWR, 0600);
 }
 
 static void
