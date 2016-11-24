@@ -730,10 +730,26 @@ traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	while (1) {
 		struct pmemfile_vinode *child;
-		const char *slash = strchr(path, '/');
+		const char *lookup_path = path;
+		const char *slash = strchr(lookup_path, '/');
+
+		if (slash) {
+			/* handle paths ending with / */
+			const char *it = slash;
+			while (*it == '/')
+				it++;
+
+			if (*it == 0) {
+				strncpy(tmp, path,
+					(uintptr_t)slash - (uintptr_t)path);
+				tmp[slash - path] = 0;
+				lookup_path = tmp;
+				slash = NULL;
+			}
+		}
 
 		if (slash == NULL) {
-			child = vinode_lookup_dirent(pfp, parent, path);
+			child = vinode_lookup_dirent(pfp, parent, lookup_path);
 			if (child) {
 				if (get_parent) {
 					path_info->parent = parent;
@@ -833,10 +849,22 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 		return -1;
 	}
 
-	if (strchr(info.remaining, '/')) {
-		vinode_unref_tx(pfp, parent);
-		errno = ENOENT;
-		return -1;
+	char *sanitized = NULL;
+	const char *slash = strchr(info.remaining, '/');
+	if (slash) {
+		const char *after_slash = slash + 1;
+
+		while (*after_slash == '/')
+			after_slash++;
+
+		if (*after_slash != 0) {
+			vinode_unref_tx(pfp, parent);
+			errno = ENOENT;
+			return -1;
+		}
+
+		sanitized = strndup(info.remaining,
+			(uintptr_t)slash - (uintptr_t)info.remaining);
 	}
 
 	int error = 0;
@@ -846,13 +874,17 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&parent->rwlock);
 
-		child = vinode_new_dir(pfp, parent, info.remaining, mode, true);
+		child = vinode_new_dir(pfp, parent, sanitized ? sanitized :
+				info.remaining, mode, true);
 
 		rwlock_tx_unlock_on_commit(&parent->rwlock);
 	} TX_ONABORT {
 		error = 1;
 		txerrno = errno;
 	} TX_END
+
+	if (sanitized)
+		free(sanitized);
 
 	if (!error)
 		vinode_unref_tx(pfp, child);
