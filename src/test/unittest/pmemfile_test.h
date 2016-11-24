@@ -45,6 +45,8 @@ PMEMfile *PMEMFILE_OPEN(PMEMfilepool *pfp, const char *path, int flags, ...);
 ssize_t PMEMFILE_WRITE(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 		size_t count, ssize_t expected, ...);
 void PMEMFILE_CLOSE(PMEMfilepool *pfp, PMEMfile *file);
+void PMEMFILE_CREATE(PMEMfilepool *pfp, const char *path, int flags,
+		mode_t mode);
 void PMEMFILE_UNLINK(PMEMfilepool *pfp, const char *path);
 ssize_t PMEMFILE_READ(PMEMfilepool *pfp, PMEMfile *file, void *buf,
 		size_t count, ssize_t expected, ...);
