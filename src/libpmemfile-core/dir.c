@@ -311,23 +311,21 @@ file_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
 			pmfi_path(parent), name);
 
+	if (name[0] == 0) {
+		file_inode_ref(pfp, parent);
+		return parent;
+	}
+
 	struct pmemfile_vinode *vinode = NULL;
 
 	util_rwlock_rdlock(&parent->rwlock);
 
-	/* XXX hack, deal with this properly */
-	if (pfp->root == parent &&
-			(name[0] == 0 || (name[0] == '.' && (name[1] == 0 ||
-			(name[1] == '.' && name[2] == 0))))) {
-		vinode = file_vinode_ref(pfp, parent->inode);
-	} else {
-		struct pmemfile_dirent *dirent =
-			file_lookup_dirent_by_name_locked(pfp, parent, name);
-		if (dirent) {
-			vinode = file_vinode_ref(pfp, dirent->inode);
-			if (vinode)
-				file_set_path_debug(pfp, parent, vinode, name);
-		}
+	struct pmemfile_dirent *dirent =
+		file_lookup_dirent_by_name_locked(pfp, parent, name);
+	if (dirent) {
+		vinode = file_vinode_ref(pfp, dirent->inode);
+		if (vinode && vinode != parent)
+			file_set_path_debug(pfp, parent, vinode, name);
 	}
 
 	util_rwlock_unlock(&parent->rwlock);
