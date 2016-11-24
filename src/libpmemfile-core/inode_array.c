@@ -40,11 +40,11 @@
 #include "../libpmemobj/sync.h"
 
 /*
- * file_inode_array_add_single -- finds space for 1 inode in specified
+ * inode_array_add_single -- finds space for 1 inode in specified
  * array, inserts it there and returns success status
  */
 static bool
-file_inode_array_add_single(PMEMfilepool *pfp,
+inode_array_add_single(PMEMfilepool *pfp,
 		struct pmemfile_inode_array *cur,
 		struct pmemfile_vinode *vinode,
 		struct pmemfile_inode_array **ins,
@@ -77,12 +77,12 @@ file_inode_array_add_single(PMEMfilepool *pfp,
 }
 
 /*
- * file_inode_array_add -- adds inode to array, returns its position
+ * inode_array_add -- adds inode to array, returns its position
  *
  * Must be called in transaction.
  */
 void
-file_inode_array_add(PMEMfilepool *pfp,
+inode_array_add(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode_array) array,
 		struct pmemfile_vinode *vinode,
 		struct pmemfile_inode_array **ins,
@@ -97,7 +97,7 @@ file_inode_array_add(PMEMfilepool *pfp,
 		pmemobj_mutex_lock_nofail(pfp->pop, &cur->mtx);
 
 		if (cur->used < NUMINODES_PER_ENTRY)
-			found = file_inode_array_add_single(pfp, cur,
+			found = inode_array_add_single(pfp, cur,
 					vinode, ins, ins_idx);
 
 		bool modified = false;
@@ -125,13 +125,13 @@ file_inode_array_add(PMEMfilepool *pfp,
 }
 
 /*
- * file_inode_array_unregister -- removes inode from specified place in
+ * inode_array_unregister -- removes inode from specified place in
  * array
  *
  * Must be called in transaction.
  */
 void
-file_inode_array_unregister(PMEMfilepool *pfp,
+inode_array_unregister(PMEMfilepool *pfp,
 		struct pmemfile_inode_array *cur,
 		unsigned idx)
 {

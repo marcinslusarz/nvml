@@ -64,59 +64,54 @@ struct pmemfile_vinode {
 	struct ctree *blocks;
 };
 
-static inline bool _file_is_dir(const struct pmemfile_inode *inode)
+static inline bool inode_is_dir(const struct pmemfile_inode *inode)
 {
 	return S_ISDIR(inode->flags);
 }
 
-static inline bool file_is_dir(struct pmemfile_vinode *vinode)
+static inline bool vinode_is_dir(struct pmemfile_vinode *vinode)
 {
-	return _file_is_dir(D_RO(vinode->inode));
+	return inode_is_dir(D_RO(vinode->inode));
 }
 
-static inline bool _file_is_regular_file(const struct pmemfile_inode *inode)
+static inline bool inode_is_regular_file(const struct pmemfile_inode *inode)
 {
 	return S_ISREG(inode->flags);
 }
 
-static inline bool file_is_regular_file(struct pmemfile_vinode *vinode)
+static inline bool vinode_is_regular_file(struct pmemfile_vinode *vinode)
 {
-	return _file_is_regular_file(D_RO(vinode->inode));
+	return inode_is_regular_file(D_RO(vinode->inode));
 }
 
 void file_get_time(struct pmemfile_time *t);
 
-struct pmemfile_vinode *file_inode_alloc(PMEMfilepool *pfp,
+struct pmemfile_vinode *inode_alloc(PMEMfilepool *pfp,
 		uint64_t flags, struct pmemfile_time *t);
 
-void file_inode_free(PMEMfilepool *pfp,
-		TOID(struct pmemfile_inode) tinode);
+void inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode);
 
 const char *pmfi_path(struct pmemfile_vinode *vinode);
 
-void file_inode_ref(PMEMfilepool *pfp,
-		struct pmemfile_vinode *vinode);
+void vinode_ref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
 
-struct pmemfile_inode_map *file_inode_map_alloc(void);
+struct pmemfile_inode_map *inode_map_alloc(void);
 
-void file_inode_map_free(struct pmemfile_inode_map *c);
+void inode_map_free(struct pmemfile_inode_map *c);
 
-struct pmemfile_vinode *file_vinode_get(PMEMfilepool *pfp,
+struct pmemfile_vinode *inode_get_vinode(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		bool ref);
 
-struct pmemfile_vinode *file_vinode_ref(PMEMfilepool *pfp,
+struct pmemfile_vinode *inode_ref(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode);
 
-struct pmemfile_vinode *file_vinode_ref_new(PMEMfilepool *pfp,
+struct pmemfile_vinode *inode_ref_new(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode);
 
-void file_vinode_unref(PMEMfilepool *pfp,
-		struct pmemfile_vinode *vinode);
-void file_vinode_unref_tx(PMEMfilepool *pfp,
-		struct pmemfile_vinode *vinode);
+void vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
+void vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
 
-void file_register_orphaned_inode(PMEMfilepool *pfp,
-		struct pmemfile_vinode *vinode);
+void vinode_orphan(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
 
 #endif

@@ -49,25 +49,25 @@ struct pmemfile_path_info {
 void traverse_path(PMEMfilepool *pfp, const char *path, bool get_parent,
 		struct pmemfile_path_info *path_info);
 
-struct pmemfile_vinode *file_new_dir(PMEMfilepool *pfp,
+struct pmemfile_vinode *vinode_new_dir(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name, mode_t mode,
 		bool add_to_parent);
 
-void file_add_dirent(PMEMfilepool *pfp,
+void vinode_add_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		const char *name,
 		struct pmemfile_vinode *child_vinode,
 		const struct pmemfile_time *tm);
 
-void file_set_path_debug(PMEMfilepool *pfp,
+void vinode_set_debug_path(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		struct pmemfile_vinode *child_vinode,
 		const char *name);
 
-struct pmemfile_vinode *file_lookup_dirent(PMEMfilepool *pfp,
+struct pmemfile_vinode *vinode_lookup_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name);
 
-void file_unlink_dirent(PMEMfilepool *pfp,
+void vinode_unlink_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent,
 		const char *name,
 		struct pmemfile_vinode *volatile *vinode);

@@ -55,10 +55,10 @@
 #include "util.h"
 
 /*
- * file_check_flags -- (internal) open(2) flags tester
+ * check_flags -- (internal) open(2) flags tester
  */
 static int
-file_check_flags(int flags)
+check_flags(int flags)
 {
 	if (flags & O_APPEND) {
 		LOG(LSUP, "O_APPEND");
@@ -178,12 +178,12 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 	rwlock_tx_wlock(&parent_vinode->rwlock);
 
 	struct pmemfile_vinode *vinode =
-			file_inode_alloc(pfp, S_IFREG | mode, &t);
+			inode_alloc(pfp, S_IFREG | mode, &t);
 
 	if ((flags & O_TMPFILE) == O_TMPFILE)
-		file_register_orphaned_inode(pfp, vinode);
+		vinode_orphan(pfp, vinode);
 	else
-		file_add_dirent(pfp, parent_vinode, filename, vinode, &t);
+		vinode_add_dirent(pfp, parent_vinode, filename, vinode, &t);
 
 	rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 
@@ -193,11 +193,11 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 static void
 open_file(const char *orig_pathname, struct pmemfile_vinode *vinode, int flags)
 {
-	if ((flags & O_DIRECTORY) && !file_is_dir(vinode))
+	if ((flags & O_DIRECTORY) && !vinode_is_dir(vinode))
 		pmemobj_tx_abort(ENOTDIR);
 
 	if (flags & O_TRUNC) {
-		if (!file_is_regular_file(vinode)) {
+		if (!vinode_is_regular_file(vinode)) {
 			LOG(LUSR, "truncating non regular file");
 			pmemobj_tx_abort(EINVAL);
 		}
@@ -209,7 +209,7 @@ open_file(const char *orig_pathname, struct pmemfile_vinode *vinode, int flags)
 
 		rwlock_tx_wlock(&vinode->rwlock);
 
-		file_truncate(vinode);
+		vinode_truncate(vinode);
 
 		rwlock_tx_unlock_on_commit(&vinode->rwlock);
 	}
@@ -231,7 +231,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 	const char *orig_pathname = pathname;
 
-	if (file_check_flags(flags))
+	if (check_flags(flags))
 		return NULL;
 
 	va_list ap;
@@ -275,7 +275,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 			pmemobj_tx_abort(ENOENT);
 
 		if ((flags & O_TMPFILE) == O_TMPFILE) {
-			if (!file_is_dir(vinode))
+			if (!vinode_is_dir(vinode))
 				pmemobj_tx_abort(ENOTDIR);
 			if (info.remaining[0])
 				pmemobj_tx_abort(ENOENT);
@@ -329,14 +329,14 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	} TX_END
 
 	if (!error)
-		file_set_path_debug(pfp, vparent, vinode, pathname);
+		vinode_set_debug_path(pfp, vparent, vinode, pathname);
 
 	if (vparent)
-		file_vinode_unref_tx(pfp, vparent);
+		vinode_unref_tx(pfp, vparent);
 
 	if (error) {
 		if (vinode != NULL)
-			file_vinode_unref_tx(pfp, vinode);
+			vinode_unref_tx(pfp, vinode);
 
 		errno = txerrno;
 		LOG(LDBG, "!");
@@ -360,7 +360,7 @@ pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
 	LOG(LDBG, "inode 0x%lx path %s", file->vinode->inode.oid.off,
 			pmfi_path(file->vinode));
 
-	file_vinode_unref_tx(pfp, file->vinode);
+	vinode_unref_tx(pfp, file->vinode);
 
 	util_mutex_destroy(&file->mutex);
 
@@ -401,7 +401,8 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 
 		struct pmemfile_time t;
 		file_get_time(&t);
-		file_add_dirent(pfp, dst.vinode, dst.remaining, src.vinode, &t);
+		vinode_add_dirent(pfp, dst.vinode, dst.remaining, src.vinode,
+				&t);
 
 		rwlock_tx_unlock_on_commit(&dst.vinode->rwlock);
 	} TX_ONABORT {
@@ -409,13 +410,13 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 	} TX_END
 
 	if (oerrno == 0)
-		file_set_path_debug(pfp, dst.vinode, src.vinode, newpath);
+		vinode_set_debug_path(pfp, dst.vinode, src.vinode, newpath);
 
 end:
 	if (dst.vinode != NULL)
-		file_vinode_unref_tx(pfp, dst.vinode);
+		vinode_unref_tx(pfp, dst.vinode);
 	if (src.vinode != NULL)
-		file_vinode_unref_tx(pfp, src.vinode);
+		vinode_unref_tx(pfp, src.vinode);
 
 	if (oerrno) {
 		errno = oerrno;
@@ -453,11 +454,11 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 		if (info.remaining[0])
 			pmemobj_tx_abort(ENOENT);
 
-		if (file_is_dir(info.vinode))
+		if (vinode_is_dir(info.vinode))
 			pmemobj_tx_abort(EISDIR);
 
 		rwlock_tx_wlock(&vparent->rwlock);
-		file_unlink_dirent(pfp, vparent, info.name, &vinode2);
+		vinode_unlink_dirent(pfp, vparent, info.name, &vinode2);
 		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
@@ -465,11 +466,11 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 	} TX_END
 
 	if (info.vinode)
-		file_vinode_unref_tx(pfp, info.vinode);
+		vinode_unref_tx(pfp, info.vinode);
 	if (vinode2)
-		file_vinode_unref_tx(pfp, vinode2);
+		vinode_unref_tx(pfp, vinode2);
 	if (vparent)
-		file_vinode_unref_tx(pfp, vparent);
+		vinode_unref_tx(pfp, vparent);
 
 	if (ret)
 		errno = oerrno;
@@ -487,7 +488,7 @@ _pmemfile_list_root(PMEMfilepool *pfp, const char *msg)
 {
 	LOG(LINF, "START %s", msg);
 	struct pmemfile_vinode *parent_vinode = pfp->root;
-	file_inode_ref(pfp, parent_vinode);
+	vinode_ref(pfp, parent_vinode);
 
 	util_rwlock_rdlock(&parent_vinode->rwlock);
 
@@ -495,7 +496,7 @@ _pmemfile_list_root(PMEMfilepool *pfp, const char *msg)
 
 	util_rwlock_unlock(&parent_vinode->rwlock);
 
-	file_vinode_unref_tx(pfp, parent_vinode);
+	vinode_unref_tx(pfp, parent_vinode);
 
 	LOG(LINF, "STOP  %s", msg);
 }

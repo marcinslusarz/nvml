@@ -60,12 +60,12 @@ file_initialize_super(PMEMfilepool *pfp)
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (!TOID_IS_NULL(super->root_inode)) {
-			pfp->root = file_vinode_ref(pfp, super->root_inode);
+			pfp->root = inode_ref(pfp, super->root_inode);
 #ifdef DEBUG
 			pfp->root->path = Strdup("/");
 #endif
 		} else {
-			pfp->root = file_new_dir(pfp, NULL, "/", 0777, false);
+			pfp->root = vinode_new_dir(pfp, NULL, "/", 0777, false);
 
 			TX_ADD(pfp->super);
 			super->version = PMEMFILE_SUPER_VERSION(0, 1);
@@ -108,7 +108,7 @@ file_cleanup_inode_array_single(PMEMfilepool *pfp,
 		LOG(LINF, "closing inode left by previous run");
 
 		ASSERTeq(D_RW(op->inodes[i])->nlink, 0);
-		file_inode_free(pfp, op->inodes[i]);
+		inode_free(pfp, op->inodes[i]);
 
 		op->inodes[i] = TOID_NULL(struct pmemfile_inode);
 
@@ -189,7 +189,7 @@ pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode)
 		goto init_super;
 	}
 	util_rwlock_init(&pfp->rwlock);
-	pfp->inode_map = file_inode_map_alloc();
+	pfp->inode_map = inode_map_alloc();
 
 	if (file_initialize_super(pfp)) {
 		oerrno = errno;
@@ -233,7 +233,7 @@ pmemfile_pool_open(const char *pathname)
 		goto no_super;
 	}
 	util_rwlock_init(&pfp->rwlock);
-	pfp->inode_map = file_inode_map_alloc();
+	pfp->inode_map = inode_map_alloc();
 
 	if (file_initialize_super(pfp)) {
 		oerrno = errno;
@@ -260,8 +260,8 @@ pmemfile_pool_close(PMEMfilepool *pfp)
 {
 	LOG(LDBG, "pfp %p", pfp);
 
-	file_vinode_unref_tx(pfp, pfp->root);
-	file_inode_map_free(pfp->inode_map);
+	vinode_unref_tx(pfp, pfp->root);
+	inode_map_free(pfp->inode_map);
 	util_rwlock_destroy(&pfp->rwlock);
 
 	pmemobj_close(pfp->pop);
