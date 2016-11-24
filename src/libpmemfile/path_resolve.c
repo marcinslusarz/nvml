@@ -156,10 +156,7 @@ resolve_path(struct pool_description *in_pool, const char *path,
 
 		if (in_pool != NULL) {
 			errno = 0;
-			// todo:
-			// pmemfile_lstat(in_pool->pool,
-			// result->path, &stat_buf);
-			stat_buf.st_mode = 0;
+			pmemfile_lstat(in_pool->pool, result->path, &stat_buf);
 			error_code = -errno;
 		} else {
 			error_code = syscall_no_intercept(SYS_lstat,
