@@ -195,6 +195,21 @@
  * - execute instructions relocated from after the original syscall
  * - jump back to libc
  *
+ * Alignment issues:
+ * The ABI requires the stack pointer to aligned to a 16 byte boundary
+ * upon entering a function. The leaf functions inside libc don't always
+ * leave the stack pointer 16 byte aligned when issuing a syscall, as that
+ * is not required for a syscall instruction. Thus, this code must take
+ * care of stack alignment before calling anything created with a C
+ * compiler. This has a nasty side effect: the magic_routine explained above
+ * presents a fixed stack size to debuggers. But aligning the stack can
+ * makes it impossible to guarantee using a fixed stack size. Therefore,
+ * two versions of the magic_routine are supplied, with different stack
+ * sizes. One of them is used if the stack used by this code is 16n bytes ( when
+ * the stack pointer was already 16 aligned ), the other one is used when
+ * 16n + 8 bytes of stack is used ( when the original RSP is just 8 bytes
+ * aligned ). An address in the appropriate function is used as the faked
+ * return address pushed on the stack before calling the C function.
  */
 
 .global xlongjmp;
