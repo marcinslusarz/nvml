@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-export UNITTEST_NAME=file_preload/basic_commands
+export UNITTEST_NAME=file_preload/TEST1
 export UNITTEST_NUM=1
 
 # standard unit test setup
