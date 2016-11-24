@@ -55,10 +55,10 @@ struct file_block_info {
 };
 
 /*
- * file_insert_block_to_cache -- inserts block into the tree
+ * insert_block_to_cache -- inserts block into the tree
  */
 static void
-file_insert_block_to_cache(struct ctree *c,
+insert_block_to_cache(struct ctree *c,
 		struct pmemfile_block_array *block_array,
 		unsigned block_id,
 		size_t off)
@@ -74,7 +74,7 @@ file_insert_block_to_cache(struct ctree *c,
  * file_rebuild_block_tree -- rebuilds runtime tree of blocks
  */
 static void
-file_rebuild_block_tree(struct pmemfile_vinode *vinode)
+vinode_rebuild_block_tree(struct pmemfile_vinode *vinode)
 {
 	struct ctree *c = ctree_new();
 	if (!c)
@@ -89,7 +89,7 @@ file_rebuild_block_tree(struct pmemfile_vinode *vinode)
 
 			if (block->size == 0)
 				break;
-			file_insert_block_to_cache(c, block_array, i, off);
+			insert_block_to_cache(c, block_array, i, off);
 
 			off += block->size;
 		}
@@ -104,7 +104,7 @@ file_rebuild_block_tree(struct pmemfile_vinode *vinode)
  * file_destroy_data_state -- destroys file state related to data
  */
 void
-file_destroy_data_state(struct pmemfile_vinode *vinode)
+vinode_destroy_data_state(struct pmemfile_vinode *vinode)
 {
 	struct ctree *blocks = vinode->blocks;
 	if (!blocks)
@@ -172,16 +172,16 @@ file_allocate_block(PMEMfile *file,
 	TX_ADD_DIRECT(&inode->last_block_fill);
 	inode->last_block_fill = 0;
 
-	file_insert_block_to_cache(file->vinode->blocks, block_array,
+	insert_block_to_cache(file->vinode->blocks, block_array,
 			(unsigned)(block - &block_array->blocks[0]),
 			pos->global_offset);
 }
 
 /*
- * file_extend_block_meta_data -- updates metadata of the current block
+ * inode_extend_block_meta_data -- updates metadata of the current block
  */
 static void
-file_extend_block_meta_data(struct pmemfile_inode *inode,
+inode_extend_block_meta_data(struct pmemfile_inode *inode,
 		struct pmemfile_block_array *block_array,
 		struct pmemfile_block *block,
 		uint32_t len)
@@ -194,10 +194,10 @@ file_extend_block_meta_data(struct pmemfile_inode *inode,
 }
 
 /*
- * file_zero_extend_block -- extends current block with zeroes
+ * inode_zero_extend_block -- extends current block with zeroes
  */
 static void
-file_zero_extend_block(PMEMfilepool *pfp,
+inode_zero_extend_block(PMEMfilepool *pfp,
 		struct pmemfile_inode *inode,
 		struct pmemfile_block_array *block_array,
 		struct pmemfile_block *block,
@@ -211,14 +211,14 @@ file_zero_extend_block(PMEMfilepool *pfp,
 	 */
 	pmemobj_memset_persist(pfp->pop, addr, 0, len);
 
-	file_extend_block_meta_data(inode, block_array, block, len);
+	inode_extend_block_meta_data(inode, block_array, block, len);
 }
 
 /*
- * file_next_block_array -- changes current block array to the next one
+ * pos_next_block_array -- changes current block array to the next one
  */
 static bool
-file_next_block_array(struct pmemfile_pos *pos, bool extend)
+pos_next_block_array(struct pmemfile_pos *pos, bool extend)
 {
 	/* Transition to the next block array in block array list. */
 	TOID(struct pmemfile_block_array) next = pos->block_array->next;
@@ -287,7 +287,7 @@ file_seek_within_block(PMEMfilepool *pfp,
 				return sz;
 			}
 
-			file_zero_extend_block(pfp, inode, pos->block_array,
+			inode_zero_extend_block(pfp, inode, pos->block_array,
 					block, (uint32_t)(offset_left -
 					inode->last_block_fill));
 
@@ -345,7 +345,7 @@ file_write_within_block(PMEMfilepool *pfp,
 			uint32_t new_used = pos->block_offset + len
 					- inode->last_block_fill;
 
-			file_extend_block_meta_data(inode, pos->block_array,
+			inode_extend_block_meta_data(inode, pos->block_array,
 					block, new_used);
 		}
 
@@ -359,10 +359,10 @@ file_write_within_block(PMEMfilepool *pfp,
 }
 
 /*
- * file_read_from_block -- reads data from current block
+ * inode_read_from_block -- reads data from current block
  */
 static size_t
-file_read_from_block(struct pmemfile_inode *inode,
+inode_read_from_block(struct pmemfile_inode *inode,
 		struct pmemfile_pos *pos,
 		struct pmemfile_block *block,
 		void *buf,
@@ -465,7 +465,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_offset = 0;
 
 			if (pos->block_id == block_array->length)
-				file_next_block_array(pos, true);
+				pos_next_block_array(pos, true);
 		}
 	}
 
@@ -495,7 +495,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_offset = 0;
 
 			if (pos->block_id == block_array->length)
-				file_next_block_array(pos, true);
+				pos_next_block_array(pos, true);
 		}
 	}
 }
@@ -508,7 +508,7 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 {
 	LOG(LDBG, "file %p buf %p count %zu", file, buf, count);
 
-	if (!file_is_regular_file(file->vinode)) {
+	if (!vinode_is_regular_file(file->vinode)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -536,7 +536,7 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 		rwlock_tx_wlock(&vinode->rwlock);
 
 		if (!vinode->blocks)
-			file_rebuild_block_tree(vinode);
+			vinode_rebuild_block_tree(vinode);
 
 		if (file->flags & PFILE_APPEND)
 			file->offset = D_RO(vinode->inode)->size;
@@ -667,7 +667,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_offset = 0;
 
 			if (pos->block_id == block_array->length) {
-				if (!file_next_block_array(pos, false))
+				if (!pos_next_block_array(pos, false))
 					/* EOF */
 					return 0;
 			}
@@ -688,7 +688,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 				&block_array->blocks[pos->block_id];
 		bool is_last = is_last_block(pos->block_id, block_array);
 
-		size_t read1 = file_read_from_block(inode, pos, block, buf,
+		size_t read1 = inode_read_from_block(inode, pos, block, buf,
 				count_left, is_last);
 
 		if (read1 == 0) {
@@ -717,7 +717,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->block_offset = 0;
 
 			if (pos->block_id == block_array->length) {
-				if (!file_next_block_array(pos, false))
+				if (!pos_next_block_array(pos, false))
 					/* EOF */
 					return 0;
 			}
@@ -749,7 +749,7 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 {
 	LOG(LDBG, "file %p buf %p count %zu", file, buf, count);
 
-	if (!file_is_regular_file(file->vinode)) {
+	if (!vinode_is_regular_file(file->vinode)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -771,7 +771,7 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 
 	if (!vinode->blocks) {
 		util_rwlock_wrlock(&vinode->rwlock);
-		file_rebuild_block_tree(vinode);
+		vinode_rebuild_block_tree(vinode);
 	} else {
 		util_rwlock_rdlock(&vinode->rwlock);
 	}
@@ -824,12 +824,12 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 {
 	LOG(LDBG, "file %p offset %lu whence %d", file, offset, whence);
 
-	if (file_is_dir(file->vinode)) {
+	if (vinode_is_dir(file->vinode)) {
 		if (whence == SEEK_END) {
 			errno = EINVAL;
 			return -1;
 		}
-	} else if (file_is_regular_file(file->vinode)) {
+	} else if (vinode_is_regular_file(file->vinode)) {
 		/* Nothing to do for now */
 	} else {
 		errno = EINVAL;
@@ -887,7 +887,7 @@ pmemfile_lseek(PMEMfilepool *pfp, PMEMfile *file, off_t offset, int whence)
  * file_truncate -- changes file size to 0
  */
 void
-file_truncate(struct pmemfile_vinode *vinode)
+vinode_truncate(struct pmemfile_vinode *vinode)
 {
 	struct pmemfile_block_array *arr =
 			&D_RW(vinode->inode)->file_data.blocks;
@@ -929,5 +929,5 @@ file_truncate(struct pmemfile_vinode *vinode)
 
 	// we don't have to rollback destroy of data state on abort, because
 	// it will be rebuilded when it's needed
-	file_destroy_data_state(vinode);
+	vinode_destroy_data_state(vinode);
 }

@@ -36,12 +36,12 @@
 #include "inode.h"
 #include "layout.h"
 
-void file_inode_array_add(PMEMfilepool *pfp,
+void inode_array_add(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode_array) array,
 		struct pmemfile_vinode *inode,
 		struct pmemfile_inode_array **ins,
 		unsigned *ins_idx);
-void file_inode_array_unregister(PMEMfilepool *pfp,
+void inode_array_unregister(PMEMfilepool *pfp,
 		struct pmemfile_inode_array *cur,
 		unsigned idx);
 
