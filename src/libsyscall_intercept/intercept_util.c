@@ -116,7 +116,7 @@ intercept_setup_log(const char *path_base)
 		path = full_path;
 	}
 
-	log_fd = syscall_no_intercept(SYS_open, path, O_CREAT | O_RDWR, 0600);
+	log_fd = syscall_no_intercept(SYS_open, path, O_CREAT | O_RDWR, 0700);
 
 	if (log_fd < 0)
 		xabort();
