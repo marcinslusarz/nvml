@@ -914,6 +914,11 @@ pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 int
 pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 {
+	if (path && path[0] != '/') {
+		errno = EINVAL;
+		return -1;
+	}
+
 	return _pmemfile_mkdirat(pfp, pfp->root, path, mode);
 }
 

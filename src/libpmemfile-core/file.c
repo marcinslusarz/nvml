@@ -378,6 +378,11 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 PMEMfile *
 pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 {
+	if (pathname && pathname[0] != '/') {
+		errno = EINVAL;
+		return NULL;
+	}
+
 	va_list ap;
 	va_start(ap, flags);
 	mode_t mode = 0;
@@ -498,6 +503,11 @@ pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
 int
 pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 {
+	if ((oldpath && oldpath[0] != '/') || (newpath && newpath[0] != '/')) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	return _pmemfile_linkat(pfp, pfp->root, oldpath, pfp->root, newpath, 0);
 }
 
@@ -578,6 +588,11 @@ pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 int
 pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 {
+	if (pathname && pathname[0] != '/') {
+		errno = EINVAL;
+		return -1;
+	}
+
 	return _pmemfile_unlinkat(pfp, pfp->root, pathname, 0);
 }
 
