@@ -43,6 +43,7 @@
 		pmemfile_openat;
 		pmemfile_close;
 		pmemfile_link;
+		pmemfile_linkat;
 		pmemfile_unlink;
 		pmemfile_read;
 		pmemfile_write;

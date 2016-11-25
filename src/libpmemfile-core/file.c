@@ -404,11 +404,11 @@ pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
 	Free(file);
 }
 
-/*
- * pmemfile_link -- make a new name for a file
- */
-int
-pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
+static int
+_pmemfile_linkat(PMEMfilepool *pfp,
+		struct pmemfile_vinode *olddir, const char *oldpath,
+		struct pmemfile_vinode *newdir, const char *newpath,
+		int flags)
 {
 	if (!oldpath || !newpath) {
 		LOG(LUSR, "NULL pathname");
@@ -418,9 +418,30 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 
 	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
 
+	flags &= ~AT_SYMLINK_FOLLOW; /* No symlinks for now XXX */
+
+	if (oldpath[0] == 0 && (flags & AT_EMPTY_PATH)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	flags &= ~AT_EMPTY_PATH;
+
+	if (flags != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	struct pmemfile_path_info src, dst;
-	traverse_path(pfp, oldpath, false, &src);
-	traverse_path(pfp, newpath, false, &dst);
+	if (oldpath[0] == '/')
+		traverse_path(pfp, oldpath, false, &src);
+	else
+		traverse_pathat(pfp, olddir, oldpath, false, &src);
+
+	if (newpath[0] == '/')
+		traverse_path(pfp, newpath, false, &dst);
+	else
+		traverse_pathat(pfp, newdir, newpath, false, &dst);
 
 	int oerrno = 0;
 	if (dst.vinode == NULL || src.vinode == NULL || src.remaining[0] != 0 ||
@@ -461,6 +482,23 @@ end:
 	}
 
 	return 0;
+}
+
+int
+pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
+		PMEMfile *newdir, const char *newpath, int flags)
+{
+	return _pmemfile_linkat(pfp, olddir->vinode, oldpath, newdir->vinode,
+			newpath, flags);
+}
+
+/*
+ * pmemfile_link -- make a new name for a file
+ */
+int
+pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
+{
+	return _pmemfile_linkat(pfp, pfp->root, oldpath, pfp->root, newpath, 0);
 }
 
 /*

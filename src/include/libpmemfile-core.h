@@ -67,6 +67,8 @@ void pmemfile_close(PMEMfilepool *pfp, PMEMfile *file);
 
 int pmemfile_link(PMEMfilepool *pfp, const char *oldpath,
 		const char *newpath);
+int pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
+		PMEMfile *newdir, const char *newpath, int flags);
 int pmemfile_unlink(PMEMfilepool *pfp, const char *pathname);
 
 ssize_t pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
