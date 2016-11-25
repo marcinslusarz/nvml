@@ -501,11 +501,9 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 	return _pmemfile_linkat(pfp, pfp->root, oldpath, pfp->root, newpath, 0);
 }
 
-/*
- * pmemfile_unlink -- delete a name and possibly the file it refers to
- */
-int
-pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
+static int
+_pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
+		const char *pathname, int flags)
 {
 	if (!pathname) {
 		LOG(LUSR, "NULL pathname");
@@ -515,10 +513,24 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 
 	LOG(LDBG, "pathname %s", pathname);
 
+	if (flags & AT_REMOVEDIR) {
+		LOG(LSUP, "AT_REMOVEDIR is not yet supported");
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (flags != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	int oerrno, ret = 0;
 
 	struct pmemfile_path_info info;
-	traverse_path(pfp, pathname, true, &info);
+	if (pathname[0] == '/')
+		traverse_path(pfp, pathname, true, &info);
+	else
+		traverse_pathat(pfp, dir, pathname, true, &info);
 	struct pmemfile_vinode *vparent = info.parent;
 	struct pmemfile_vinode *volatile vinode2 = NULL;
 
@@ -551,6 +563,22 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 		errno = oerrno;
 
 	return ret;
+}
+
+int
+pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
+		int flags)
+{
+	return _pmemfile_unlinkat(pfp, dir->vinode, pathname, flags);
+}
+
+/*
+ * pmemfile_unlink -- delete a name and possibly the file it refers to
+ */
+int
+pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
+{
+	return _pmemfile_unlinkat(pfp, pfp->root, pathname, 0);
 }
 
 /*

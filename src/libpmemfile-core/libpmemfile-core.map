@@ -45,6 +45,7 @@
 		pmemfile_link;
 		pmemfile_linkat;
 		pmemfile_unlink;
+		pmemfile_unlinkat;
 		pmemfile_read;
 		pmemfile_write;
 		pmemfile_lseek;
