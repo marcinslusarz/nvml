@@ -677,6 +677,11 @@ pmemfile_fstatat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 int
 pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 {
+	if (path && path[0] != '/') {
+		errno = EINVAL;
+		return -1;
+	}
+
 	return _pmemfile_fstatat(pfp, pfp->root, path, buf, 0);
 }
 
