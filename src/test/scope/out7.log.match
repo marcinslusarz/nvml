@@ -21,6 +21,7 @@ pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
 pmemfile_link
+pmemfile_linkat
 pmemfile_lseek
 pmemfile_lseek64
 pmemfile_lstat
@@ -67,6 +68,7 @@ pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
 pmemfile_link
+pmemfile_linkat
 pmemfile_lseek
 pmemfile_lseek64
 pmemfile_lstat

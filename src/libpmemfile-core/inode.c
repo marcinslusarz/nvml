@@ -628,14 +628,14 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	flags &= ~AT_NO_AUTOMOUNT; /* No automounting */
 
 	if (path[0] == 0 && (flags & AT_EMPTY_PATH)) {
-		errno = ENOTSUP;
+		errno = EINVAL;
 		return -1;
 	}
 
 	flags &= ~AT_EMPTY_PATH;
 
 	if (flags != 0) {
-		errno = ENOTSUP;
+		errno = EINVAL;
 		return -1;
 	}
 
