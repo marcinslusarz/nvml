@@ -45,6 +45,7 @@ pmemfile_symlinkat
 pmemfile_sync
 pmemfile_truncate
 pmemfile_unlink
+pmemfile_unlinkat
 pmemfile_write
 ../../nondebug/libpmemfile-core.so:
 _pmemfile_file_size
@@ -92,4 +93,5 @@ pmemfile_symlinkat
 pmemfile_sync
 pmemfile_truncate
 pmemfile_unlink
+pmemfile_unlinkat
 pmemfile_write
