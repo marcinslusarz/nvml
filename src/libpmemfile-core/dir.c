@@ -824,11 +824,16 @@ traverse_path(PMEMfilepool *pfp, const char *path, bool get_parent,
 	traverse_pathat(pfp, pfp->root, path, get_parent, path_info);
 }
 
-int
-pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
+static int
+_pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
+		const char *path, mode_t mode)
 {
 	struct pmemfile_path_info info;
-	traverse_path(pfp, path, false, &info);
+
+	if (path[0] == '/')
+		traverse_path(pfp, path, false, &info);
+	else
+		traverse_pathat(pfp, dir, path, false, &info);
 
 	if (!info.vinode) {
 		errno = ENOENT;
@@ -897,6 +902,19 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 	}
 
 	return 0;
+}
+
+int
+pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
+		mode_t mode)
+{
+	return _pmemfile_mkdirat(pfp, dir->vinode, path, mode);
+}
+
+int
+pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
+{
+	return _pmemfile_mkdirat(pfp, pfp->root, path, mode);
 }
 
 int

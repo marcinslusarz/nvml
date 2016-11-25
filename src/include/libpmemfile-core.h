@@ -96,6 +96,8 @@ int pmemfile_getdents(PMEMfilepool *, PMEMfile *file,
 int pmemfile_getdents64(PMEMfilepool *, PMEMfile *file,
 			struct linux_dirent64 *dirp, unsigned count);
 int pmemfile_mkdir(PMEMfilepool *, const char *path, mode_t mode);
+int pmemfile_mkdirat(PMEMfilepool *, PMEMfile *dir, const char *path,
+		mode_t mode);
 int pmemfile_rmdir(PMEMfilepool *, const char *path);
 
 /* temporary debugging functions, do NOT use outside of tests */
