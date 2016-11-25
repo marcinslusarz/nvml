@@ -193,20 +193,6 @@ pmemfile_renameat(PMEMfilepool *pfp, PMEMfile *old_at, const char *old_path,
 }
 
 int
-pmemfile_openat(PMEMfilepool *pfp, PMEMfile *at,
-		const char *path, int oflag, mode_t mode)
-{
-	check_pfp_file(pfp, at);
-
-	(void) path;
-	(void) oflag;
-	(void) mode;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_flock(PMEMfilepool *pfp, PMEMfile *file, int operation)
 {
 	check_pfp_file(pfp, file);

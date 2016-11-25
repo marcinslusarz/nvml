@@ -42,6 +42,8 @@ extern "C" {
 /* pmemfile stuff */
 PMEMfilepool *PMEMFILE_MKFS(const char *path);
 PMEMfile *PMEMFILE_OPEN(PMEMfilepool *pfp, const char *path, int flags, ...);
+PMEMfile *PMEMFILE_OPENAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
+		int flags, ...);
 ssize_t PMEMFILE_WRITE(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 		size_t count, ssize_t expected, ...);
 void PMEMFILE_CLOSE(PMEMfilepool *pfp, PMEMfile *file);
@@ -58,6 +60,8 @@ ssize_t PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path,
 		ssize_t expected_size);
 void PMEMFILE_MKDIR(PMEMfilepool *pfp, const char *path, mode_t mode);
 void PMEMFILE_RMDIR(PMEMfilepool *pfp, const char *path);
+void PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
+		struct stat *buf, int flags);
 
 #ifdef __cplusplus
 }

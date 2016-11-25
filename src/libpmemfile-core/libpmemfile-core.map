@@ -40,6 +40,7 @@
 		pmemfile_pool_open;
 		pmemfile_pool_close;
 		pmemfile_open;
+		pmemfile_openat;
 		pmemfile_close;
 		pmemfile_link;
 		pmemfile_unlink;
@@ -49,6 +50,7 @@
 		pmemfile_lseek64;
 		pmemfile_stat;
 		pmemfile_fstat;
+		pmemfile_fstatat;
 		pmemfile_lstat;
 
 		pmemfile_chdir;

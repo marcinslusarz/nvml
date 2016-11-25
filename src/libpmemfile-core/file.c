@@ -216,10 +216,11 @@ open_file(const char *orig_pathname, struct pmemfile_vinode *vinode, int flags)
 }
 
 /*
- * pmemfile_open -- open file
+ * _pmemfile_openat -- open file
  */
-PMEMfile *
-pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
+static PMEMfile *
+_pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
+		const char *pathname, int flags, ...)
 {
 	if (!pathname) {
 		LOG(LUSR, "NULL pathname");
@@ -263,7 +264,10 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 
 	struct pmemfile_vinode *volatile vparent = NULL;
 	struct pmemfile_vinode *volatile vinode;
-	traverse_path(pfp, pathname, false, &info);
+	if (pathname[0] == '/')
+		traverse_path(pfp, pathname, false, &info);
+	else
+		traverse_pathat(pfp, dir, pathname, false, &info);
 	vinode = info.vinode;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -349,6 +353,39 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	LOG(LDBG, "pathname %s opened inode 0x%lx", orig_pathname,
 			file->vinode->inode.oid.off);
 	return file;
+}
+
+/*
+ * pmemfile_openat -- open file
+ */
+PMEMfile *
+pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
+		int flags, ...)
+{
+	va_list ap;
+	va_start(ap, flags);
+	mode_t mode = 0;
+	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE)
+		mode = va_arg(ap, mode_t);
+	va_end(ap);
+
+	return _pmemfile_openat(pfp, dir->vinode, pathname, flags, mode);
+}
+
+/*
+ * pmemfile_open -- open file
+ */
+PMEMfile *
+pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
+{
+	va_list ap;
+	va_start(ap, flags);
+	mode_t mode = 0;
+	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE)
+		mode = va_arg(ap, mode_t);
+	va_end(ap);
+
+	return _pmemfile_openat(pfp, pfp->root, pathname, flags, mode);
 }
 
 /*
