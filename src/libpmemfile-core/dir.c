@@ -717,7 +717,7 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
  *
  * Takes reference on returned inode.
  */
-static void
+void
 traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, bool get_parent,
 		struct pmemfile_path_info *path_info)

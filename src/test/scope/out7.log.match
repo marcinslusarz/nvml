@@ -15,6 +15,7 @@ pmemfile_fchmod
 pmemfile_fdatasync
 pmemfile_flock
 pmemfile_fstat
+pmemfile_fstatat
 pmemfile_ftruncate
 pmemfile_getcwd
 pmemfile_getdents
@@ -60,6 +61,7 @@ pmemfile_fchmod
 pmemfile_fdatasync
 pmemfile_flock
 pmemfile_fstat
+pmemfile_fstatat
 pmemfile_ftruncate
 pmemfile_getcwd
 pmemfile_getdents

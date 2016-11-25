@@ -63,6 +63,22 @@ PMEMFILE_OPEN(PMEMfilepool *pfp, const char *path, int flags, ...)
 	return f;
 }
 
+PMEMfile *
+PMEMFILE_OPENAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path, int flags,
+		...)
+{
+	va_list ap;
+	mode_t mode;
+
+	va_start(ap, flags);
+	mode = va_arg(ap, mode_t);
+	PMEMfile *f = pmemfile_openat(pfp, dir, path, flags, mode);
+	va_end(ap);
+
+	UT_ASSERTne(f, NULL);
+	return f;
+}
+
 ssize_t
 PMEMFILE_WRITE(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 		size_t count, ssize_t expected, ...)
@@ -153,6 +169,14 @@ PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path, ssize_t expected_size)
 	if (expected_size >= 0)
 		UT_ASSERTeq(buf.st_size, expected_size);
 	return buf.st_size;
+}
+
+void
+PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
+		struct stat *buf, int flags)
+{
+	int ret = pmemfile_fstatat(pfp, dir, path, buf, flags);
+	UT_ASSERTeq(ret, 0);
 }
 
 void

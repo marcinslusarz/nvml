@@ -34,9 +34,12 @@
  * inode.c -- inode operations
  */
 
+#define _GNU_SOURCE
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "callbacks.h"
@@ -606,11 +609,9 @@ vinode_stat(struct pmemfile_vinode *vinode, struct stat *buf)
 	return 0;
 }
 
-/*
- * pmemfile_stat
- */
-int
-pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
+static int
+_pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
+		const char *path, struct stat *buf, int flags)
 {
 	if (!path) {
 		errno = ENOENT;
@@ -622,10 +623,29 @@ pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 		return -1;
 	}
 
+	flags &= ~AT_SYMLINK_FOLLOW; /* No symlinks for now XXX */
+
+	flags &= ~AT_NO_AUTOMOUNT; /* No automounting */
+
+	if (path[0] == 0 && (flags & AT_EMPTY_PATH)) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	flags &= ~AT_EMPTY_PATH;
+
+	if (flags != 0) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
 	LOG(LDBG, "path %s", path);
 
 	struct pmemfile_path_info info;
-	traverse_path(pfp, path, false, &info);
+	if (path[0] == '/')
+		traverse_path(pfp, path, false, &info);
+	else
+		traverse_pathat(pfp, dir, path, false, &info);
 
 	if (!info.vinode) {
 		errno = EINVAL; /* XXX: remove */
@@ -642,6 +662,22 @@ pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 	vinode_unref_tx(pfp, info.vinode);
 
 	return ret;
+}
+
+int
+pmemfile_fstatat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
+		struct stat *buf, int flags)
+{
+	return _pmemfile_fstatat(pfp, dir->vinode, path, buf, flags);
+}
+
+/*
+ * pmemfile_stat
+ */
+int
+pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
+{
+	return _pmemfile_fstatat(pfp, pfp->root, path, buf, 0);
 }
 
 /*

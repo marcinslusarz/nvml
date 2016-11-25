@@ -120,6 +120,61 @@ dump_linux_dirents64(void *dirp, unsigned length)
 	UT_OUT("---");
 }
 
+static const char *
+timespec_to_str(const struct timespec *t)
+{
+	char *s = asctime(localtime(&t->tv_sec));
+	s[strlen(s) - 1] = 0;
+	return s;
+}
+
+static void
+list_files64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp, unsigned length)
+{
+	struct stat statbuf;
+	char *buf = (void *)dirp;
+
+	for (int i = 0; i < length; ) {
+		i += 8;
+		i += 8;
+
+		short int reclen = *(short *)&buf[i];
+		i += 2;
+
+		char type = *(char *)&buf[i];
+		i += 1;
+
+		PMEMFILE_FSTATAT(pfp, dir, buf + i, &statbuf, 0);
+		if (type == DT_REG)
+			UT_ASSERTeq(S_ISREG(statbuf.st_mode), 1);
+		else if (type == DT_DIR)
+			UT_ASSERTeq(S_ISDIR(statbuf.st_mode), 1);
+		else
+			UT_ASSERT(0);
+
+		UT_OUT("%c%c%c%c%c%c%c%c%c%c %ld %d %d %6ld %s %s",
+				type == DT_DIR ? 'd' : '-',
+				statbuf.st_mode & S_IRUSR ? 'r' : '-',
+				statbuf.st_mode & S_IWUSR ? 'w' : '-',
+				statbuf.st_mode & S_IXUSR ? 'x' : '-',
+				statbuf.st_mode & S_IRGRP ? 'r' : '-',
+				statbuf.st_mode & S_IWGRP ? 'w' : '-',
+				statbuf.st_mode & S_IXGRP ? 'x' : '-',
+				statbuf.st_mode & S_IROTH ? 'r' : '-',
+				statbuf.st_mode & S_IWOTH ? 'w' : '-',
+				statbuf.st_mode & S_IXOTH ? 'x' : '-',
+				statbuf.st_nlink,
+				statbuf.st_uid,
+				statbuf.st_gid,
+				statbuf.st_size,
+				timespec_to_str(&statbuf.st_mtim),
+				buf + i);
+		i += reclen - 8 - 8 - 2 - 1;
+	}
+
+	UT_OUT("---");
+}
+
 static void
 test1(PMEMfilepool *pfp)
 {
@@ -182,9 +237,10 @@ test2(PMEMfilepool *pfp)
 	PMEMFILE_CREATE(pfp, "/dir1/file3", O_EXCL, 0644);
 
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_SET, 0);
-	r = pmemfile_getdents(pfp, f, (void *)buf, sizeof(buf));
+	r = pmemfile_getdents64(pfp, f, (void *)buf, sizeof(buf));
 	UT_ASSERT(r > 0);
-	dump_linux_dirents(buf, r);
+	dump_linux_dirents64(buf, r);
+	list_files64(pfp, f, buf, r);
 
 	PMEMFILE_CLOSE(pfp, f);
 

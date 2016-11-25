@@ -60,6 +60,8 @@ void pmemfile_pool_close(PMEMfilepool *pfp);
 
 PMEMfile *pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags,
 		...);
+PMEMfile *pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir,
+		const char *pathname, int flags, ...);
 /* XXX Should we get rid of PMEMfilepool pointer? */
 void pmemfile_close(PMEMfilepool *pfp, PMEMfile *file);
 
@@ -84,6 +86,8 @@ off64_t pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset,
 int pmemfile_stat(PMEMfilepool *, const char *path, struct stat *buf);
 int pmemfile_lstat(PMEMfilepool *, const char *path, struct stat *buf);
 int pmemfile_fstat(PMEMfilepool *, PMEMfile *file, struct stat *buf);
+int pmemfile_fstatat(PMEMfilepool *, PMEMfile *dir, const char *path,
+		struct stat *buf, int flags);
 
 struct linux_dirent;
 struct linux_dirent64;
