@@ -45,6 +45,8 @@ SOURCE = \
 	$(COMMON)/out.c \
 	$(COMMON)/util.c
 
+CFLAGS += -std=gnu11
+
 EXTRA_OBJS += $(LIB_OUTDIR)/libsyscall_intercept.a $(LIB_OUTDIR)/libpmemfile-core.a
 
 LIBS += -lpmemobj -lcapstone

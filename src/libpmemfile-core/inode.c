@@ -643,7 +643,7 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		return -1;
 	}
 
-	flags &= ~AT_SYMLINK_FOLLOW; /* No symlinks for now XXX */
+	flags &= ~AT_SYMLINK_NOFOLLOW; /* No symlinks for now XXX */
 
 	flags &= ~AT_NO_AUTOMOUNT; /* No automounting */
 

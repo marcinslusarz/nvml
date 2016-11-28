@@ -50,355 +50,266 @@
 
 #include "preload.h"
 
-static void path_setup_prefix(struct path_component *dst, const char *path,
-			struct pool_description **in_pool);
-static void path_initial_copy(struct path_component *dst, const char *src);
-static size_t resolve_root_parent(struct path_component *result,
-				struct pool_description **in_pool);
+static int
+get_stat(struct resolved_path *result, struct stat *buf)
+{
+	if (is_fda_null(&result->at.pmem_fda)) {
+		long error_code = syscall_no_intercept(SYS_newfstatat,
+			result->at.kernel_fd,
+			result->path,
+			buf,
+			AT_SYMLINK_NOFOLLOW);
+		if (error_code == 0) {
+			return 0;
+		} else {
+			result->error_code = error_code;
+			return -1;
+		}
+	} else {
+		int r = pmemfile_fstatat(result->at.pmem_fda.pool->pool,
+			result->at.pmem_fda.file,
+			result->path,
+			buf,
+			AT_SYMLINK_NOFOLLOW);
+
+		if (r == 0) {
+			return 0;
+		} else {
+			result->error_code = -errno;
+			return -1;
+		}
+	}
+}
+
+static void
+resolve_symlink(struct resolved_path *result,
+		size_t *resolved, size_t *end, size_t *size,
+		bool *is_last_component)
+{
+	char link_buf[0x200];
+	long link_len;
+
+	result->path[*end] = '\0';
+
+	if (is_fda_null(&result->at.pmem_fda)) {
+		link_len = syscall_no_intercept(SYS_readlinkat,
+			result->at.kernel_fd,
+			result->path,
+			link_buf,
+			sizeof(link_buf));
+	} else {
+		assert(false);
+		/*
+		 *
+		 * TODO -- when pmemfile-core supports symlinks
+		 *
+		 * link_len = pmemfile_readlinkat(result->at.pmem_fda.pool,
+		 * 	result->at.pmem_fda.file,
+		 * 	result->path,
+		 * 	link_buf,
+		 * 	sizeof(link_buf));
+		 * if (link_len < 0 && errno != 0) {
+		 * 	result->error_code = -errno;
+		 * 	return;
+		 * }
+		 */
+	}
+
+	if (! *is_last_component)
+		result->path[*end] = '/';
+
+	if (link_len < 0 || (size_t)link_len >= sizeof(result->path)) {
+		result->error_code = -ENOMEM;
+		return;
+	}
+	link_buf[link_len] = '\0';
+
+	size_t link_insert;
+
+	if (link_buf[0] == '/')
+		link_insert = 0;
+	else
+		link_insert = *resolved;
+
+	size_t postfix_insert = link_insert + (size_t)link_len;
+
+	/*
+	 * At this point, link_buf holds the destination of the symlink.
+	 * The link_insert offset shows where to insert it in the path, and
+	 * the postfix_insert offset shows where to move the part of the
+	 * path that follows the path component which is the symlink.
+	 *
+	 * E.g.: "/usr/lib/a/b/" where "/usr/lib" is a symlink to "other" :
+	 *
+	 * "/usr/lib/a/b/"
+	 *       ^    ^postfix_insert
+	 *       |link_insert
+	 *
+	 * The first step in altering the path is the relocation of the
+	 * postfix part, as in:
+	 *
+	 * "/usr/lib/a/b/" --> "/usr/...../a/b"
+	 *                  postfix_insert^
+	 *
+	 * The second step is copying the link destination into the path:
+	 *
+	 * "/usr/lib/a/b/" --> "/usr/...../a/b" --> "/usr/other/a/b"
+	 *                  postfix_insert^    link_insert^
+	 *
+	 * Processing a symlink to an absolute path is similar, but the
+	 * link destination overwrites the whole path prefix.
+	 * E.g.: where "/usr/lib" is a symlink to "/other" :
+	 *
+	 * "/usr/lib/a/b/" --> "....../a/b" -> "/other/a/b"
+	 *              postfix_insert^         ^link_insert
+	 *
+	 */
+	char *postfix_dst = result->path + postfix_insert;
+	char *link_dst = result->path + link_insert;
+
+	/*
+	 * The postfix starts at offset *end, i.e. after the symlink path
+	 * component.
+	 */
+	char *postfix_src = result->path + *end;
+
+	/*
+	 * It spans till the end of the path, all that plus the
+	 * terminating null character is moved.
+	 */
+	size_t postfix_len = *size - *end + 1;
+
+	if (postfix_insert + postfix_len >= sizeof(result->path)) {
+		// The path just doesn't fit in the available buffer
+		result->error_code = -ENOMEM;
+		return;
+	}
+
+	/*
+	 * The actual transformation happens in the following two lines
+	 * Note: if the link would be copied first, it could overwrite parts
+	 * of the postfix.
+	 */
+	memmove(postfix_dst, postfix_src, postfix_len);
+	memcpy(link_dst, link_buf, (size_t)link_len);
+
+	// Adjust the offsets used by the path resolving loop
+	*size = postfix_insert + postfix_len - 1;
+	*resolved = link_insert;
+
+	if (link_buf[0] == '/')
+		result->at.pmem_fda.pool = NULL;
+}
+
+static void
+enter_pool(struct resolved_path *result, struct pool_description *pool,
+		size_t *resolved, size_t end, size_t *size)
+{
+	memmove(result->path, result->path + end, *size - end);
+	result->path[0] = '/';
+	result->at.pmem_fda.pool = pool;
+	result->at.pmem_fda.file = PMEMFILE_AT_CWD;
+	*resolved = 1;
+	*size -= end;
+	result->path[*size] = '\0';
+}
+
+static void
+exit_pool(struct resolved_path *result,
+		size_t *resolved, size_t end, size_t *size)
+{
+	result->at.kernel_fd = result->at.pmem_fda.pool->fd;
+	result->at.pmem_fda.pool = NULL;
+	memcpy(result->path, result->path + end + 1, *size - end);
+	*resolved = 0;
+	*size -= end;
+}
 
 void
-resolve_path(struct pool_description *in_pool, const char *path,
-			struct path_component *result,
+resolve_path(struct fd_desc at,
+			const char *path,
+			struct resolved_path *result,
 			enum resolve_last_or_not follow_last)
 {
-	size_t resolved; // how many chars are resolved already?
-	result->error_code = 0;
-	result->pool = NULL;
-
 	if (path == NULL || path[0] == '\0') {
 		result->error_code = -ENOTDIR;
 		return;
 	}
 
-	if (path[0] == '\0') {
-		result->error_code = -EIO;
-		return;
-	}
+	result->at = at;
+	result->error_code = 0;
 
-	/* If it is a relative path, prefix it with the CWD */
-	path_setup_prefix(result, path, &in_pool);
-	if (result->error_code != 0)
-		return;
+	size_t resolved; // How many chars are resolved already?
+	size_t size; // The length of the whole path to be resolved.
 
-	resolved = result->path_len;
+	for (size = 0; path[size] != '\0'; ++size)
+		result->path[size] = path[size];
 
-	/* Make a copy of the whole path. */
-	path_initial_copy(result, path);
-	if (result->error_code != 0)
-		return;
+	result->path[size] = '\0';
 
-	/* Loop over the path component strings */
-	while (resolved < result->path_len) {
-		assert(resolved > 0);
+	for (resolved = 0; result->path[resolved] == '/'; ++resolved)
+		;
 
-		struct stat stat_buf;
-		char *end;
-		char end_backup;
-		long error_code;
-		char *r = result->path + resolved;
+	if (path[0] == '/')
+		at.pmem_fda.pool = NULL;
 
-		if (r[0] == '.' && r[1] == '.' && r[2] == '\0') {
-			end = r + 2;
-			if (resolved == 1) {
-				/* "/../a/b/c/d" -> "/a/b/c/d" */
-				resolved =
-				    resolve_root_parent(result, &in_pool);
-				if (result->error_code != 0)
-					return;
+	while (result->path[resolved] != '\0' && result->error_code == 0) {
+		size_t end = resolved;
 
-			} else {
-				assert(resolved > 1);
+		while (result->path[end] != '\0' && result->path[end] != '/')
+			++end;
 
-				/* "/a/b/../c/d" -> "/a/c/d" */
-				char *c = r - 2;
-				size_t copy_len = (size_t)(
-				    result->path + result->path_len - end);
-
-				while (*c != '/' && c > result->path)
-					--c;
-
-				memmove(c, end, copy_len);
-				result->path_len -= (size_t)(end - c);
-				resolved -= (size_t)(end - c);
-				end = c;
-			}
-			continue;
-		}
-
-		/* Look for the end of current component */
-		for (end = result->path + resolved;
-		    *end != '/' && *end != '\0';
-		    ++end)
-			;
 		/*
-		 * At this point r points to the start of the current
-		 * component, end points to the '/' or '\0' following
-		 * the current component.
+		 * At this point, resolved points to the first character
+		 * of the path component to be resolved, end points
+		 * to one past the last character of the same path
+		 * component. E.g.:
+		 *
+		 *   /usr/lib/a/b/c
+		 *        ^  ^
+		 * resolved   end
 		 */
 
-		bool is_last_component = (*end == '\0' || end[1] == '\0');
+		bool is_last_component = (result->path[end] == '\0');
 
-		if (is_last_component && follow_last == no_resolve_last_slink) {
-			if (in_pool == NULL) {
-				in_pool = lookup_pd_by_path(result->path);
-				if (in_pool != NULL) {
-					result->path[0] = '/';
-					result->path[1] = '\0';
-					result->path_len = 1;
-				}
-			}
-			result->pool = in_pool;
+		if (is_last_component && follow_last == no_resolve_last_slink)
 			return;
-		}
 
-		end_backup = *end;
-		*end = '\0';
+		result->path[end] = '\0';
 
-		if (in_pool != NULL) {
-			errno = 0;
-			pmemfile_lstat(in_pool->pool, result->path, &stat_buf);
-			error_code = -errno;
-		} else {
-			error_code = syscall_no_intercept(SYS_lstat,
-						result->path, &stat_buf);
-		}
-
-		*end = end_backup;
-
-		assert(error_code <= 0);
-		if (error_code < 0) {
-			result->error_code = error_code;
+		struct stat stat_buf;
+		if (get_stat(result, &stat_buf) != 0)
 			return;
-		}
+
+		if (!is_last_component)
+			result->path[end] = '/';
 
 		if (S_ISLNK(stat_buf.st_mode)) {
-			char link_buf[0x400];
-			long l;
-
-			*end = '\0';
-			if (in_pool != NULL) {
-				l = pmemfile_readlink(in_pool->pool,
-						result->path,
-						link_buf, sizeof(link_buf));
-			} else {
-				l = syscall_no_intercept(SYS_readlink,
-						result->path,
-						link_buf, sizeof(link_buf));
-			}
-			*end = end_backup;
-
-			assert(l != 0);
-
-			if (l < 0) {
-				result->error_code = l;
-				return;
-			}
-
-			if (link_buf[0] == '/') {
-				/*
-				 * If the symlink points to an absolute path
-				 * then replace the beginning of the resolved
-				 * string with the symlink's value.
-				 *
-				 * E.g.
-				 * if "/usr/share" is a symlink to "/mnt/a/b"
-				 *
-				 * "/usr/share/some" -> "/mnt/a/b/some"
-				 */
-				size_t prefix_len_before =
-				    (size_t)(end - result->path);
-				size_t prefix_len_after = (size_t)l;
-				size_t postfix_len = (size_t)(
-				    result->path_len - prefix_len_before);
-
-				if (prefix_len_after + postfix_len >=
-				    sizeof(result->path) - 2) {
-					result->error_code = -EIO;
-					return;
-				}
-				memmove(result->path + prefix_len_after, end,
-				    postfix_len);
-				memcpy(result->path, link_buf,
-				    prefix_len_after);
-
-				result->path_len +=
-				    prefix_len_after - prefix_len_before;
-				result->path[result->path_len] = '\0';
-				r += prefix_len_after - prefix_len_before;
-			} else {
-				/*
-				 * If the symlink points to a relative path
-				 * then replace the current component in the
-				 * resolved string with the symlink's value.
-				 *
-				 * E.g. if "/usr/share" is a symlink to "a/b"
-				 *
-				 * "/usr/share/some" -> "/usr/a/b/some"
-				 */
-				size_t link_len = (size_t)l;
-				size_t postfix_len = (size_t)(result->path_len -
-				    (size_t)(end - result->path));
-				size_t prefix_len = resolved;
-				if (prefix_len + link_len + postfix_len >=
-				    sizeof(result->path)) {
-					result->error_code = -EIO;
-					return;
-				}
-				memmove(result->path + prefix_len + link_len,
-				    end, postfix_len + 1);
-				memcpy(r, link_buf, link_len);
-				result->path_len =
-				    prefix_len + link_len + postfix_len;
-			}
+			resolve_symlink(result,
+				&resolved, &end, &size, &is_last_component);
+			continue;
 		} else if (!S_ISDIR(stat_buf.st_mode)) {
 			if (!is_last_component)
 				result->error_code = -ENOTDIR;
-			else
-				result->pool = in_pool;
+
 			return;
-		} else {
-			if (in_pool == NULL) {
-				struct pool_description *pool_mounted =
-				    lookup_pd_by_inode(stat_buf.st_ino);
+		} else if (is_fda_null(&result->at.pmem_fda)) {
+			struct pool_description *pool;
 
-				if (pool_mounted != NULL) {
-					in_pool = pool_mounted;
-
-					size_t new_len = (size_t)((
-					    result->path + result->path_len)
-					    - end);
-
-					if (new_len == 0) {
-						result->path[0] = '/';
-						result->path[1] = '\0';
-						result->pool = in_pool;
-						return;
-					}
-
-					memmove(result->path, end, new_len);
-					result->path_len = new_len;
-					resolved = 1;
-					result->path[result->path_len] = '\0';
-					assert(result->path[0] == '/');
-					continue;
-				}
-			}
-			resolved = (size_t)(end - result->path);
-			if (end_backup == '/')
-				++resolved;
-		}
-	}
-	result->pool = in_pool;
-}
-
-static void
-path_setup_prefix(struct path_component *dst, const char *path,
-			struct pool_description **in_pool)
-{
-
-	if (path[0] != '/') {
-		if (*in_pool != NULL) {
-			char *r = pmemfile_getcwd((*in_pool)->pool,
-					dst->path, sizeof(dst->path));
-
-			if (r == NULL) {
-				dst->error_code = -errno;
-				return;
+			pool = lookup_pd_by_inode(stat_buf.st_ino);
+			if (pool != NULL) {
+				enter_pool(result, pool, &resolved, end, &size);
+				continue;
 			}
 		} else {
-			long r = syscall_no_intercept(SYS_getcwd,
-					dst->path, sizeof(dst->path));
-			if (r < 0) {
-				dst->error_code = r;
-				return;
+			if (stat_buf.st_ino ==
+			    result->at.pmem_fda.pool->pmem_stat.st_ino) {
+				exit_pool(result, &resolved, end, &size);
+				continue;
 			}
 		}
-		dst->path_len = strlen(dst->path);
-	} else {
-		dst->path_len = 0;
-		*in_pool = NULL;
-	}
 
-	dst->path[dst->path_len++] = '/';
-	dst->path[dst->path_len] = '\0';
-}
-
-static void
-path_initial_copy(struct path_component *dst, const char *src)
-{
-	assert(dst->path_len >= 1);
-	assert(dst->path[0] == '/');
-	assert(dst->path[dst->path_len - 1] == '/');
-	assert(src[0] != '\0');
-
-	const char *p = src;
-
-	while (*p == '/')
-		++p;
-
-	while (*p != '\0') {
-		/* Collapse slash clusters + skip self references in path */
-		if (p[0] == '/' && (p[1] == '/' || p[1] == '\0')) {
-			++p;
-		} else if (p[0] == '.' && p[1] == '/') {
-			p += 2;
-		} else if (p[0] == '.' && p[1] == '\0') {
-			break;
-		} else if (p[0] == '/') {
-			dst->path[dst->path_len++] = '/';
-			++p;
-		} else {
-			assert(*p != '/');
-			do {
-				dst->path[dst->path_len++] = *p++;
-				if (dst->path_len >= sizeof(dst->path) - 2) {
-					dst->error_code = -EIO;
-					return;
-				}
-			} while (*p != '/' && *p != '\0');
-		}
-	}
-	if (dst->path_len > 0) {
-		if (dst->path[dst->path_len - 1] == '/')
-			--dst->path_len;
-	}
-
-	dst->path[dst->path_len] = '\0';
-}
-
-static size_t
-resolve_root_parent(struct path_component *result,
-			struct pool_description **in_pool)
-{
-	if (*in_pool == NULL) {
-		/*
-		 * Parent directory of the root directory
-		 *
-		 * "/../a/b/c" -> "/a/b/c"
-		 */
-		result->path_len -= 3;
-		memmove(result->path, result->path + 3, result->path_len + 1);
-		return 1;
-	} else {
-		/*
-		 * Parent directory of the pmemfile mount point.
-		 * E.g.: if the mount point is at "/mnt/point_parent/point"
-		 * then the beginning of the string "/.." must be replaced
-		 * with "/mnt/point_parent/point/..", thus:
-		 *
-		 * "/../a/b/c" -> "/mnt/point_parent/a/b/c"
-		 */
-		size_t mnt_len = (*in_pool)->len_mount_point_parent;
-		size_t new_len = result->path_len + mnt_len - 3;
-		if (new_len > sizeof(result->path)) {
-			result->error_code = -EIO;
-			return 0;
-		}
-		memmove(result->path + mnt_len,
-		    result->path + 3, result->path_len - 3 + 1);
-		memmove(result->path, (*in_pool)->mount_point_parent, mnt_len);
-		result->path_len = new_len;
-		*in_pool = NULL;
-		return mnt_len;
+		for (resolved = end; result->path[resolved] == '/'; ++resolved)
+			;
 	}
 }
