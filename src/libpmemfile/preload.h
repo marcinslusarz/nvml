@@ -33,10 +33,12 @@
 #ifndef PMEMFILE_PRELOAD_RESOLVE_PATH_H
 #define PMEMFILE_PRELOAD_RESOLVE_PATH_H
 
+#include <stdbool.h>
 #include <sys/stat.h>
 #include <stddef.h>
 
 struct PMEMfilepool;
+struct PMEMfile;
 
 struct pool_description {
 	// A path where the mount point is - a directory must exist at this path
@@ -59,6 +61,8 @@ struct pool_description {
 	 */
 	struct stat stat;
 
+	struct stat pmem_stat;
+
 	/*
 	 * The pmemfile pool associated with this mount point.
 	 * If this is NULL, the mount point was not used by the application
@@ -67,22 +71,44 @@ struct pool_description {
 	PMEMfilepool *pool;
 };
 
-struct path_component {
-	long error_code;
-
-	struct pool_description *pool; // if NULL, path is in kernels FS
-
-	char path[0x1000];
-	size_t path_len;
-};
-
 enum resolve_last_or_not { resolve_last_slink, no_resolve_last_slink };
 
 struct pool_description *lookup_pd_by_inode(__ino_t inode);
 struct pool_description *lookup_pd_by_path(const char *path);
 
-void resolve_path(struct pool_description *in_pool, const char *path,
-			struct path_component *result,
+/*
+ * The array fd_table is used to look up file descriptors, and find a pool, and
+ * PMEM file open in that pool. When the 'file' member is NULL, the fd is
+ * not used ( but might still be in the fd_pool ).
+ */
+struct fd_association {
+	struct pool_description *pool;
+	PMEMfile *file;
+};
+
+static inline bool
+is_fda_null(const struct fd_association *fda)
+{
+	return fda->pool == NULL;
+}
+
+struct fd_desc {
+	long kernel_fd;
+	struct fd_association pmem_fda;
+};
+
+struct resolved_path {
+	long error_code;
+
+	struct fd_desc at;
+
+	char path[0x1000];
+	size_t path_len;
+};
+
+void resolve_path(struct fd_desc at,
+			const char *path,
+			struct resolved_path *result,
 			enum resolve_last_or_not);
 
 #endif
