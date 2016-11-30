@@ -49,6 +49,7 @@ ssize_t PMEMFILE_WRITE(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 void PMEMFILE_CLOSE(PMEMfilepool *pfp, PMEMfile *file);
 void PMEMFILE_CREATE(PMEMfilepool *pfp, const char *path, int flags,
 		mode_t mode);
+void PMEMFILE_LINK(PMEMfilepool *pfp, const char *oldpath, const char *newpath);
 void PMEMFILE_UNLINK(PMEMfilepool *pfp, const char *path);
 ssize_t PMEMFILE_READ(PMEMfilepool *pfp, PMEMfile *file, void *buf,
 		size_t count, ssize_t expected, ...);
@@ -66,6 +67,7 @@ char *PMEMFILE_GETCWD(PMEMfilepool *pfp, char *buf, size_t size,
 		const char *cmp);
 
 void PMEMFILE_STAT(PMEMfilepool *pfp, const char *path, struct stat *buf);
+void PMEMFILE_LSTAT(PMEMfilepool *pfp, const char *path, struct stat *buf);
 void PMEMFILE_FSTAT(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf);
 void PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		struct stat *buf, int flags);

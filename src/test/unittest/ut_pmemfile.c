@@ -112,6 +112,13 @@ PMEMFILE_CREATE(PMEMfilepool *pfp, const char *path, int flags, mode_t mode)
 }
 
 void
+PMEMFILE_LINK(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
+{
+	int ret = pmemfile_link(pfp, oldpath, newpath);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
 PMEMFILE_UNLINK(PMEMfilepool *pfp, const char *path)
 {
 	int ret = pmemfile_unlink(pfp, path);
@@ -175,6 +182,13 @@ void
 PMEMFILE_STAT(PMEMfilepool *pfp, const char *path, struct stat *buf)
 {
 	int ret = pmemfile_stat(pfp, path, buf);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
+PMEMFILE_LSTAT(PMEMfilepool *pfp, const char *path, struct stat *buf)
+{
+	int ret = pmemfile_lstat(pfp, path, buf);
 	UT_ASSERTeq(ret, 0);
 }
 
