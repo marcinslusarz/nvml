@@ -178,7 +178,7 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 	rwlock_tx_wlock(&parent_vinode->rwlock);
 
 	struct pmemfile_vinode *vinode =
-			inode_alloc(pfp, S_IFREG | mode, &t);
+			inode_alloc(pfp, S_IFREG | mode, &t, NULL, NULL);
 
 	if ((flags & O_TMPFILE) == O_TMPFILE)
 		vinode_orphan(pfp, vinode);
@@ -543,6 +543,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		traverse_pathat(pfp, dir, pathname, true, &info);
 	struct pmemfile_vinode *vparent = info.parent;
 	struct pmemfile_vinode *volatile vinode2 = NULL;
+	volatile bool parent_refed = false;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (info.vinode == NULL)
@@ -555,7 +556,8 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			pmemobj_tx_abort(EISDIR);
 
 		rwlock_tx_wlock(&vparent->rwlock);
-		vinode_unlink_dirent(pfp, vparent, info.name, &vinode2);
+		vinode_unlink_dirent(pfp, vparent, info.name, &vinode2,
+				&parent_refed);
 		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
@@ -569,8 +571,11 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	if (vparent)
 		vinode_unref_tx(pfp, vparent);
 
-	if (ret)
+	if (ret) {
+		if (parent_refed)
+			vinode_unref_tx(pfp, vparent);
 		errno = oerrno;
+	}
 
 	return ret;
 }

@@ -50,11 +50,8 @@
 #ifndef LIBPMEMFILE_CORE_STUBS_H
 #define LIBPMEMFILE_CORE_STUBS_H
 
-int pmemfile_chdir(PMEMfilepool *, const char *path);
-int pmemfile_fchdir(PMEMfilepool *, PMEMfile *);
 int pmemfile_readlink(PMEMfilepool *, const char *path,
 			char *buf, size_t buf_len);
-char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t buf_len);
 ssize_t pmemfile_pread(PMEMfilepool *, PMEMfile *file,
 			char *buf, size_t count, off_t pos);
 ssize_t pmemfile_pwrite(PMEMfilepool *, PMEMfile *file,

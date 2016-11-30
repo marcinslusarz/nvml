@@ -243,7 +243,8 @@ vinode_unregister_locked(PMEMfilepool *pfp,
  */
 static struct pmemfile_vinode *
 _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode, bool ref,
-		bool is_new)
+		bool is_new, struct pmemfile_vinode *parent,
+		volatile bool *parent_refed)
 {
 	struct pmemfile_inode_map *c = pfp->inode_map;
 	int tx = 0;
@@ -322,6 +323,13 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode, bool ref,
 
 	util_rwlock_init(&vinode->rwlock);
 	vinode->inode = inode;
+	if (inode_is_dir(D_RO(inode)) && parent) {
+		vinode_ref(pfp, parent);
+		vinode->parent = parent;
+
+		if (parent_refed)
+			*parent_refed = true;
+	}
 
 	b->arr[empty_slot].pinode = inode;
 	b->arr[empty_slot].vinode = vinode;
@@ -352,7 +360,7 @@ struct pmemfile_vinode *
 inode_get_vinode(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode, bool ref)
 {
-	return _inode_get(pfp, inode, ref, false);
+	return _inode_get(pfp, inode, ref, false, NULL, NULL);
 }
 
 /*
@@ -363,9 +371,11 @@ inode_get_vinode(PMEMfilepool *pfp,
  */
 struct pmemfile_vinode *
 inode_ref_new(PMEMfilepool *pfp,
-		TOID(struct pmemfile_inode) inode)
+		TOID(struct pmemfile_inode) inode,
+		struct pmemfile_vinode *parent,
+		volatile bool *parent_refed)
 {
-	return _inode_get(pfp, inode, true, true);
+	return _inode_get(pfp, inode, true, true, parent, parent_refed);
 }
 
 /*
@@ -376,9 +386,11 @@ inode_ref_new(PMEMfilepool *pfp,
  */
 struct pmemfile_vinode *
 inode_ref(PMEMfilepool *pfp,
-		TOID(struct pmemfile_inode) inode)
+		TOID(struct pmemfile_inode) inode,
+		struct pmemfile_vinode *parent,
+		volatile bool *parent_refed)
 {
-	return _inode_get(pfp, inode, true, false);
+	return _inode_get(pfp, inode, true, false, parent, parent_refed);
 }
 
 /*
@@ -386,7 +398,7 @@ inode_ref(PMEMfilepool *pfp,
  *
  * Must be called in transaction.
  */
-void
+static bool
 vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 {
 	struct pmemfile_inode_map *c = pfp->inode_map;
@@ -394,7 +406,7 @@ vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	rwlock_tx_wlock(&c->rwlock);
 	if (__sync_sub_and_fetch(&vinode->ref, 1) > 0) {
 		rwlock_tx_unlock_on_commit(&c->rwlock);
-		return;
+		return false;
 	}
 
 	if (D_RO(vinode->inode)->nlink == 0) {
@@ -409,6 +421,7 @@ vinode_unref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 		vinode);
 
 	rwlock_tx_unlock_on_commit(&c->rwlock);
+	return true;
 }
 
 /*
@@ -419,11 +432,17 @@ vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 {
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_NONE);
 
-	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		vinode_unref(pfp, vinode);
-	} TX_ONABORT {
-		FATAL("!");
-	} TX_END
+	while (vinode) {
+		TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
+			struct pmemfile_vinode *parent = vinode->parent;
+			if (vinode_unref(pfp, vinode))
+				vinode = parent;
+			else
+				vinode = NULL;
+		} TX_ONABORT {
+			FATAL("!");
+		} TX_END
+	}
 }
 
 /*
@@ -447,7 +466,8 @@ file_get_time(struct pmemfile_time *t)
  * Must be called in transaction.
  */
 struct pmemfile_vinode *
-inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
+inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t,
+		struct pmemfile_vinode *parent, volatile bool *parent_refed)
 {
 	LOG(LDBG, "flags 0x%lx", flags);
 
@@ -480,7 +500,7 @@ inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t)
 		inode->size = sizeof(inode->file_data);
 	}
 
-	return inode_ref_new(pfp, tinode);
+	return inode_ref_new(pfp, tinode, parent, parent_refed);
 }
 
 /*

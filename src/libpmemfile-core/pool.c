@@ -60,17 +60,21 @@ file_initialize_super(PMEMfilepool *pfp)
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (!TOID_IS_NULL(super->root_inode)) {
-			pfp->root = inode_ref(pfp, super->root_inode);
+			pfp->root = inode_ref(pfp, super->root_inode, NULL,
+					NULL);
 #ifdef DEBUG
 			pfp->root->path = Strdup("/");
 #endif
 		} else {
-			pfp->root = vinode_new_dir(pfp, NULL, "/", 0777, false);
+			pfp->root = vinode_new_dir(pfp, NULL, "/", 0777, false,
+					NULL);
 
 			TX_ADD(pfp->super);
 			super->version = PMEMFILE_SUPER_VERSION(0, 1);
 			super->root_inode = pfp->root->inode;
 		}
+		vinode_ref(pfp, pfp->root);
+		pfp->cwd = pfp->root;
 	} TX_ONABORT {
 		err = -1;
 		txerrno = errno;
@@ -186,19 +190,33 @@ pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode)
 	if (TOID_IS_NULL(pfp->super)) {
 		oerrno = ENODEV;
 		ERR("cannot initialize super block");
-		goto init_super;
+		goto no_super;
 	}
 	util_rwlock_init(&pfp->rwlock);
+	util_rwlock_init(&pfp->cwd_rwlock);
 	pfp->inode_map = inode_map_alloc();
+	if (!pfp->inode_map) {
+		oerrno = errno;
+		goto inode_map_fail;
+	}
 
 	if (file_initialize_super(pfp)) {
 		oerrno = errno;
-		goto init_super;
+		goto init_failed;
 	}
 
 	return pfp;
 
-init_super:
+init_failed:
+	if (pfp->cwd)
+		vinode_unref_tx(pfp, pfp->cwd);
+	if (pfp->root)
+		vinode_unref_tx(pfp, pfp->root);
+	inode_map_free(pfp->inode_map);
+inode_map_fail:
+	util_rwlock_destroy(&pfp->rwlock);
+	util_rwlock_destroy(&pfp->cwd_rwlock);
+no_super:
 	pmemobj_close(pfp->pop);
 pool_create:
 	Free(pfp);
@@ -233,17 +251,31 @@ pmemfile_pool_open(const char *pathname)
 		goto no_super;
 	}
 	util_rwlock_init(&pfp->rwlock);
+	util_rwlock_init(&pfp->cwd_rwlock);
 	pfp->inode_map = inode_map_alloc();
+	if (!pfp->inode_map) {
+		oerrno = errno;
+		goto inode_map_fail;
+	}
 
 	if (file_initialize_super(pfp)) {
 		oerrno = errno;
-		goto no_super;
+		goto init_failed;
 	}
 
 	file_cleanup_inode_array(pfp, D_RO(pfp->super)->orphaned_inodes);
 
 	return pfp;
 
+init_failed:
+	if (pfp->cwd)
+		vinode_unref_tx(pfp, pfp->cwd);
+	if (pfp->root)
+		vinode_unref_tx(pfp, pfp->root);
+	inode_map_free(pfp->inode_map);
+inode_map_fail:
+	util_rwlock_destroy(&pfp->rwlock);
+	util_rwlock_destroy(&pfp->cwd_rwlock);
 no_super:
 	pmemobj_close(pfp->pop);
 pool_open:
@@ -260,9 +292,11 @@ pmemfile_pool_close(PMEMfilepool *pfp)
 {
 	LOG(LDBG, "pfp %p", pfp);
 
+	vinode_unref_tx(pfp, pfp->cwd);
 	vinode_unref_tx(pfp, pfp->root);
 	inode_map_free(pfp->inode_map);
 	util_rwlock_destroy(&pfp->rwlock);
+	util_rwlock_destroy(&pfp->cwd_rwlock);
 
 	pmemobj_close(pfp->pop);
 	pfp->pop = NULL;

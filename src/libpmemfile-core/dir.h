@@ -54,7 +54,7 @@ void traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 struct pmemfile_vinode *vinode_new_dir(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name, mode_t mode,
-		bool add_to_parent);
+		bool add_to_parent, volatile bool *parent_refed);
 
 void vinode_add_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
@@ -73,7 +73,8 @@ struct pmemfile_vinode *vinode_lookup_dirent(PMEMfilepool *pfp,
 void vinode_unlink_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent,
 		const char *name,
-		struct pmemfile_vinode *volatile *vinode);
+		struct pmemfile_vinode *volatile *vinode,
+		volatile bool *parent_refed);
 void _pmemfile_list(PMEMfilepool *pfp, struct pmemfile_vinode *parent);
 
 #endif

@@ -172,6 +172,20 @@ PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path, ssize_t expected_size)
 }
 
 void
+PMEMFILE_STAT(PMEMfilepool *pfp, const char *path, struct stat *buf)
+{
+	int ret = pmemfile_stat(pfp, path, buf);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
+PMEMFILE_FSTAT(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
+{
+	int ret = pmemfile_fstat(pfp, file, buf);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
 PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		struct stat *buf, int flags)
 {
@@ -191,4 +205,28 @@ PMEMFILE_RMDIR(PMEMfilepool *pfp, const char *path)
 {
 	int ret = pmemfile_rmdir(pfp, path);
 	UT_ASSERTeq(ret, 0);
+}
+
+void
+PMEMFILE_CHDIR(PMEMfilepool *pfp, const char *path)
+{
+	int ret = pmemfile_chdir(pfp, path);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
+PMEMFILE_FCHDIR(PMEMfilepool *pfp, PMEMfile *dir)
+{
+	int ret = pmemfile_fchdir(pfp, dir);
+	UT_ASSERTeq(ret, 0);
+}
+
+char *
+PMEMFILE_GETCWD(PMEMfilepool *pfp, char *buf, size_t size, const char *cmp)
+{
+	char *ret = pmemfile_getcwd(pfp, buf, size);
+	UT_ASSERTne(ret, NULL);
+	if (cmp && strcmp(ret, cmp) != 0)
+		UT_FATAL("%s != %s", ret, cmp);
+	return ret;
 }

@@ -63,17 +63,6 @@ check_pfp_file(PMEMfilepool *pfp, PMEMfile *file)
 }
 
 int
-pmemfile_chdir(PMEMfilepool *pfp, const char *path)
-{
-	check_pfp(pfp);
-
-	(void) path;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_readlink(PMEMfilepool *pfp, const char *path,
 			char *buf, size_t buf_len)
 {
@@ -84,26 +73,6 @@ pmemfile_readlink(PMEMfilepool *pfp, const char *path,
 
 	errno = ENOTSUP;
 	return -1;
-}
-
-char *
-pmemfile_getcwd(PMEMfilepool *pfp, char *buf, size_t buf_len)
-{
-	check_pfp(pfp);
-
-	if (buf != NULL && buf_len == 0) {
-		errno = EINVAL;
-		return NULL;
-	}
-
-	if (buf_len > 1) {
-		buf[0] = '/';
-		buf[1] = '\0';
-		return buf;
-	} else {
-		errno = EINVAL;
-		return NULL;
-	}
 }
 
 ssize_t
@@ -221,15 +190,6 @@ pmemfile_ftruncate(PMEMfilepool *pfp, PMEMfile *file, off_t length)
 	check_pfp_file(pfp, file);
 
 	(void) length;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
-pmemfile_fchdir(PMEMfilepool *pfp, PMEMfile *file)
-{
-	check_pfp_file(pfp, file);
 
 	errno = ENOTSUP;
 	return -1;
