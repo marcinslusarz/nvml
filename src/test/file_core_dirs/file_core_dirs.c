@@ -362,7 +362,9 @@ test4(PMEMfilepool *pfp)
 
 
 	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
-	PMEMFILE_CHDIR(pfp, "dir1");
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "dir1", O_DIRECTORY);
+	PMEMFILE_FCHDIR(pfp, f);
+	PMEMFILE_CLOSE(pfp, f);
 
 	errno = 0;
 	UT_ASSERTeq(pmemfile_getcwd(pfp, buf, 0), NULL);
