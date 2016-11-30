@@ -70,12 +70,6 @@ test_open_create_close(PMEMfilepool *pfp)
 	UT_ASSERTeq(f1, NULL);
 	UT_ASSERTeq(errno, EFAULT);
 
-	/* path does not start with "/" */
-	errno = 0;
-	f1 = pmemfile_open(pfp, "aaa", O_CREAT, 0777);
-	UT_ASSERTeq(f1, NULL);
-	UT_ASSERTeq(errno, EINVAL);
-
 	/* file does not exist */
 	errno = 0;
 	f1 = pmemfile_open(pfp, "/aaa", 0);
