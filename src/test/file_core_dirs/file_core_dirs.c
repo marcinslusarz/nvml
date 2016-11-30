@@ -387,6 +387,36 @@ test4(PMEMfilepool *pfp)
 	PMEMFILE_RMDIR(pfp, "/dir1");
 }
 
+static void
+test5(PMEMfilepool *pfp)
+{
+	UT_OUT("test5");
+	struct stat stat;
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
+	PMEMFILE_CHDIR(pfp, "/dir1");
+
+	PMEMFILE_CREATE(pfp, "../file1", 0, 0755);
+	PMEMFILE_CREATE(pfp, "file2", 0, 0755);
+	PMEMFILE_UNLINK(pfp, "file2");
+	PMEMFILE_LINK(pfp, "../file1", "file2");
+	PMEMFILE_STAT(pfp, "file2", &stat);
+	PMEMFILE_STAT(pfp, "../file1", &stat);
+	PMEMFILE_LSTAT(pfp, "file2", &stat);
+	PMEMFILE_LSTAT(pfp, "../file1", &stat);
+	PMEMFILE_MKDIR(pfp, "../dir2", 0755);
+	PMEMFILE_MKDIR(pfp, "dir3", 0755);
+	PMEMFILE_STAT(pfp, "/dir2", &stat);
+	PMEMFILE_STAT(pfp, "/dir1/dir3", &stat);
+	PMEMFILE_RMDIR(pfp, "../dir2");
+	PMEMFILE_RMDIR(pfp, "dir3");
+
+	PMEMFILE_UNLINK(pfp, "/dir1/file2");
+	PMEMFILE_UNLINK(pfp, "/file1");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+	PMEMFILE_CHDIR(pfp, "/");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -409,6 +439,8 @@ main(int argc, char *argv[])
 	list_files(pfp, "/", 2, 1, "after test3");
 	test4(pfp);
 	list_files(pfp, "/", 2, 1, "after test4");
+	test5(pfp);
+	list_files(pfp, "/", 2, 1, "after test5");
 
 	pmemfile_pool_close(pfp);
 
