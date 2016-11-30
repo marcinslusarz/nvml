@@ -68,18 +68,6 @@ dump_stat(struct stat *st, const char *path)
 	UT_OUT("---");
 }
 
-static int
-stat_and_dump(PMEMfilepool *pfp, const char *path)
-{
-	struct stat st;
-	int ret = pmemfile_stat(pfp, path, &st);
-	if (ret)
-		return ret;
-
-	dump_stat(&st, path);
-	return 0;
-}
-
 struct linux_dirent64 {
 	uint64_t	d_ino;
 	uint64_t	d_off;
@@ -108,8 +96,11 @@ list_files(PMEMfilepool *pfp, const char *dir, int expected_files,
 					"name: \"%s\"",
 					d->d_ino, d->d_off, d->d_reclen,
 					d->d_type, d->d_name);
-			sprintf(path, "/%s", d->d_name);
-			stat_and_dump(pfp, path);
+			sprintf(path, "/%s/%s", dir, d->d_name);
+
+			struct stat st;
+			PMEMFILE_STAT(pfp, path, &st);
+			dump_stat(&st, path);
 		}
 		d = (void *)(((char *)d) + d->d_reclen);
 	}
@@ -261,7 +252,7 @@ test2(PMEMfilepool *pfp)
 static void
 test3(PMEMfilepool *pfp)
 {
-	UT_OUT("test2");
+	UT_OUT("test3");
 
 	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
 	PMEMFILE_CREATE(pfp, "/dir1/file", O_EXCL, 0644);
@@ -279,6 +270,119 @@ test3(PMEMfilepool *pfp)
 	UT_ASSERTeq(errno, ENOTEMPTY);
 
 	PMEMFILE_RMDIR(pfp, "/dir1/dir2");
+
+	PMEMFILE_RMDIR(pfp, "/dir1");
+}
+
+static void
+test4(PMEMfilepool *pfp)
+{
+	UT_OUT("test4");
+	char buf[PATH_MAX];
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
+	PMEMFILE_MKDIR(pfp, "/dir1/dir2", 0755);
+	PMEMFILE_MKDIR(pfp, "/dir1/dir2/dir3", 0755);
+
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/");
+
+	PMEMFILE_CHDIR(pfp, "/dir1");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1");
+
+	PMEMFILE_CHDIR(pfp, "/dir1/dir2");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1/dir2");
+
+	PMEMFILE_CHDIR(pfp, "/dir1/dir2/dir3");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1/dir2/dir3");
+
+
+	PMEMFILE_CHDIR(pfp, "..");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1/dir2");
+
+	PMEMFILE_CHDIR(pfp, "..");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1");
+
+	PMEMFILE_CHDIR(pfp, "..");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/");
+
+	PMEMFILE_CHDIR(pfp, "..");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/");
+
+
+	PMEMFILE_CHDIR(pfp, "dir1/..");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/");
+
+
+	PMEMFILE_CHDIR(pfp, "dir1");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1");
+
+	PMEMFILE_CHDIR(pfp, "dir2");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1/dir2");
+
+	PMEMFILE_CHDIR(pfp, "dir3");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1/dir2/dir3");
+
+	PMEMFILE_CHDIR(pfp, ".");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir1/dir2/dir3");
+
+	PMEMFILE_RMDIR(pfp, "/dir1/dir2/dir3");
+	PMEMFILE_RMDIR(pfp, "/dir1/dir2");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_getcwd(pfp, buf, sizeof(buf)), NULL);
+	UT_ASSERTeq(errno, ENOENT);
+
+	PMEMFILE_CHDIR(pfp, "..");
+	UT_ASSERTeq(pmemfile_getcwd(pfp, buf, sizeof(buf)), NULL);
+
+	PMEMFILE_CHDIR(pfp, "..");
+	UT_ASSERTeq(pmemfile_getcwd(pfp, buf, sizeof(buf)), NULL);
+
+	PMEMFILE_CHDIR(pfp, "..");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/");
+
+
+	PMEMFILE_CHDIR(pfp, ".");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/");
+
+	PMEMFILE_CHDIR(pfp, "./././././");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/");
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_chdir(pfp, "dir1/../"), -1);
+	UT_ASSERTeq(errno, ENOENT);
+
+	PMEMFILE_CREATE(pfp, "/file", 0, 0777);
+	errno = 0;
+	UT_ASSERTeq(pmemfile_chdir(pfp, "file"), -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	PMEMFILE_UNLINK(pfp, "/file");
+
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
+	PMEMFILE_CHDIR(pfp, "dir1");
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_getcwd(pfp, buf, 0), NULL);
+	UT_ASSERTeq(errno, EINVAL);
+
+	char *t;
+
+	t = PMEMFILE_GETCWD(pfp, NULL, 0, "/dir1");
+	free(t);
+
+	t = PMEMFILE_GETCWD(pfp, NULL, 10, "/dir1");
+	free(t);
+
+
+	for (int i = 1; i < strlen("/dir1") + 1; ++i) {
+		errno = 0;
+		UT_ASSERTeq(pmemfile_getcwd(pfp, buf, i), NULL);
+		UT_ASSERTeq(errno, ERANGE);
+	}
+	PMEMFILE_GETCWD(pfp, buf, strlen("/dir1") + 1, "/dir1");
 
 	PMEMFILE_RMDIR(pfp, "/dir1");
 }
@@ -303,6 +407,8 @@ main(int argc, char *argv[])
 	list_files(pfp, "/", 2, 1, "after test2");
 	test3(pfp);
 	list_files(pfp, "/", 2, 1, "after test3");
+	test4(pfp);
+	list_files(pfp, "/", 2, 1, "after test4");
 
 	pmemfile_pool_close(pfp);
 

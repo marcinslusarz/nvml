@@ -104,6 +104,10 @@ int pmemfile_mkdirat(PMEMfilepool *, PMEMfile *dir, const char *path,
 		mode_t mode);
 int pmemfile_rmdir(PMEMfilepool *, const char *path);
 
+int pmemfile_chdir(PMEMfilepool *, const char *path);
+int pmemfile_fchdir(PMEMfilepool *, PMEMfile *dir);
+char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t size);
+
 /* temporary debugging functions, do NOT use outside of tests */
 void _pmemfile_list_root(PMEMfilepool *pfp, const char *msg);
 void _pmemfile_stats(PMEMfilepool *pfp);

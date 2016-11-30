@@ -60,6 +60,13 @@ ssize_t PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path,
 		ssize_t expected_size);
 void PMEMFILE_MKDIR(PMEMfilepool *pfp, const char *path, mode_t mode);
 void PMEMFILE_RMDIR(PMEMfilepool *pfp, const char *path);
+void PMEMFILE_CHDIR(PMEMfilepool *pfp, const char *path);
+void PMEMFILE_FCHDIR(PMEMfilepool *pfp, PMEMfile *dir);
+char *PMEMFILE_GETCWD(PMEMfilepool *pfp, char *buf, size_t size,
+		const char *cmp);
+
+void PMEMFILE_STAT(PMEMfilepool *pfp, const char *path, struct stat *buf);
+void PMEMFILE_FSTAT(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf);
 void PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		struct stat *buf, int flags);
 
