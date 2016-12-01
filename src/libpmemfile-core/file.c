@@ -369,7 +369,24 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 		mode = va_arg(ap, mode_t);
 	va_end(ap);
 
-	return _pmemfile_openat(pfp, dir->vinode, pathname, flags, mode);
+	struct pmemfile_vinode *at;
+	int at_unref = 0;
+
+	if (dir == PMEMFILE_AT_CWD) {
+		if (pathname && pathname[0] != '/') {
+			at = pool_get_cwd(pfp);
+			at_unref = 1;
+		} else
+			at = NULL;
+	} else
+		at = dir->vinode;
+
+	PMEMfile *ret = _pmemfile_openat(pfp, at, pathname, flags, mode);
+
+	if (at_unref)
+		vinode_unref_tx(pfp, at);
+
+	return ret;
 }
 
 /*
@@ -499,8 +516,41 @@ int
 pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
 		PMEMfile *newdir, const char *newpath, int flags)
 {
-	return _pmemfile_linkat(pfp, olddir->vinode, oldpath, newdir->vinode,
-			newpath, flags);
+	struct pmemfile_vinode *olddir_at, *newdir_at;
+	int olddir_at_unref = 0, newdir_at_unref = 0;
+
+	if (olddir == PMEMFILE_AT_CWD) {
+		if (oldpath && oldpath[0] != '/') {
+			olddir_at = pool_get_cwd(pfp);
+			olddir_at_unref = 1;
+		} else
+			olddir_at = NULL;
+	} else
+		olddir_at = olddir->vinode;
+
+	if (newdir == PMEMFILE_AT_CWD) {
+		if (newpath && newpath[0] != '/') {
+			if (olddir_at_unref) {
+				newdir_at = olddir_at;
+			} else {
+				newdir_at = pool_get_cwd(pfp);
+				newdir_at_unref = 1;
+			}
+		} else
+			newdir_at = NULL;
+	} else
+		newdir_at = newdir->vinode;
+
+	int ret = _pmemfile_linkat(pfp, olddir_at, oldpath, newdir_at, newpath,
+			flags);
+
+	if (olddir_at_unref)
+		vinode_unref_tx(pfp, olddir_at);
+
+	if (newdir_at_unref)
+		vinode_unref_tx(pfp, newdir_at);
+
+	return ret;
 }
 
 /*
@@ -596,7 +646,24 @@ int
 pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 		int flags)
 {
-	return _pmemfile_unlinkat(pfp, dir->vinode, pathname, flags);
+	struct pmemfile_vinode *at;
+	int at_unref = 0;
+
+	if (dir == PMEMFILE_AT_CWD) {
+		if (pathname && pathname[0] != '/') {
+			at = pool_get_cwd(pfp);
+			at_unref = 1;
+		} else
+			at = NULL;
+	} else
+		at = dir->vinode;
+
+	int ret = _pmemfile_unlinkat(pfp, at, pathname, flags);
+
+	if (at_unref)
+		vinode_unref_tx(pfp, at);
+
+	return ret;
 }
 
 /*

@@ -688,7 +688,24 @@ int
 pmemfile_fstatat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		struct stat *buf, int flags)
 {
-	return _pmemfile_fstatat(pfp, dir->vinode, path, buf, flags);
+	struct pmemfile_vinode *at;
+	int at_unref = 0;
+
+	if (dir == PMEMFILE_AT_CWD) {
+		if (path && path[0] != '/') {
+			at = pool_get_cwd(pfp);
+			at_unref = 1;
+		} else
+			at = NULL;
+	} else
+		at = dir->vinode;
+
+	int ret = _pmemfile_fstatat(pfp, at, path, buf, flags);
+
+	if (at_unref)
+		vinode_unref_tx(pfp, at);
+
+	return ret;
 }
 
 /*
