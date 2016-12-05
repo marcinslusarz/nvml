@@ -1164,7 +1164,7 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 		at = NULL;
 	} else {
 		at = pool_get_cwd(pfp);
-		traverse_pathat(pfp, pfp->cwd, path, false, &info);
+		traverse_pathat(pfp, at, path, false, &info);
 	}
 
 	if (!info.vinode) {
