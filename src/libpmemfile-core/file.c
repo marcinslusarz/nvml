@@ -372,9 +372,15 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	at = pool_get_dir_for_path(pfp, dir, pathname, &at_unref);
 
 	PMEMfile *ret = _pmemfile_openat(pfp, at, pathname, flags, mode);
+	int oerrno;
+	if (!ret)
+		oerrno = errno;
 
 	if (at_unref)
 		vinode_unref_tx(pfp, at);
+
+	if (!ret)
+		errno = oerrno;
 
 	return ret;
 }
@@ -403,9 +409,15 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, pathname, &at_unref);
 
 	PMEMfile *f = _pmemfile_openat(pfp, at, pathname, flags, mode);
+	int oerrno;
+	if (!f)
+		oerrno = errno;
 
 	if (at_unref)
 		vinode_unref_tx(pfp, at);
+
+	if (!f)
+		errno = oerrno;
 
 	return f;
 }
@@ -529,12 +541,18 @@ pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
 
 	int ret = _pmemfile_linkat(pfp, olddir_at, oldpath, newdir_at, newpath,
 			flags);
+	int oerrno;
+	if (ret)
+		oerrno = errno;
 
 	if (olddir_at_unref)
 		vinode_unref_tx(pfp, olddir_at);
 
 	if (newdir_at_unref)
 		vinode_unref_tx(pfp, newdir_at);
+
+	if (ret)
+		errno = oerrno;
 
 	return ret;
 }
@@ -560,8 +578,15 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 
 	int ret = _pmemfile_linkat(pfp, at, oldpath, at, newpath, 0);
 
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+
 	if (at)
 		vinode_unref_tx(pfp, at);
+
+	if (ret)
+		errno = oerrno;
 
 	return ret;
 }
@@ -646,7 +671,7 @@ pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 		}
 	}
 
-	int oerrno = 0;
+	int oerrno;
 	if (ret)
 		oerrno = errno;
 	if (at_unref)
@@ -676,8 +701,15 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 
 	int ret = _pmemfile_unlinkat(pfp, at, pathname);
 
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+
 	if (at)
 		vinode_unref_tx(pfp, at);
+
+	if (ret)
+		errno = oerrno;
 
 	return ret;
 }

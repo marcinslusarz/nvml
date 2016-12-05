@@ -936,8 +936,15 @@ pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 
 	int ret = _pmemfile_mkdirat(pfp, at, path, mode);
 
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+
 	if (at_unref)
 		vinode_unref_tx(pfp, at);
+
+	if (ret)
+		errno = oerrno;
 
 	return ret;
 }
@@ -957,8 +964,15 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 
 	int ret = _pmemfile_mkdirat(pfp, at, path, mode);
 
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+
 	if (at_unref)
 		vinode_unref_tx(pfp, at);
+
+	if (ret)
+		errno = oerrno;
 
 	return ret;
 }
@@ -1109,8 +1123,15 @@ pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 
 	int ret = _pmemfile_rmdirat(pfp, at, path);
 
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+
 	if (at_unref)
 		vinode_unref_tx(pfp, at);
+
+	if (ret)
+		errno = oerrno;
 
 	return ret;
 }
@@ -1165,6 +1186,8 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	}
 
 	ret = _pmemfile_chdir(pfp, info.vinode);
+	if (ret)
+		err = errno;
 
 end:
 	if (at_unref)
