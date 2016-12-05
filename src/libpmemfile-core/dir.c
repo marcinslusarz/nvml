@@ -845,12 +845,6 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path, mode_t mode)
 {
 	struct pmemfile_path_info info;
-
-	if (!path) {
-		errno = ENOENT;
-		return -1;
-	}
-
 	traverse_path(pfp, dir, path, false, &info);
 
 	if (!info.vinode) {
@@ -933,8 +927,13 @@ pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 	struct pmemfile_vinode *at;
 	int at_unref = 0;
 
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
+
 	if (dir == PMEMFILE_AT_CWD) {
-		if (path && path[0] != '/') {
+		if (path[0] != '/') {
 			at = pool_get_cwd(pfp);
 			at_unref = 1;
 		} else
@@ -954,7 +953,13 @@ int
 pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 {
 	struct pmemfile_vinode *at;
-	if (path && path[0] == '/')
+
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (path[0] == '/')
 		at = NULL;
 	else
 		at = pool_get_cwd(pfp);
@@ -972,12 +977,6 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path)
 {
 	struct pmemfile_path_info info;
-
-	if (!path) {
-		errno = ENOENT;
-		return -1;
-	}
-
 	traverse_path(pfp, dir, path, true, &info);
 
 	if (!info.vinode) {
@@ -1108,7 +1107,12 @@ int
 pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 {
 	struct pmemfile_vinode *at;
-	if (path && path[0] == '/')
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (path[0] == '/')
 		at = NULL;
 	else
 		at = pool_get_cwd(pfp);

@@ -633,11 +633,6 @@ static int
 _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path, struct stat *buf, int flags)
 {
-	if (!path) {
-		errno = ENOENT;
-		return -1;
-	}
-
 	if (!buf) {
 		errno = EFAULT;
 		return -1;
@@ -693,8 +688,13 @@ pmemfile_fstatat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 	struct pmemfile_vinode *at;
 	int at_unref = 0;
 
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
+
 	if (dir == PMEMFILE_AT_CWD) {
-		if (path && path[0] != '/') {
+		if (path[0] != '/') {
 			at = pool_get_cwd(pfp);
 			at_unref = 1;
 		} else
@@ -717,7 +717,13 @@ int
 pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 {
 	struct pmemfile_vinode *at;
-	if (path && path[0] == '/')
+
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (path[0] == '/')
 		at = NULL;
 	else
 		at = pool_get_cwd(pfp);
