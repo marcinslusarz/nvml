@@ -79,7 +79,18 @@ parent 0x$(X) ppath /
 *   1 0x$(X)     3      0 0100666 aaa2.link
 *   1 0x$(X)     2      0 0100666 bbb2.link
 STOP  test_link end, files: . .. aaa bbb aaa.link aaa2.link bbb2.link
-inodes 3 dirs 0 block_arrays 0 inode_arrays 0 blocks 0
+START test_link end, files: . .. aaa bbb aaa.link aaa2.link bbb2.link
+parent 0x$(X) ppath /
+- ref    inode nlink   size   flags name
+*   3 0x$(X)     2   4008 0040777 .
+*   3 0x$(X)     2   4008 0040777 ..
+*   1 0x$(X)     3      0 0100666 aaa
+*   1 0x$(X)     2      0 0100666 bbb
+*   1 0x$(X)     3      0 0100666 aaa.link
+*   1 0x$(X)     3      0 0100666 aaa2.link
+*   1 0x$(X)     2      0 0100666 bbb2.link
+STOP  test_link end, files: . .. aaa bbb aaa.link aaa2.link bbb2.link
+inodes 3 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
 START test_unlink end, files: . .. aaa aaa.link aaa2.link
 parent 0x$(X) ppath /
 - ref    inode nlink   size   flags name
