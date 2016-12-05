@@ -925,21 +925,14 @@ pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		mode_t mode)
 {
 	struct pmemfile_vinode *at;
-	int at_unref = 0;
+	bool at_unref;
 
 	if (!path) {
 		errno = ENOENT;
 		return -1;
 	}
 
-	if (dir == PMEMFILE_AT_CWD) {
-		if (path[0] != '/') {
-			at = pool_get_cwd(pfp);
-			at_unref = 1;
-		} else
-			at = NULL;
-	} else
-		at = dir->vinode;
+	at = pool_get_dir_for_path(pfp, dir, path, &at_unref);
 
 	int ret = _pmemfile_mkdirat(pfp, at, path, mode);
 
@@ -953,20 +946,18 @@ int
 pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 {
 	struct pmemfile_vinode *at;
+	bool at_unref;
 
 	if (!path) {
 		errno = ENOENT;
 		return -1;
 	}
 
-	if (path[0] == '/')
-		at = NULL;
-	else
-		at = pool_get_cwd(pfp);
+	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, path, &at_unref);
 
 	int ret = _pmemfile_mkdirat(pfp, at, path, mode);
 
-	if (at)
+	if (at_unref)
 		vinode_unref_tx(pfp, at);
 
 	return ret;
@@ -1107,19 +1098,18 @@ int
 pmemfile_rmdir(PMEMfilepool *pfp, const char *path)
 {
 	struct pmemfile_vinode *at;
+	bool at_unref;
+
 	if (!path) {
 		errno = ENOENT;
 		return -1;
 	}
 
-	if (path[0] == '/')
-		at = NULL;
-	else
-		at = pool_get_cwd(pfp);
+	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, path, &at_unref);
 
 	int ret = _pmemfile_rmdirat(pfp, at, path);
 
-	if (at)
+	if (at_unref)
 		vinode_unref_tx(pfp, at);
 
 	return ret;
@@ -1150,16 +1140,14 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	struct pmemfile_vinode *at;
 	int ret = 0;
 	int err = 0;
+	bool at_unref;
 
 	if (!path) {
 		errno = ENOENT;
 		return -1;
 	}
 
-	if (path[0] == '/')
-		at = NULL;
-	else
-		at = pool_get_cwd(pfp);
+	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, path, &at_unref);
 
 	traverse_path(pfp, at, path, false, &info);
 
@@ -1179,7 +1167,7 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	ret = _pmemfile_chdir(pfp, info.vinode);
 
 end:
-	if (at)
+	if (at_unref)
 		vinode_unref_tx(pfp, at);
 	if (err)
 		errno = err;
@@ -1211,6 +1199,22 @@ pool_get_cwd(PMEMfilepool *pfp)
 	util_rwlock_unlock(&pfp->cwd_rwlock);
 
 	return cwd;
+}
+
+struct pmemfile_vinode *
+pool_get_dir_for_path(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
+		bool *unref)
+{
+	*unref = false;
+	if (path[0] == '/')
+		return NULL;
+
+	if (dir == PMEMFILE_AT_CWD) {
+		*unref = true;
+		return pool_get_cwd(pfp);
+	}
+
+	return dir->vinode;
 }
 
 char *
