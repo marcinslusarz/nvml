@@ -262,10 +262,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	vinode = info.vinode;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		// TODO: remove once relative paths work
-		if (vinode == NULL)
-			pmemobj_tx_abort(EINVAL);
-
 		if (strchr(info.remaining, '/'))
 			pmemobj_tx_abort(ENOENT);
 
@@ -466,21 +462,21 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 
 	int oerrno = 0;
 
-	if (src.vinode && src.remaining[0] != 0 && !vinode_is_dir(src.vinode)) {
+	if (src.remaining[0] != 0 && !vinode_is_dir(src.vinode)) {
 		oerrno = ENOTDIR;
 		goto end;
 	}
 
-	if (dst.vinode && dst.remaining[0] != 0 && !vinode_is_dir(dst.vinode)) {
+	if (dst.remaining[0] != 0 && !vinode_is_dir(dst.vinode)) {
 		oerrno = ENOTDIR;
 		goto end;
 	}
 
-	if (dst.vinode == NULL || src.vinode == NULL || src.remaining[0] != 0 ||
-			strchr(dst.remaining, '/')) {
+	if (src.remaining[0] != 0 || strchr(dst.remaining, '/')) {
 		oerrno = ENOENT;
 		goto end;
 	}
+
 	if (dst.remaining[0] == 0) {
 		oerrno = EEXIST;
 		goto end;
@@ -508,10 +504,8 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		vinode_set_debug_path(pfp, dst.vinode, src.vinode, newpath);
 
 end:
-	if (dst.vinode != NULL)
-		vinode_unref_tx(pfp, dst.vinode);
-	if (src.vinode != NULL)
-		vinode_unref_tx(pfp, src.vinode);
+	vinode_unref_tx(pfp, dst.vinode);
+	vinode_unref_tx(pfp, src.vinode);
 
 	if (oerrno) {
 		errno = oerrno;
@@ -606,9 +600,6 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	volatile bool parent_refed = false;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		if (info.vinode == NULL)
-			pmemobj_tx_abort(EINVAL);
-
 		if (info.remaining[0]) {
 			if (!vinode_is_dir(info.vinode))
 				pmemobj_tx_abort(ENOTDIR);

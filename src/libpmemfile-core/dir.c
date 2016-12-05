@@ -847,11 +847,6 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, path, false, &info);
 
-	if (!info.vinode) {
-		errno = ENOENT;
-		return -1;
-	}
-
 	if (info.remaining[0] == 0) {
 		vinode_unref_tx(pfp, info.vinode);
 		errno = EEXIST;
@@ -983,11 +978,6 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 {
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, path, true, &info);
-
-	if (!info.vinode) {
-		errno = ENOENT;
-		return -1;
-	}
 
 	if (info.remaining[0] != 0) {
 		vinode_unref_tx(pfp, info.vinode);
@@ -1171,12 +1161,6 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, path, &at_unref);
 
 	traverse_path(pfp, at, path, false, &info);
-
-	if (!info.vinode) {
-		err = ENOENT;
-		ret = -1;
-		goto end;
-	}
 
 	if (info.remaining[0] != 0) {
 		vinode_unref_tx(pfp, info.vinode);
