@@ -222,12 +222,6 @@ static PMEMfile *
 _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *pathname, int flags, ...)
 {
-	if (!pathname) {
-		LOG(LUSR, "NULL pathname");
-		errno = ENOENT;
-		return NULL;
-	}
-
 	LOG(LDBG, "pathname %s flags 0x%x", pathname, flags);
 
 	const char *orig_pathname = pathname;
@@ -359,6 +353,12 @@ PMEMfile *
 pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 		int flags, ...)
 {
+	if (!pathname) {
+		LOG(LUSR, "NULL pathname");
+		errno = ENOENT;
+		return NULL;
+	}
+
 	va_list ap;
 	va_start(ap, flags);
 	mode_t mode = 0;
@@ -370,7 +370,7 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	int at_unref = 0;
 
 	if (dir == PMEMFILE_AT_CWD) {
-		if (pathname && pathname[0] != '/') {
+		if (pathname[0] != '/') {
 			at = pool_get_cwd(pfp);
 			at_unref = 1;
 		} else
@@ -392,6 +392,12 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 PMEMfile *
 pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 {
+	if (!pathname) {
+		LOG(LUSR, "NULL pathname");
+		errno = ENOENT;
+		return NULL;
+	}
+
 	va_list ap;
 	va_start(ap, flags);
 	mode_t mode = 0;
@@ -400,7 +406,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	va_end(ap);
 
 	struct pmemfile_vinode *at;
-	if (pathname && pathname[0] == '/')
+	if (pathname[0] == '/')
 		at = NULL;
 	else
 		at = pool_get_cwd(pfp);
@@ -435,12 +441,6 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		struct pmemfile_vinode *newdir, const char *newpath,
 		int flags)
 {
-	if (!oldpath || !newpath) {
-		LOG(LUSR, "NULL pathname");
-		errno = ENOENT;
-		return -1;
-	}
-
 	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
 
 	flags &= ~AT_SYMLINK_FOLLOW; /* No symlinks for now XXX */
@@ -525,8 +525,14 @@ pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
 	struct pmemfile_vinode *olddir_at, *newdir_at;
 	int olddir_at_unref = 0, newdir_at_unref = 0;
 
+	if (!oldpath || !newpath) {
+		LOG(LUSR, "NULL pathname");
+		errno = ENOENT;
+		return -1;
+	}
+
 	if (olddir == PMEMFILE_AT_CWD) {
-		if (oldpath && oldpath[0] != '/') {
+		if (oldpath[0] != '/') {
 			olddir_at = pool_get_cwd(pfp);
 			olddir_at_unref = 1;
 		} else
@@ -535,7 +541,7 @@ pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
 		olddir_at = olddir->vinode;
 
 	if (newdir == PMEMFILE_AT_CWD) {
-		if (newpath && newpath[0] != '/') {
+		if (newpath[0] != '/') {
 			if (olddir_at_unref) {
 				newdir_at = olddir_at;
 			} else {
@@ -566,7 +572,14 @@ int
 pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 {
 	struct pmemfile_vinode *at;
-	if (oldpath && oldpath[0] == '/' && newpath && newpath[0] == '/')
+
+	if (!oldpath || !newpath) {
+		LOG(LUSR, "NULL pathname");
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (oldpath[0] == '/' && newpath[0] == '/')
 		at = NULL;
 	else
 		at = pool_get_cwd(pfp);
@@ -583,12 +596,6 @@ static int
 _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *pathname)
 {
-	if (!pathname) {
-		LOG(LUSR, "NULL pathname");
-		errno = ENOENT;
-		return -1;
-	}
-
 	LOG(LDBG, "pathname %s", pathname);
 
 	int oerrno, ret = 0;
@@ -645,8 +652,13 @@ pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	struct pmemfile_vinode *at;
 	int at_unref = 0;
 
+	if (!pathname) {
+		errno = ENOENT;
+		return -1;
+	}
+
 	if (dir == PMEMFILE_AT_CWD) {
-		if (pathname && pathname[0] != '/') {
+		if (pathname[0] != '/') {
 			at = pool_get_cwd(pfp);
 			at_unref = 1;
 		} else
@@ -685,7 +697,13 @@ int
 pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 {
 	struct pmemfile_vinode *at;
-	if (pathname && pathname[0] == '/')
+	if (!pathname) {
+		LOG(LUSR, "NULL pathname");
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (pathname[0] == '/')
 		at = NULL;
 	else
 		at = pool_get_cwd(pfp);
