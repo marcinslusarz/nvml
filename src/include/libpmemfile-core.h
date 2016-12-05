@@ -53,7 +53,7 @@ extern "C" {
 typedef struct pmemfilepool PMEMfilepool;
 typedef struct pmemfile_file PMEMfile;
 
-#define PMEMFILE_AT_CWD ((PMEMfile *)(NULL) - 1)
+#define PMEMFILE_AT_CWD ((PMEMfile *)(((unsigned char *)0) - 1))
 
 PMEMfilepool *pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode);
 
