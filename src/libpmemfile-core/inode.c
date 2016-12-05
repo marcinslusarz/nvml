@@ -659,11 +659,6 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, path, false, &info);
 
-	if (!info.vinode) {
-		errno = EINVAL; /* XXX: remove */
-		return -1;
-	}
-
 	if (info.remaining[0] != 0) {
 		bool is_dir = vinode_is_dir(info.vinode);
 		vinode_unref_tx(pfp, info.vinode);
