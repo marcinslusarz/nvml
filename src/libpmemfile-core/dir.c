@@ -735,8 +735,8 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
  *
  * Takes reference on returned inode.
  */
-void
-traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+static void
+_traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, bool get_parent,
 		struct pmemfile_path_info *path_info)
 {
@@ -827,18 +827,17 @@ traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 }
 
 void
-traverse_path(PMEMfilepool *pfp, const char *path, bool get_parent,
+traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+		const char *path, bool get_parent,
 		struct pmemfile_path_info *path_info)
 {
-	if (path[0] != '/') {
-		memset(path_info, 0, sizeof(*path_info));
-		return;
+	if (path[0] == '/') {
+		while (path[0] == '/')
+			path++;
+		parent = pfp->root;
 	}
 
-	while (path[0] == '/')
-		path++;
-
-	traverse_pathat(pfp, pfp->root, path, get_parent, path_info);
+	_traverse_pathat(pfp, parent, path, get_parent, path_info);
 }
 
 static int
@@ -852,10 +851,7 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		return -1;
 	}
 
-	if (path[0] == '/')
-		traverse_path(pfp, path, false, &info);
-	else
-		traverse_pathat(pfp, dir, path, false, &info);
+	traverse_path(pfp, dir, path, false, &info);
 
 	if (!info.vinode) {
 		errno = ENOENT;
@@ -982,10 +978,7 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		return -1;
 	}
 
-	if (path[0] == '/')
-		traverse_path(pfp, path, true, &info);
-	else
-		traverse_pathat(pfp, dir, path, true, &info);
+	traverse_path(pfp, dir, path, true, &info);
 
 	if (!info.vinode) {
 		errno = ENOENT;
@@ -1159,13 +1152,12 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 		return -1;
 	}
 
-	if (path[0] == '/') {
-		traverse_path(pfp, path, false, &info);
+	if (path[0] == '/')
 		at = NULL;
-	} else {
+	else
 		at = pool_get_cwd(pfp);
-		traverse_pathat(pfp, at, path, false, &info);
-	}
+
+	traverse_path(pfp, at, path, false, &info);
 
 	if (!info.vinode) {
 		err = ENOENT;

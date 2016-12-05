@@ -46,9 +46,7 @@ struct pmemfile_path_info {
 	const char *name;
 };
 
-void traverse_path(PMEMfilepool *pfp, const char *path, bool get_parent,
-		struct pmemfile_path_info *path_info);
-void traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+void traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, bool get_parent,
 		struct pmemfile_path_info *path_info);
 

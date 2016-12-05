@@ -264,10 +264,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	struct pmemfile_vinode *volatile vparent = NULL;
 	struct pmemfile_vinode *volatile vinode;
-	if (pathname[0] == '/')
-		traverse_path(pfp, pathname, false, &info);
-	else
-		traverse_pathat(pfp, dir, pathname, false, &info);
+	traverse_path(pfp, dir, pathname, false, &info);
 	vinode = info.vinode;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -461,15 +458,8 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 	}
 
 	struct pmemfile_path_info src, dst;
-	if (oldpath[0] == '/')
-		traverse_path(pfp, oldpath, false, &src);
-	else
-		traverse_pathat(pfp, olddir, oldpath, false, &src);
-
-	if (newpath[0] == '/')
-		traverse_path(pfp, newpath, false, &dst);
-	else
-		traverse_pathat(pfp, newdir, newpath, false, &dst);
+	traverse_path(pfp, olddir, oldpath, false, &src);
+	traverse_path(pfp, newdir, newpath, false, &dst);
 
 	int oerrno = 0;
 
@@ -604,10 +594,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	int oerrno, ret = 0;
 
 	struct pmemfile_path_info info;
-	if (pathname[0] == '/')
-		traverse_path(pfp, pathname, true, &info);
-	else
-		traverse_pathat(pfp, dir, pathname, true, &info);
+	traverse_path(pfp, dir, pathname, true, &info);
 	struct pmemfile_vinode *vparent = info.parent;
 	struct pmemfile_vinode *volatile vinode2 = NULL;
 	volatile bool parent_refed = false;
