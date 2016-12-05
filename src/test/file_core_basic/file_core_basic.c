@@ -68,7 +68,7 @@ test_open_create_close(PMEMfilepool *pfp)
 	errno = 0;
 	f1 = pmemfile_open(pfp, NULL, O_CREAT, 0777);
 	UT_ASSERTeq(f1, NULL);
-	UT_ASSERTeq(errno, EFAULT);
+	UT_ASSERTeq(errno, ENOENT);
 
 	/* file does not exist */
 	errno = 0;
