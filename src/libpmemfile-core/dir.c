@@ -966,7 +966,7 @@ pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 	return ret;
 }
 
-static int
+int
 _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path)
 {
