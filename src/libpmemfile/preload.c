@@ -125,7 +125,7 @@ fetch_fd(long fd)
 	return result;
 }
 
-_Thread_local bool reenter = false;
+static __thread bool reenter = false;
 /*
  * This way the default can be overridden from the command line during
  * a build, without altering the source. As a second option, it can be
