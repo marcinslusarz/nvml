@@ -847,6 +847,11 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 {
 	struct pmemfile_path_info info;
 
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
+
 	if (path[0] == '/')
 		traverse_path(pfp, path, false, &info);
 	else
@@ -971,6 +976,11 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path)
 {
 	struct pmemfile_path_info info;
+
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
 
 	if (path[0] == '/')
 		traverse_path(pfp, path, true, &info);
@@ -1143,6 +1153,11 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	struct pmemfile_vinode *at;
 	int ret = 0;
 	int err = 0;
+
+	if (!path) {
+		errno = ENOENT;
+		return -1;
+	}
 
 	if (path[0] == '/') {
 		traverse_path(pfp, path, false, &info);

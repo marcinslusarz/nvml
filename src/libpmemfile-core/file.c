@@ -224,7 +224,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 {
 	if (!pathname) {
 		LOG(LUSR, "NULL pathname");
-		errno = EFAULT;
+		errno = ENOENT;
 		return NULL;
 	}
 
@@ -440,7 +440,7 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 {
 	if (!oldpath || !newpath) {
 		LOG(LUSR, "NULL pathname");
-		errno = EFAULT;
+		errno = ENOENT;
 		return -1;
 	}
 
@@ -579,7 +579,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 {
 	if (!pathname) {
 		LOG(LUSR, "NULL pathname");
-		errno = EFAULT;
+		errno = ENOENT;
 		return -1;
 	}
 
