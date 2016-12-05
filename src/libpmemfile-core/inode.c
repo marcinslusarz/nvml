@@ -662,10 +662,7 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	LOG(LDBG, "path %s", path);
 
 	struct pmemfile_path_info info;
-	if (path[0] == '/')
-		traverse_path(pfp, path, false, &info);
-	else
-		traverse_pathat(pfp, dir, path, false, &info);
+	traverse_path(pfp, dir, path, false, &info);
 
 	if (!info.vinode) {
 		errno = EINVAL; /* XXX: remove */
