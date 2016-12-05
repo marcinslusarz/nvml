@@ -88,7 +88,17 @@ test_open_create_close(PMEMfilepool *pfp)
 	UT_ASSERTeq(f1, NULL);
 	UT_ASSERTeq(errno, EEXIST);
 
-
+	/* too long name */
+	errno = 0;
+	f1 = pmemfile_open(pfp, "/"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"123456", O_CREAT | O_EXCL, 0777);
+	UT_ASSERTeq(f1, NULL);
+	UT_ASSERTeq(errno, ENAMETOOLONG);
 
 	/* file does not exist */
 	errno = 0;
@@ -147,8 +157,7 @@ test_link(const char *path)
 		". .. aaa bbb");
 
 	/* successful link */
-	ret = pmemfile_link(pfp, "/aaa", "/aaa.link");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_LINK(pfp, "/aaa", "/aaa.link");
 
 	_pmemfile_list_root(pfp,
 		"test_link end, files: "
@@ -175,20 +184,63 @@ test_link(const char *path)
 		". .. aaa bbb aaa.link");
 
 	/* successful link from link */
-	ret = pmemfile_link(pfp, "/aaa.link", "/aaa2.link");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_LINK(pfp, "/aaa.link", "/aaa2.link");
 
 	_pmemfile_list_root(pfp,
 		"test_link end, files: "
 		". .. aaa bbb aaa.link aaa2.link");
 
 	/* another successful link */
-	ret = pmemfile_link(pfp, "/bbb", "/bbb2.link");
-	UT_ASSERTeq(ret, 0);
+	PMEMFILE_LINK(pfp, "/bbb", "/bbb2.link");
 
 	_pmemfile_list_root(pfp,
 		"test_link end, files: "
 		". .. aaa bbb aaa.link aaa2.link bbb2.link");
+
+	PMEMFILE_MKDIR(pfp, "/dir", 0777);
+	/* destination already exists as directory */
+	errno = 0;
+	ret = pmemfile_link(pfp, "/aaa", "/dir");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, EEXIST);
+
+	errno = 0;
+	ret = pmemfile_link(pfp, "/dir", "/dir2");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, EPERM);
+
+	errno = 0;
+	ret = pmemfile_link(pfp, "/aaa/bbb", "/file");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	errno = 0;
+	ret = pmemfile_link(pfp, "/bbb", "/aaa/ccc");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	errno = 0;
+	ret = pmemfile_link(pfp, "/dir/aaaa", "/bbbb");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOENT);
+
+	errno = 0;
+	ret = pmemfile_link(pfp, "/aaa", "/"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"12345678901234567890123456789012345678901234567890"
+		"123456");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENAMETOOLONG);
+
+	PMEMFILE_RMDIR(pfp, "/dir");
+
+	_pmemfile_list_root(pfp,
+		"test_link end, files: "
+		". .. aaa bbb aaa.link aaa2.link bbb2.link");
+
 	_pmemfile_stats(pfp);
 
 	pmemfile_pool_close(pfp);

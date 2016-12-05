@@ -472,6 +472,17 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		traverse_pathat(pfp, newdir, newpath, false, &dst);
 
 	int oerrno = 0;
+
+	if (src.vinode && src.remaining[0] != 0 && !vinode_is_dir(src.vinode)) {
+		oerrno = ENOTDIR;
+		goto end;
+	}
+
+	if (dst.vinode && dst.remaining[0] != 0 && !vinode_is_dir(dst.vinode)) {
+		oerrno = ENOTDIR;
+		goto end;
+	}
+
 	if (dst.vinode == NULL || src.vinode == NULL || src.remaining[0] != 0 ||
 			strchr(dst.remaining, '/')) {
 		oerrno = ENOENT;
@@ -479,6 +490,11 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 	}
 	if (dst.remaining[0] == 0) {
 		oerrno = EEXIST;
+		goto end;
+	}
+
+	if (vinode_is_dir(src.vinode)) {
+		oerrno = EPERM;
 		goto end;
 	}
 
@@ -600,8 +616,12 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		if (info.vinode == NULL)
 			pmemobj_tx_abort(EINVAL);
 
-		if (info.remaining[0])
-			pmemobj_tx_abort(ENOENT);
+		if (info.remaining[0]) {
+			if (!vinode_is_dir(info.vinode))
+				pmemobj_tx_abort(ENOTDIR);
+			else
+				pmemobj_tx_abort(ENOENT);
+		}
 
 		if (vinode_is_dir(info.vinode))
 			pmemobj_tx_abort(EISDIR);

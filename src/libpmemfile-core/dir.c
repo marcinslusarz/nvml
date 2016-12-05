@@ -122,7 +122,7 @@ vinode_add_dirent(PMEMfilepool *pfp,
 
 	if (strlen(name) > PMEMFILE_MAX_FILE_NAME) {
 		LOG(LUSR, "file name too long");
-		pmemobj_tx_abort(EINVAL);
+		pmemobj_tx_abort(ENAMETOOLONG);
 	}
 
 	if (strchr(name, '/') != NULL)
