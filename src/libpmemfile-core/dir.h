@@ -75,6 +75,9 @@ void vinode_unlink_dirent(PMEMfilepool *pfp,
 		volatile bool *parent_refed);
 
 struct pmemfile_vinode *pool_get_cwd(PMEMfilepool *pfp);
+struct pmemfile_vinode *pool_get_dir_for_path(PMEMfilepool *pfp, PMEMfile *dir,
+		const char *path, bool *unref);
+
 int _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path);
 
