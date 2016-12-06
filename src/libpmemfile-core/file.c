@@ -737,14 +737,3 @@ pmemfile_stats(PMEMfilepool *pfp, struct pmemfile_stats *stats)
 	stats->inode_arrays = inode_arrays;
 	stats->blocks = blocks;
 }
-
-/*
- * _pmemfile_file_size -- returns size of the file
- *
- * XXX: remove once pmemfile_stat is implemented
- */
-size_t
-_pmemfile_file_size(PMEMfilepool *pfp, PMEMfile *file)
-{
-	return D_RW(file->vinode->inode)->size;
-}
