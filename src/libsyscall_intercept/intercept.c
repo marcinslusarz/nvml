@@ -239,14 +239,14 @@ intercept_routine(long nr, long arg0, long arg1,
 		    arg0, arg1, arg2, arg3, arg4, arg5, &result);
 
 	if (nr == SYS_exit_group || nr == SYS_exit) {
-		// can't log these syscalls after-the-fact
+		/* can't log these syscalls after-the-fact */
 		intercept_log_syscall(libpath, nr,
 		    arg0, arg1, arg2, arg3, arg4, arg5,
 		    syscall_offset, 0);
 	} else if (nr == SYS_clone ||
 	    nr == SYS_vfork ||
 	    nr == SYS_rt_sigreturn) {
-		// can't handle these syscall the normal way
+		/* can't handle these syscall the normal way */
 		intercept_log_syscall(libpath, nr,
 		    arg0, arg1, arg2, arg3, arg4, arg5,
 		    syscall_offset, 0);

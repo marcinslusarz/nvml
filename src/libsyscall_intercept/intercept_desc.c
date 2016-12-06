@@ -86,12 +86,12 @@ add_new_patch(struct intercept_desc *desc)
 {
 	if (desc->count == 0) {
 
-		// initial allocation
+		/* initial allocation */
 		desc->items = xmmap_anon(sizeof(desc->items[0]));
 
 	} else if ((desc->count & (desc->count - 1)) == 0) {
 
-		// if count is a power of two, double the allocate space
+		/* if count is a power of two, double the allocate space */
 		size_t size = desc->count * sizeof(desc->items[0]);
 
 		desc->items = xmremap(desc->items, size, 2 * size);
@@ -239,12 +239,12 @@ find_jumps_in_section_syms(struct intercept_desc *desc, Elf64_Shdr *section,
 
 	for (size_t i = 0; i < sym_count; ++i) {
 		if (ELF64_ST_TYPE(syms[i].st_info) != STT_FUNC)
-			continue; // it is not a function
+			continue; /* it is not a function */
 
 		if (syms[i].st_shndx != desc->text_section_index)
-			continue; // it is not in the text section
+			continue; /* it is not in the text section */
 
-		// a function entry point in .text, mark it as jump destination
+		/* a function entry point in .text, mark it */
 		mark_jump(desc, syms[i].st_value +
 		    (unsigned char *)desc->dlinfo.dli_fbase);
 	}
@@ -361,7 +361,7 @@ padding_pinpoint(unsigned char *dl_base, unsigned char *syscall_addr,
 	unsigned char *bound_high;
 
 	if (sym->st_size % SALIGNMENT == 0)
-		return NULL; // no padding
+		return NULL; /* no padding */
 
 	/* bound_low - the lowest address in the padding */
 	bound_low = dl_base + sym->st_value + sym->st_size;
@@ -369,16 +369,16 @@ padding_pinpoint(unsigned char *dl_base, unsigned char *syscall_addr,
 	/* bound_high - the higher address in the padding */
 	bound_high = (unsigned char *)((uintptr_t)bound_low | (SALIGNMENT - 1));
 
-	if (bound_low <= used) { // some bytes in this padding are already used?
+	if (bound_low <= used) { /* bytes in this padding are already used? */
 
 		if (bound_high <= used)
-			return NULL; // the whole padding is used
+			return NULL; /* the whole padding is used */
 
-		bound_low = used + 1; // exclude the used bytes
+		bound_low = used + 1; /* exclude the used bytes */
 	}
 
 	if (((bound_high - bound_low) + 1) < JUMP_INS_SIZE)
-		return NULL;   // can't fit a jump here
+		return NULL; /* can't fit a jump here */
 
 	/*
 	 * The source of said short jump determines what addresses
@@ -485,7 +485,7 @@ allocate_trampoline_table(struct intercept_desc *desc)
 
 	FILE *maps;
 	char line[0x100];
-	unsigned char *guess; // Where we would like to allocate the table
+	unsigned char *guess; /* Where we would like to allocate the table */
 	size_t size;
 
 	if ((uintptr_t)desc->text_end < (1u << 31)) {
@@ -496,7 +496,7 @@ allocate_trampoline_table(struct intercept_desc *desc)
 				& ~((uintptr_t)(0xfff)));
 	}
 
-	size = 64 * 0x1000; // TODO: don't just guess
+	size = 64 * 0x1000; /* TODO: don't just guess */
 
 	if ((maps = fopen("/proc/self/maps", "r")) == NULL)
 		xabort();
@@ -513,10 +513,10 @@ allocate_trampoline_table(struct intercept_desc *desc)
 		 * with the guess!
 		 */
 		if (end < guess)
-			continue; // No overlap, let's see the next mapping
+			continue; /* No overlap, let's see the next mapping */
 
 		if (start >= guess + size) {
-			// The rest of the mappings can't possibly overlap
+			/* The rest of the mappings can't possibly overlap */
 			break;
 		}
 
@@ -527,7 +527,7 @@ allocate_trampoline_table(struct intercept_desc *desc)
 		guess = end + 1;
 
 		if (guess + size >= desc->text_start + (1u << 31)) {
-			// Too far away
+			/* Too far away */
 			xabort();
 		}
 	}
