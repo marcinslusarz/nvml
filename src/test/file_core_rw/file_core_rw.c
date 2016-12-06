@@ -175,11 +175,11 @@ test1(PMEMfilepool *pfp)
 
 	_pmemfile_list_root(pfp, "/file1 9+100+4=113");
 
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_UNLINK(pfp, "/file1");
 
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_RDWR, 0644);
@@ -200,7 +200,7 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 
 	_pmemfile_list_root(pfp, "/file1 8192");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_UNLINK(pfp, "/file1");
 }
@@ -226,7 +226,7 @@ test2(PMEMfilepool *pfp)
 
 	PMEMFILE_CLOSE(pfp, f);
 	_pmemfile_list_root(pfp, "/file1 ~800MB");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
@@ -268,7 +268,7 @@ test_trunc(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f1);
 	PMEMFILE_CLOSE(pfp, f2);
 	_pmemfile_list_root(pfp, "/file1,file2 25600");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	f1 = PMEMFILE_OPEN(pfp, "/file1", O_RDWR | O_TRUNC, 0);
 
@@ -282,7 +282,7 @@ test_trunc(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f2);
 
 	_pmemfile_list_root(pfp, "/file1 0, /file2 128");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_UNLINK(pfp, "/file1");
 
@@ -332,25 +332,25 @@ main(int argc, char *argv[])
 
 	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	_pmemfile_list_root(pfp, "no files");
 
 	test1(pfp);
 	_pmemfile_list_root(pfp, "no files");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	test2(pfp);
 	_pmemfile_list_root(pfp, "no files");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	test_trunc(pfp);
 	_pmemfile_list_root(pfp, "no files");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	test_o_append(pfp);
 	_pmemfile_list_root(pfp, "no files");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);
 
