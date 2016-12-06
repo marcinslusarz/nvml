@@ -230,20 +230,32 @@ print_clone_flags(char buffer[static 0x100], long flags)
 		c += sprintf(c, "CLONE_FS | ");
 	if ((flags & CLONE_IO) == CLONE_IO)
 		c += sprintf(c, "CLONE_IO | ");
+#ifdef CLONE_NEWCGROUP
 	if ((flags & CLONE_NEWCGROUP) == CLONE_NEWCGROUP)
 		c += sprintf(c, "CLONE_NEWCGROUP | ");
+#endif
+#ifdef CLONE_NEWIPC
 	if ((flags & CLONE_NEWIPC) == CLONE_NEWIPC)
 		c += sprintf(c, "CLONE_NEWIPC | ");
+#endif
+#ifdef CLONE_NEWNET
 	if ((flags & CLONE_NEWNET) == CLONE_NEWNET)
 		c += sprintf(c, "CLONE_NEWNET | ");
+#endif
+#ifdef CLONE_NEWNS
 	if ((flags & CLONE_NEWNS) == CLONE_NEWNS)
 		c += sprintf(c, "CLONE_NEWNS | ");
+#endif
+#ifdef CLONE_NEWPID
 	if ((flags & CLONE_NEWPID) == CLONE_NEWPID)
 		c += sprintf(c, "CLONE_NEWPID | ");
+#endif
 	if ((flags & CLONE_NEWUSER) == CLONE_NEWUSER)
 		c += sprintf(c, "CLONE_NEWUSER | ");
+#ifdef CLONE_NEWUTS
 	if ((flags & CLONE_NEWUTS) == CLONE_NEWUTS)
 		c += sprintf(c, "CLONE_NEWUTS | ");
+#endif
 	if ((flags & CLONE_PARENT) == CLONE_PARENT)
 		c += sprintf(c, "CLONE_PARENT | ");
 	if ((flags & CLONE_PARENT_SETTID) == CLONE_PARENT_SETTID)
