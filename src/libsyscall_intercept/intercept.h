@@ -69,19 +69,19 @@ __attribute__((noreturn)) void xabort(void);
  *  be written.
  */
 struct patch_desc {
-	// the original syscall instruction
+	/* the original syscall instruction */
 	unsigned char *syscall_addr;
 
-	// the offset of the original syscall instruction
+	/* the offset of the original syscall instruction */
 	unsigned long syscall_offset;
 
-	// the new asm wrapper created
+	/* the new asm wrapper created */
 	unsigned char *asm_wrapper;
 
-	// the first byte overwritten in the code
+	/* the first byte overwritten in the code */
 	unsigned char *dst_jmp_patch;
 
-	//  the address to jump back to
+	/* the address to jump back to */
 	unsigned char *return_address;
 
 	unsigned char *padding_addr;
@@ -99,7 +99,7 @@ struct patch_desc {
 
 void patch_apply(struct patch_desc *patch);
 
-// The size of a trampoline jump, jmp instruction + pointer
+/* The size of a trampoline jump, jmp instruction + pointer */
 #define TRAMPOLINE_SIZE (6 + 8)
 
 struct intercept_desc {

@@ -71,26 +71,24 @@ static void create_wrapper(struct patch_desc *patch, void *dest_routine,
 static void
 create_absolute_jump(unsigned char *from, void *to)
 {
-	from[0] = 0xff; // opcode of RIP based indirect jump
-	from[1] = 0x25; // opcode of RIP based indirect jump
-	from[2] = 0; // 32 bit zero offset
-	from[3] = 0; // this means zero relative to the value
-	from[4] = 0; // of RIP, which during the execution of the jump
-	from[5] = 0; // points to right after the jump instruction
+	from[0] = 0xff; /* opcode of RIP based indirect jump */
+	from[1] = 0x25; /* opcode of RIP based indirect jump */
+	from[2] = 0; /* 32 bit zero offset */
+	from[3] = 0; /* this means zero relative to the value */
+	from[4] = 0; /* of RIP, which during the execution of the jump */
+	from[5] = 0; /* points to right after the jump instruction */
 
 	unsigned char *d = (unsigned char *)&to;
 
-	from[6] = d[0]; // so, this is where (RIP + 0) points to,
-	from[7] = d[1]; // jump reads the destination address
-	from[8] = d[2]; // from here
+	from[6] = d[0]; /* so, this is where (RIP + 0) points to, */
+	from[7] = d[1]; /* jump reads the destination address */
+	from[8] = d[2]; /* from here */
 	from[9] = d[3];
 	from[10] = d[4];
 	from[11] = d[5];
 	from[12] = d[6];
 	from[13] = d[7];
 
-	// Just written 14 bytes, static_assert that it is correct.
-	// Actually, no static_assert, we do C99
 	if (TRAMPOLINE_SIZE != 14)
 		xabort();
 }
@@ -112,7 +110,7 @@ create_jump(unsigned char opcode, unsigned char *from, void *to)
 	ptrdiff_t delta = ((unsigned char *)to) - (from + JUMP_INS_SIZE);
 
 	if (delta > ((ptrdiff_t)INT32_MAX) || delta < ((ptrdiff_t)INT32_MIN))
-		xabort(); // belt and suspenders
+		xabort();
 
 	int32_t delta32 = (int32_t)delta;
 	unsigned char *d = (unsigned char *)&delta32;
@@ -327,8 +325,8 @@ extern unsigned char intercept_asm_wrapper_push_origin_addr;
 extern unsigned char intercept_asm_wrapper_mov_return_addr_r11_no_syscall;
 extern unsigned char intercept_asm_wrapper_mov_return_addr_r11_syscall;
 extern unsigned char intercept_asm_wrapper_mov_libpath_r11;
-extern unsigned char intercept_asm_wrapper_mov_magic_r11;
-extern unsigned char intercept_asm_wrapper_mov_magic_r11_2;
+extern unsigned char intercept_asm_wrapper_mov_phaddr_r11;
+extern unsigned char intercept_asm_wrapper_mov_ph2addr_r11;
 extern unsigned char intercept_asm_wrapper_simd_save_YMM;
 extern unsigned char intercept_asm_wrapper_simd_save_YMM_end;
 extern unsigned char intercept_asm_wrapper_simd_restore_YMM;
@@ -338,8 +336,8 @@ extern unsigned char intercept_asm_wrapper_return_and_syscall;
 extern unsigned char intercept_asm_wrapper_push_stack_first_return_addr;
 extern unsigned char intercept_asm_wrapper_mov_r11_stack_first_return_addr;
 
-extern void magic_routine();
-extern void magic_routine_2();
+extern void backtrace_placeholder();
+extern void backtrace_placeholder_2();
 
 static size_t tmpl_size;
 static ptrdiff_t o_prefix;
@@ -354,8 +352,8 @@ static ptrdiff_t o_simd_restore;
 static ptrdiff_t o_mov_return_r11_no_syscall;
 static ptrdiff_t o_mov_return_r11_syscall;
 static ptrdiff_t o_mov_libpath_r11;
-static ptrdiff_t o_mov_magic_r11;
-static ptrdiff_t o_mov_magic_r11_2;
+static ptrdiff_t o_move_phaddr_r11;
+static ptrdiff_t o_move_ph2addr_r11;
 static ptrdiff_t o_push_first_return_addr;
 static ptrdiff_t o_mov_r11_first_return_addr;
 static size_t simd_save_YMM_size;
@@ -386,8 +384,8 @@ init_patcher(void)
 	o_mov_return_r11_syscall =
 	    &intercept_asm_wrapper_mov_return_addr_r11_syscall - begin;
 	o_mov_libpath_r11 = &intercept_asm_wrapper_mov_libpath_r11 - begin;
-	o_mov_magic_r11 = &intercept_asm_wrapper_mov_magic_r11 - begin;
-	o_mov_magic_r11_2 = &intercept_asm_wrapper_mov_magic_r11_2 - begin;
+	o_move_phaddr_r11 = &intercept_asm_wrapper_mov_phaddr_r11 - begin;
+	o_move_ph2addr_r11 = &intercept_asm_wrapper_mov_ph2addr_r11 - begin;
 	o_mov_r11_first_return_addr =
 	    &intercept_asm_wrapper_mov_r11_stack_first_return_addr - begin;
 	o_push_first_return_addr =
@@ -425,8 +423,8 @@ create_movabs_r11(unsigned char *code, uint64_t value)
 {
 	unsigned char *bytes = (unsigned char *)&value;
 
-	code[0] = 0x49; // movabs opcode
-	code[1] = 0xbb; // specifiy r11 as destination
+	code[0] = 0x49; /* movabs opcode */
+	code[1] = 0xbb; /* specifiy r11 as destination */
 	code[2] = bytes[0];
 	code[3] = bytes[1];
 	code[4] = bytes[2];
@@ -463,7 +461,7 @@ create_wrapper(struct patch_desc *patch, void *dest_routine,
 	}
 
 	if (patch->syscall_offset > UINT32_MAX)
-		xabort(); // libc larger than 2 gigabytes? wow
+		xabort(); /* libc larger than 2 gigabytes? wow */
 
 	/* the instruction pushing the syscall's address to the stack */
 	create_push_imm(begin + o_push_origin, (uint32_t)patch->syscall_offset);
@@ -474,19 +472,21 @@ create_wrapper(struct patch_desc *patch, void *dest_routine,
 	create_movabs_r11(begin + o_mov_return_r11_syscall,
 	    (uint64_t)(begin + o_ret_syscall));
 
-	create_movabs_r11(begin + o_mov_magic_r11,
-	    (uint64_t)&magic_routine + 1);
+	create_movabs_r11(begin + o_move_phaddr_r11,
+	    (uint64_t)&backtrace_placeholder + 1);
 
-	create_movabs_r11(begin + o_mov_magic_r11_2,
-	    (uint64_t)&magic_routine_2 + 1);
+	create_movabs_r11(begin + o_move_ph2addr_r11,
+	    (uint64_t)&backtrace_placeholder_2 + 1);
 
 #ifndef NDEBUG
 
 	create_movabs_r11(begin + o_mov_r11_first_return_addr,
 	    ((uint64_t)patch->syscall_addr) + 2);
 
-	// write a 'push %r11' instruction
-	// overwriting the 'subq $0x8, %rsp' instrucion
+	/*
+	 * write a 'push %r11' instruction
+	 * overwriting the 'subq $0x8, %rsp' instrucion
+	 */
 	begin[o_push_first_return_addr] = 0x41;
 	begin[o_push_first_return_addr + 1] = 0x53;
 	begin[o_push_first_return_addr + 2] = 0x90;
@@ -519,8 +519,6 @@ create_short_jump(unsigned char *from, unsigned char *to)
 {
 	ptrdiff_t d = to - (from + 2);
 
-	// that is "d < -128"
-	// gotta fix cstyle...
 	if (d < - 128 || d > 127)
 		xabort();
 
@@ -556,7 +554,7 @@ activate_patches(struct intercept_desc *desc)
 
 		if (patch->dst_jmp_patch < desc->text_start ||
 		    patch->dst_jmp_patch > desc->text_end)
-			xabort(); // belt and suspenders
+			xabort();
 
 		if (desc->uses_trampoline_table) {
 			/*
