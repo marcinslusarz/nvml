@@ -40,8 +40,8 @@
  *
  * The syscall_number, and the six args describe the syscall
  * currently being intercepted.
- * For now, a zero return value means the interceptor exceute
- * the original syscall, use its result. A non-zero return value
+ * For now, a non-zero return value means the interceptor executes
+ * the original syscall, use its result. A zero return value
  * means the interceptor should not execute the syscall, and
  * use the integer stored to *result as the result of the syscall
  * to be returned in RAX to libc.
