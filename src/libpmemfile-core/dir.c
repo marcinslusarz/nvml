@@ -313,10 +313,8 @@ vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
 			pmfi_path(parent), name);
 
-	if (name[0] == 0) {
-		vinode_ref(pfp, parent);
-		return parent;
-	}
+	if (name[0] == 0)
+		return NULL;
 
 	struct pmemfile_vinode *vinode = NULL;
 
@@ -747,11 +745,7 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		strncpy(tmp, path, (uintptr_t)slash - (uintptr_t)path);
 		tmp[slash - path] = 0;
 
-		if (tmp[0] == 0) // workaround for file_lookup_dirent
-			child = NULL;
-		else
-			child = vinode_lookup_dirent(pfp, parent, tmp);
-
+		child = vinode_lookup_dirent(pfp, parent, tmp);
 		if (!child) {
 			if (get_parent)
 				path_info->parent = prev_parent;
