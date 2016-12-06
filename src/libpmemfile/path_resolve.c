@@ -104,13 +104,13 @@ resolve_symlink(struct resolved_path *result,
 		 * TODO -- when pmemfile-core supports symlinks
 		 *
 		 * link_len = pmemfile_readlinkat(result->at.pmem_fda.pool,
-		 * 	result->at.pmem_fda.file,
-		 * 	result->path,
-		 * 	link_buf,
-		 * 	sizeof(link_buf));
+		 *	result->at.pmem_fda.file,
+		 *	result->path,
+		 *	link_buf,
+		 *	sizeof(link_buf));
 		 * if (link_len < 0 && errno != 0) {
-		 * 	result->error_code = -errno;
-		 * 	return;
+		 *	result->error_code = -errno;
+		 *	return;
 		 * }
 		 */
 	}
