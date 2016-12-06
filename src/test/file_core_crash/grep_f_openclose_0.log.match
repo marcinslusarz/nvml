@@ -6,4 +6,3 @@ parent 0x$(X) ppath /
 *   3 0x$(X)     2   4008 0040777 ..
 *   1 0x$(X)     1      0 0100644 bbb
 STOP  
-inodes 2 dirs 0 block_arrays 0 inode_arrays 1 blocks 0

@@ -37,6 +37,17 @@
 #include "pmemfile_test.h"
 #include "unittest.h"
 
+void
+PMEMFILE_STATS(PMEMfilepool *pfp)
+{
+	struct pmemfile_stats stats;
+	pmemfile_stats(pfp, &stats);
+
+	UT_OUT("inodes %u dirs %u block_arrays %u inode_arrays %u blocks %u",
+			stats.inodes, stats.dirs, stats.block_arrays,
+			stats.inode_arrays, stats.blocks);
+}
+
 PMEMfilepool *
 PMEMFILE_MKFS(const char *path)
 {

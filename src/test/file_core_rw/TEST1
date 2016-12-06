@@ -50,7 +50,7 @@ PMEMFILECORE_BLOCK_SIZE=4096 expect_normal_exit\
 
 if [ "$BUILD" = "debug" ]; then
 	cat ${PMEMFILECORE_LOG_FILE} | \
-		grep -e "inode left by previous run" -e "_pmemfile_list" -e "_pmemfile_stats" | \
+		grep -e "inode left by previous run" -e "_pmemfile_list" | \
 		sed "s/^<libpmemfile-core>: <[0-9]*> \[[a-z\.]*:[0-9]* [a-z_]*\][ ]*//" \
 		> grep${UNITTEST_NUM}.log || true
 

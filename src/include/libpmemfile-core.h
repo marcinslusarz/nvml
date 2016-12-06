@@ -112,7 +112,16 @@ char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t size);
 
 /* temporary debugging functions, do NOT use outside of tests */
 void _pmemfile_list_root(PMEMfilepool *pfp, const char *msg);
-void _pmemfile_stats(PMEMfilepool *pfp);
+
+struct pmemfile_stats {
+	unsigned inodes;
+	unsigned dirs;
+	unsigned block_arrays;
+	unsigned inode_arrays;
+	unsigned blocks;
+};
+void pmemfile_stats(PMEMfilepool *pfp, struct pmemfile_stats *stats);
+
 size_t _pmemfile_file_size(PMEMfilepool *pfp, PMEMfile *file);
 
 /*

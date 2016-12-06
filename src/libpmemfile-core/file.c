@@ -729,12 +729,10 @@ _pmemfile_list_root(PMEMfilepool *pfp, const char *msg)
 }
 
 /*
- * _pmemfile_stats -- dumps pool statistics to log file
- *
- * XXX: figure out how to export this information and remove this function
+ * pmemfile_stats -- get pool statistics
  */
 void
-_pmemfile_stats(PMEMfilepool *pfp)
+pmemfile_stats(PMEMfilepool *pfp, struct pmemfile_stats *stats)
 {
 	PMEMoid oid;
 	unsigned inodes = 0, dirs = 0, block_arrays = 0, inode_arrays = 0,
@@ -756,9 +754,11 @@ _pmemfile_stats(PMEMfilepool *pfp)
 		else
 			FATAL("unknown type %u", t);
 	}
-
-	LOG(LINF, "inodes %u dirs %u block_arrays %u inode_arrays %u blocks %u",
-			inodes, dirs, block_arrays, inode_arrays, blocks);
+	stats->inodes = inodes;
+	stats->dirs = dirs;
+	stats->block_arrays = block_arrays;
+	stats->inode_arrays = inode_arrays;
+	stats->blocks = blocks;
 }
 
 /*

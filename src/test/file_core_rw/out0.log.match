@@ -1,0 +1,14 @@
+file_core_rw/TEST0: START: file_core_rw
+ ./file_core_rw$(nW) $(nW)
+inodes 1 dirs 0 block_arrays 0 inode_arrays 0 blocks 0
+inodes 2 dirs 0 block_arrays 0 inode_arrays 0 blocks 1
+inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
+inodes 2 dirs 0 block_arrays 0 inode_arrays 1 blocks 1
+inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
+inodes 2 dirs 0 block_arrays 11 inode_arrays 1 blocks 2014
+inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
+inodes 3 dirs 0 block_arrays 0 inode_arrays 1 blocks 4
+inodes 3 dirs 0 block_arrays 0 inode_arrays 1 blocks 1
+inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
+inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
+file_core_rw/TEST0: Done
