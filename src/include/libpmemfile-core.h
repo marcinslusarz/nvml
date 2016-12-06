@@ -121,8 +121,6 @@ struct pmemfile_stats {
 };
 void pmemfile_stats(PMEMfilepool *pfp, struct pmemfile_stats *stats);
 
-size_t _pmemfile_file_size(PMEMfilepool *pfp, PMEMfile *file);
-
 /*
  * PMEMFILE_MAJOR_VERSION and PMEMFILE_MINOR_VERSION provide the current version
  * of the libpmemfile API as provided by this header file.  Applications can

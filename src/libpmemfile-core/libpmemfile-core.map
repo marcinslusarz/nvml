@@ -82,8 +82,6 @@
 		pmemfile_write;
 
 		pmemfile_stats;
-		# temporary, do NOT use
-		_pmemfile_file_size;
 	local:
 		*;
 };
