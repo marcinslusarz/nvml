@@ -83,7 +83,6 @@
 
 		pmemfile_stats;
 		# temporary, do NOT use
-		_pmemfile_list_root;
 		_pmemfile_file_size;
 	local:
 		*;

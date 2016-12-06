@@ -706,29 +706,6 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 }
 
 /*
- * _pmemfile_list_root -- dumps root directory listing to log file
- *
- * XXX: remove once directory traversal API is implemented
- */
-void
-_pmemfile_list_root(PMEMfilepool *pfp, const char *msg)
-{
-	LOG(LINF, "START %s", msg);
-	struct pmemfile_vinode *parent_vinode = pfp->root;
-	vinode_ref(pfp, parent_vinode);
-
-	util_rwlock_rdlock(&parent_vinode->rwlock);
-
-	_pmemfile_list(pfp, parent_vinode);
-
-	util_rwlock_unlock(&parent_vinode->rwlock);
-
-	vinode_unref_tx(pfp, parent_vinode);
-
-	LOG(LINF, "STOP  %s", msg);
-}
-
-/*
  * pmemfile_stats -- get pool statistics
  */
 void

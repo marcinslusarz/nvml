@@ -411,57 +411,6 @@ vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	dirent->inode = TOID_NULL(struct pmemfile_inode);
 }
 
-/*
- * _pmemfile_list -- dumps directory listing to log file
- *
- * XXX: remove once directory traversal API is implemented
- */
-void
-_pmemfile_list(PMEMfilepool *pfp, struct pmemfile_vinode *parent)
-{
-	LOG(LINF, "parent 0x%lx ppath %s", parent->inode.oid.off,
-			pmfi_path(parent));
-
-	struct pmemfile_inode *par = D_RW(parent->inode);
-
-	struct pmemfile_dir *dir = &par->file_data.dir;
-
-	LOG(LINF, "- ref    inode nlink   size   flags name");
-
-	while (dir != NULL) {
-		for (uint32_t i = 0; i < dir->num_elements; ++i) {
-			const struct pmemfile_dirent *d = &dir->dirents[i];
-			if (d->name[0] == 0)
-				continue;
-
-			const struct pmemfile_inode *inode = D_RO(d->inode);
-			struct pmemfile_vinode *vinode;
-
-			if (TOID_EQUALS(parent->inode, d->inode))
-				vinode = inode_get_vinode(pfp, d->inode, false);
-			else {
-				vinode = inode_get_vinode(pfp, d->inode, true);
-				if (vinode)
-					vinode_set_debug_path(pfp, parent,
-							vinode, d->name);
-			}
-
-			if (vinode == NULL)
-				LOG(LINF, "0x%lx %d", d->inode.oid.off, errno);
-			else
-				LOG(LINF, "* %3d 0x%6lx %5lu %6lu 0%06lo %s",
-					vinode->ref, d->inode.oid.off,
-					inode->nlink, inode->size, inode->flags,
-					d->name);
-
-			if (!TOID_EQUALS(parent->inode, d->inode))
-				vinode_unref_tx(pfp, vinode);
-		}
-
-		dir = D_RW(dir->next);
-	}
-}
-
 #define DIRENT_ID_MASK 0xffffffffULL
 
 #define DIR_ID(offset) ((offset) >> 32)
