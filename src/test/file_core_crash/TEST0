@@ -50,10 +50,11 @@ function run() {
 
 	if [ "$BUILD" = "debug" -o "$BUILD" = "static-debug" ]; then
 		cat ${PMEMFILECORE_LOG_FILE} | \
-			grep -e "inode left by previous run" -e "_pmemfile_list" -e "_pmemfile_stats" | \
+			grep -e "inode left by previous run" -e "_pmemfile_list" | \
 			sed "s/^<libpmemfile-core>: <[0-9]*> \[[a-z\.]*:[0-9]* [a-z_]*\][ ]*//" \
 			> grep_${num}_${name}_${UNITTEST_NUM}.log || true
 	fi
+	cat out${UNITTEST_NUM}.log > out_${num}_${name}_${UNITTEST_NUM}.log
 }
 
 rm -f ${PMEMFILECORE_LOG_FILE}

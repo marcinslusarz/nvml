@@ -72,6 +72,8 @@ void PMEMFILE_FSTAT(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf);
 void PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		struct stat *buf, int flags);
 
+void PMEMFILE_STATS(PMEMfilepool *pfp);
+
 #ifdef __cplusplus
 }
 #endif

@@ -62,7 +62,7 @@ test_open_create_close(PMEMfilepool *pfp)
 	PMEMfile *f1, *f2;
 
 	_pmemfile_list_root(pfp, "test_open_create_close start, files: . ..");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	/* NULL file name */
 	errno = 0;
@@ -122,7 +122,7 @@ test_open_create_close(PMEMfilepool *pfp)
 
 	_pmemfile_list_root(pfp,
 			"test_open_create_close end, files: . .. aaa bbb");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);
 }
@@ -141,7 +141,7 @@ test_open_close(const char *path)
 {
 	PMEMfilepool *pfp = open_pool(path);
 	_pmemfile_list_root(pfp, "test_open_close, files: . .. aaa bbb");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 	pmemfile_pool_close(pfp);
 }
 
@@ -241,7 +241,7 @@ test_link(const char *path)
 		"test_link end, files: "
 		". .. aaa bbb aaa.link aaa2.link bbb2.link");
 
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);
 }
@@ -307,7 +307,7 @@ test_unlink(const char *path)
 
 	_pmemfile_list_root(pfp,
 			"test_unlink end, files: . .. aaa aaa.link aaa2.link");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_UNLINK(pfp, "/aaa");
 	PMEMFILE_UNLINK(pfp, "/aaa.link");
@@ -321,7 +321,7 @@ test_tmpfile(const char *path)
 {
 	PMEMfilepool *pfp = open_pool(path);
 
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	_pmemfile_list_root(pfp,
 			"test_O_TMPFILE before, files: . .. ");
@@ -331,13 +331,13 @@ test_tmpfile(const char *path)
 
 	_pmemfile_list_root(pfp,
 			"test_O_TMPFILE middle, files: . .. ");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_CLOSE(pfp, f);
 
 	_pmemfile_list_root(pfp,
 			"test_O_TMPFILE end, files: . .. ");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);
 }

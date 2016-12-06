@@ -35,6 +35,7 @@
  */
 
 #include "unittest.h"
+#include "pmemfile_test.h"
 
 static PMEMfilepool *
 create_pool(const char *path)
@@ -54,7 +55,7 @@ open_pool(const char *path)
 		UT_FATAL("!pmemfile_pool_open %s", path);
 
 	_pmemfile_list_root(pfp, "");
-	_pmemfile_stats(pfp);
+	PMEMFILE_STATS(pfp);
 
 	return pfp;
 }

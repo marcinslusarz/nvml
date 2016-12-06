@@ -1,0 +1,4 @@
+file_core_crash/TEST0: START: file_core_crash openclose
+ ./file_core_crash$(nW) $(nW) openclose
+inodes 3 dirs 0 block_arrays 0 inode_arrays 0 blocks 0
+file_core_crash/TEST0: Done
