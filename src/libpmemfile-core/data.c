@@ -45,6 +45,7 @@
 #include "pool.h"
 #include "sys_util.h"
 #include "util.h"
+#include "valgrind_internal.h"
 #include "../libpmemobj/ctree.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -333,8 +334,10 @@ file_write_within_block(PMEMfilepool *pfp,
 	uint32_t len = (uint32_t)min((size_t)block->size - pos->block_offset,
 			count_left);
 
-	pmemobj_memcpy_persist(pfp->pop, D_RW(block->data) + pos->block_offset,
-			buf, len);
+	void *dest = D_RW(block->data) + pos->block_offset;
+	VALGRIND_ADD_TO_TX(dest, len);
+	pmemobj_memcpy_persist(pfp->pop, dest, buf, len);
+	VALGRIND_REMOVE_FROM_TX(dest, len);
 
 	if (is_last) {
 		/*
