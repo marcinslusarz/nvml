@@ -197,10 +197,10 @@ d_name.txt: "file3"
 d_name.bin: 0x66 (f) 0x69 (i) 0x6c (l) 0x65 (e) 0x33 (3) 0x00 (?)  
 -
 ---
-drwxr-xr-x 2 1000 1000   4008 $(*) .
-drwxrwxrwx 3 1000 1000   4008 $(*) ..
--rw-r--r-- 1 1000 1000      0 $(*) file1
--rw-r--r-- 1 1000 1000      0 $(*) file2
--rw-r--r-- 1 1000 1000      0 $(*) file3
+drwxr-xr-x 2 0 0   4008  .
+drwxrwxrwx 3 0 0   4008  ..
+-rw-r--r-- 1 0 0      0  file1
+-rw-r--r-- 1 0 0      0  file2
+-rw-r--r-- 1 0 0      0  file3
 ---
 file_core_getdents/TEST0: Done

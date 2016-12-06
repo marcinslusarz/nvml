@@ -1,7 +1,6 @@
 scope/TEST7:
 ../../debug/libpmemfile-core.so:
 _pmemfile_file_size
-_pmemfile_list_root
 pmemfile_access
 pmemfile_chdir
 pmemfile_chmod
@@ -49,7 +48,6 @@ pmemfile_unlinkat
 pmemfile_write
 ../../nondebug/libpmemfile-core.so:
 _pmemfile_file_size
-_pmemfile_list_root
 pmemfile_access
 pmemfile_chdir
 pmemfile_chmod

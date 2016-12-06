@@ -61,7 +61,8 @@ test_open_create_close(PMEMfilepool *pfp)
 {
 	PMEMfile *f1, *f2;
 
-	_pmemfile_list_root(pfp, "test_open_create_close start, files: . ..");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_open_create_close start, files: . ..");
 	PMEMFILE_STATS(pfp);
 
 	/* NULL file name */
@@ -120,7 +121,7 @@ test_open_create_close(PMEMfilepool *pfp)
 
 	pmemfile_close(pfp, f1);
 
-	_pmemfile_list_root(pfp,
+	PMEMFILE_LIST_FILES(pfp, "/",
 			"test_open_create_close end, files: . .. aaa bbb");
 	PMEMFILE_STATS(pfp);
 
@@ -140,7 +141,8 @@ static void
 test_open_close(const char *path)
 {
 	PMEMfilepool *pfp = open_pool(path);
-	_pmemfile_list_root(pfp, "test_open_close, files: . .. aaa bbb");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_open_close, files: . .. aaa bbb");
 	PMEMFILE_STATS(pfp);
 	pmemfile_pool_close(pfp);
 }
@@ -152,16 +154,14 @@ test_link(const char *path)
 
 	int ret;
 
-	_pmemfile_list_root(pfp,
-		"test_link end, files: "
-		". .. aaa bbb");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_link, files: . .. aaa bbb");
 
 	/* successful link */
 	PMEMFILE_LINK(pfp, "/aaa", "/aaa.link");
 
-	_pmemfile_list_root(pfp,
-		"test_link end, files: "
-		". .. aaa bbb aaa.link");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_link, files: . .. aaa bbb aaa.link");
 
 	/* destination already exists */
 	errno = 0;
@@ -169,9 +169,8 @@ test_link(const char *path)
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, EEXIST);
 
-	_pmemfile_list_root(pfp,
-		"test_link end, files: "
-		". .. aaa bbb aaa.link");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_link, files: . .. aaa bbb aaa.link");
 
 	/* source does not exist */
 	errno = 0;
@@ -179,23 +178,20 @@ test_link(const char *path)
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, ENOENT);
 
-	_pmemfile_list_root(pfp,
-		"test_link end, files: "
-		". .. aaa bbb aaa.link");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_link, files: . .. aaa bbb aaa.link");
 
 	/* successful link from link */
 	PMEMFILE_LINK(pfp, "/aaa.link", "/aaa2.link");
 
-	_pmemfile_list_root(pfp,
-		"test_link end, files: "
-		". .. aaa bbb aaa.link aaa2.link");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_link, files: . .. aaa bbb aaa.link aaa2.link");
 
 	/* another successful link */
 	PMEMFILE_LINK(pfp, "/bbb", "/bbb2.link");
 
-	_pmemfile_list_root(pfp,
-		"test_link end, files: "
-		". .. aaa bbb aaa.link aaa2.link bbb2.link");
+	PMEMFILE_LIST_FILES(pfp, "/",
+		"test_link, files: . .. aaa bbb aaa.link aaa2.link bbb2.link");
 
 	PMEMFILE_MKDIR(pfp, "/dir", 0777);
 	/* destination already exists as directory */
@@ -237,9 +233,8 @@ test_link(const char *path)
 
 	PMEMFILE_RMDIR(pfp, "/dir");
 
-	_pmemfile_list_root(pfp,
-		"test_link end, files: "
-		". .. aaa bbb aaa.link aaa2.link bbb2.link");
+	PMEMFILE_LIST_FILES(pfp, "/",
+		"test_link, files: . .. aaa bbb aaa.link aaa2.link bbb2.link");
 
 	PMEMFILE_STATS(pfp);
 
@@ -305,7 +300,7 @@ test_unlink(const char *path)
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, EISDIR);
 
-	_pmemfile_list_root(pfp,
+	PMEMFILE_LIST_FILES(pfp, "/",
 			"test_unlink end, files: . .. aaa aaa.link aaa2.link");
 	PMEMFILE_STATS(pfp);
 
@@ -323,20 +318,20 @@ test_tmpfile(const char *path)
 
 	PMEMFILE_STATS(pfp);
 
-	_pmemfile_list_root(pfp,
-			"test_O_TMPFILE before, files: . .. ");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_O_TMPFILE before, files: . ..");
 
 	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_TMPFILE | O_WRONLY, 0644);
 	PMEMFILE_WRITE(pfp, f, "qwerty", 6, 6);
 
-	_pmemfile_list_root(pfp,
-			"test_O_TMPFILE middle, files: . .. ");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_O_TMPFILE middle, files: . ..");
 	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_CLOSE(pfp, f);
 
-	_pmemfile_list_root(pfp,
-			"test_O_TMPFILE end, files: . .. ");
+	PMEMFILE_LIST_FILES(pfp, "/",
+			"test_O_TMPFILE end, files: . ..");
 	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);
