@@ -1019,13 +1019,13 @@ hook_faccessat(struct fd_desc at, long path_arg, long mode, long flags)
 	 * TODO
 	 *
 	 * long r = pmemfile_faccessat(where.pool->pool,
-	 * 		where.path, (mode_t)arg1);
+	 *		where.path, (mode_t)arg1);
 	 *
 	 * log_write("pmemfile_lstat(%p, \"%s\", %ld) = %ld",
 	 *     (void *)where.pool->pool, where.path, arg1, r);
 	 *
 	 * if (r < 0)
-	 * 	r = -errno;
+	 *     r = -errno;
 	 *
 	 * return r;
 	 *
