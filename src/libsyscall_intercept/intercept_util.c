@@ -289,12 +289,12 @@ print_clone_flags(char buffer[static 0x100], long flags)
  * The formats of syscall arguments, as they should appear in logs.
  */
 enum {
-	f_dec,		// decimal number
-	f_oct_mode,	// mode_t, octal number ( open, chmod, etc.. )
-	f_hex,		// hexadecimal number, with zero padding e.g. pointers
-	f_str,		// zero terminated string
-	f_buf,		// buffer, with a given size
-	f_open_flags	// only used for oflags in open, openat
+	f_dec, /* decimal number */
+	f_oct_mode, /* mode_t, octal number ( open, chmod, etc.. ) */
+	f_hex, /* hexadecimal number, with zero padding e.g. pointers */
+	f_str, /* zero terminated string */
+	f_buf, /* buffer, with a given size */
+	f_open_flags /* only used for oflags in open, openat */
 };
 
 static char *print_syscall(char *buffer, const char *name, unsigned args, ...);

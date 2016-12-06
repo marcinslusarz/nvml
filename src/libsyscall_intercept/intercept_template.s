@@ -38,7 +38,7 @@
  * jumps here. This assembly wrapper has to achieve multiple things
  * that can not be achieved in C:
  *
- * libc expects the registers not clobberred by a syscall to have the
+ * libc expects the registers not clobbered by a syscall to have the
  * same value before and after a syscall instruction. C function calls
  * clobber a different set of registers. To make sure this doesn't cause
  * problems, all registers are saved on the stack before calling the
@@ -106,7 +106,7 @@
  *
  * Sometimes the C function executes the actual syscall, sometimes
  * it calls a hook function to provide a user space implementation.
- * In case of createing a thread ( using SYS_clone ), none of these
+ * In case of creating a thread ( using SYS_clone ), none of these
  * two approaches can work. The new thread is start execution on a
  * new stack - therefore the 'restore registers' step would fail.
  * So creating a new thread can not be hook, and this assembly
@@ -133,15 +133,15 @@
  * To address this problem, a trick is introduced that supplies a 'fake'
  * return address when calling the C function. This fake return address points
  * to a function in the text segment, for which appropriate debug information
- * is available for debuggers. This is the 'magic_routine' seen in the code
+ * is available for debuggers. This is the magic routine seen in the code
  * below, and seen in the callstack. So instead calling the C function with
- * call instruction, and address inside a magic_routine is pushed on the stack,
- * and a jump instruction jumps to the C function -- this makes a debugger
- * believe that the C function was called from the said magic_routine.
+ * call instruction, and address inside a placeholder routine is pushed on the
+ * stack, and a jump instruction jumps to the C function -- this makes a
+ * debugger believe that the C function was called from the said placeholder
  * Appropriate debug information is provided using the cfi_def_cfa_offset
  * assembler directive as follows:
  *
- * magic_routine:
+ * backtrace_placeholder:
  *	.cfi_startproc
  *	.cfi_def_cfa_offset 0x580
  *	nop
@@ -201,12 +201,12 @@
  * leave the stack pointer 16 byte aligned when issuing a syscall, as that
  * is not required for a syscall instruction. Thus, this code must take
  * care of stack alignment before calling anything created with a C
- * compiler. This has a nasty side effect: the magic_routine explained above
+ * compiler. This has a nasty side effect: the magic routine explained above
  * presents a fixed stack size to debuggers. But aligning the stack can
  * makes it impossible to guarantee using a fixed stack size. Therefore,
- * two versions of the magic_routine are supplied, with different stack
- * sizes. One of them is used if the stack used by this code is 16n bytes ( when
- * the stack pointer was already 16 aligned ), the other one is used when
+ * two versions of the magic placeholder routine are supplied, with different
+ * stack sizes. One of them is used if the stack used by this code is 16n bytes
+ * ( when the stack pointer was already 16 aligned ), the other one is used when
  * 16n + 8 bytes of stack is used ( when the original RSP is just 8 bytes
  * aligned ). An address in the appropriate function is used as the faked
  * return address pushed on the stack before calling the C function.
@@ -215,11 +215,11 @@
 .global xlongjmp;
 .type   xlongjmp, @function
 
-.global magic_routine;
-.type   magic_routine, @function
+.global backtrace_placeholder;
+.type   backtrace_placeholder, @function
 
-.global magic_routine_2;
-.type   magic_routine_2, @function
+.global backtrace_placeholder_2;
+.type   backtrace_placeholder_2, @function
 
 .global intercept_asm_wrapper_tmpl;
 .global intercept_asm_wrapper_simd_save;
@@ -228,8 +228,8 @@
 .global intercept_asm_wrapper_mov_return_addr_r11_no_syscall;
 .global intercept_asm_wrapper_mov_return_addr_r11_syscall;
 .global intercept_asm_wrapper_mov_libpath_r11;
-.global intercept_asm_wrapper_mov_magic_r11;
-.global intercept_asm_wrapper_mov_magic_r11_2;
+.global intercept_asm_wrapper_mov_phaddr_r11;
+.global intercept_asm_wrapper_mov_ph2addr_r11;
 .global intercept_asm_wrapper_call;
 .global intercept_asm_wrapper_simd_restore;
 .global intercept_asm_wrapper_postfix;
@@ -255,7 +255,7 @@ xlongjmp:
 
 .size   xlongjmp, .-xlongjmp
 
-magic_routine:
+backtrace_placeholder:
 	.cfi_startproc
 	.cfi_def_cfa_offset 0x580
 	nop
@@ -264,9 +264,9 @@ magic_routine:
 	nop
 	.cfi_endproc
 
-.size   magic_routine, .-magic_routine
+.size   backtrace_placeholder, .-backtrace_placeholder
 
-magic_routine_2:
+backtrace_placeholder_2:
 	.cfi_startproc
 	.cfi_def_cfa_offset 0x578
 	nop
@@ -275,7 +275,7 @@ magic_routine_2:
 	nop
 	.cfi_endproc
 
-.size   magic_routine_2, .-magic_routine_2
+.size   backtrace_placeholder_2, .-backtrace_placeholder_2
 
 intercept_asm_wrapper_tmpl:
 	nop
@@ -394,13 +394,36 @@ intercept_asm_wrapper_push_origin_addr:
 	movq        %rdi, %rsi
 	movq        %rax, %rdi
 
+	/*
+	 * Move the faked return address into r11, so that it can be
+	 * pushed to the stack. The stack size to present to gdb depends
+	 * on the stack alignment.
+	 * If the stack pointer originally was not 16 byte aligned, this
+	 * code will use 16n+8 bytes of stack -- this should fix the alignment.
+	 * We ignore the case the RSP is not even 8 byte aligned, as that wasn't
+	 * encountered before, and this is just a nicety for debugging.
+	 * If the stack was originally 16 byte aligned, this code will use
+	 * 16n bytes of stack, thus keeping the alignment correct.
+	 *
+	 * To explain all this to gdb, the return address should point into
+	 * a function that uses the appropriate stack space, and the binary
+	 * has debug information associated with it. For this purpuse addresses
+	 * in backtrace_placeholder, or backtrace_placeholder_2 are used.
+	 * The appropriate mov instructions should be filled in the template, e.g.:
+	 * at intercept_asm_wrapper_mov_ph2addr_r11, where mov_ph2addr_r11
+	 * stands for 'mov placeholder2 address into r11' a movabs instruction
+	 * is expected, with an actual runtime address in
+	 * backtrace_placeholder_2. It wouldn't be easy to fill this compile,
+	 * especially since GAS is designed for compiler generated assembly, and
+	 * I don't know how to describe such a thing in this syntax.
+	 */
 	andq        $0x8, %rbp
 	jnz         L4
-intercept_asm_wrapper_mov_magic_r11:
+intercept_asm_wrapper_mov_phaddr_r11:
 .fill 10, 1, 0x90
 	jmp         L5
 L4:
-intercept_asm_wrapper_mov_magic_r11_2:
+intercept_asm_wrapper_mov_ph2addr_r11:
 .fill 10, 1, 0x90
 L5:
 	pushq       %r11  /* push the fake return address */
