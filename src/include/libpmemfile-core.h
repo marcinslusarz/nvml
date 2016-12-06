@@ -110,8 +110,6 @@ int pmemfile_chdir(PMEMfilepool *, const char *path);
 int pmemfile_fchdir(PMEMfilepool *, PMEMfile *dir);
 char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t size);
 
-/* temporary debugging functions, do NOT use outside of tests */
-
 struct pmemfile_stats {
 	unsigned inodes;
 	unsigned dirs;
