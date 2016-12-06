@@ -55,10 +55,6 @@ ssize_t PMEMFILE_READ(PMEMfilepool *pfp, PMEMfile *file, void *buf,
 		size_t count, ssize_t expected, ...);
 off_t PMEMFILE_LSEEK(PMEMfilepool *pfp, PMEMfile *file, off_t offset,
 		int whence, off_t expected);
-ssize_t PMEMFILE_FILE_SIZE(PMEMfilepool *pfp, PMEMfile *file,
-		ssize_t expected_size);
-ssize_t PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path,
-		ssize_t expected_size);
 void PMEMFILE_MKDIR(PMEMfilepool *pfp, const char *path, mode_t mode);
 void PMEMFILE_RMDIR(PMEMfilepool *pfp, const char *path);
 void PMEMFILE_CHDIR(PMEMfilepool *pfp, const char *path);
@@ -72,7 +68,17 @@ void PMEMFILE_FSTAT(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf);
 void PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		struct stat *buf, int flags);
 
+/* utilities */
 void PMEMFILE_STATS(PMEMfilepool *pfp);
+ssize_t PMEMFILE_FILE_SIZE(PMEMfilepool *pfp, PMEMfile *file,
+		ssize_t expected_size);
+ssize_t PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path,
+		ssize_t expected_size);
+void PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
+		unsigned length, int print_dates);
+void PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path, const char *txt);
+void PMEMFILE_LIST_FILES_WITH_ATTRS(PMEMfilepool *pfp, const char *path,
+		const char *txt);
 
 #ifdef __cplusplus
 }

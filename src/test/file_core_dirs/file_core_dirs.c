@@ -151,7 +151,7 @@ test1(PMEMfilepool *pfp)
 {
 	PMEMfile *f;
 	char buf[1001];
-	_pmemfile_list_root(pfp, "before");
+	PMEMFILE_LIST_FILES(pfp, "/", "before");
 	memset(buf, 0xff, sizeof(buf));
 	UT_OUT("test1");
 
@@ -178,7 +178,7 @@ static void
 test2(PMEMfilepool *pfp)
 {
 	char buf[1001];
-	_pmemfile_list_root(pfp, "before");
+	PMEMFILE_LIST_FILES(pfp, "/", "before");
 	UT_OUT("test2");
 
 	for (int i = 0; i < 100; ++i) {

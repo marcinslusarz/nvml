@@ -42,17 +42,8 @@ require_fs_type any
 
 setup
 
-rm -f grep${UNITTEST_NUM}.log
-
 expect_normal_exit ./file_core_basic$EXESUFFIX $DIR/testfile1
 
-if [ "$BUILD" = "debug" -o "$BUILD" = "static-debug" ]; then
-	cat ${PMEMFILECORE_LOG_FILE} | \
-		grep -e "inode left by previous run" -e "_pmemfile_list" | \
-		sed "s/^<libpmemfile-core>: <[0-9]*> \[[a-z\.]*:[0-9]* [a-z_]*\][ ]*//" \
-		> grep${UNITTEST_NUM}.log || true
-
-	check
-fi
+check
 
 pass

@@ -43,7 +43,7 @@ test1(PMEMfilepool *pfp)
 	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
 
-	_pmemfile_list_root(pfp, "/file1 0");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 0");
 
 	const char *data = "Marcin S";
 	char data2[4096];
@@ -54,7 +54,7 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_WRITE(pfp, f, data, len, len);
 
-	_pmemfile_list_root(pfp, "/file1 9");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9");
 
 	/* file is opened write-only */
 	PMEMFILE_READ(pfp, f, data2, len, -1, EBADF);
@@ -113,7 +113,7 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 
 
-	_pmemfile_list_root(pfp, "/file1 9");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9");
 
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
@@ -173,7 +173,7 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 
 
-	_pmemfile_list_root(pfp, "/file1 9+100+4=113");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9+100+4=113");
 
 	PMEMFILE_STATS(pfp);
 
@@ -199,7 +199,7 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_CLOSE(pfp, f);
 
-	_pmemfile_list_root(pfp, "/file1 8192");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 8192");
 	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_UNLINK(pfp, "/file1");
@@ -225,7 +225,7 @@ test2(PMEMfilepool *pfp)
 		PMEMFILE_WRITE(pfp, f, bufd, LEN, LEN);
 
 	PMEMFILE_CLOSE(pfp, f);
-	_pmemfile_list_root(pfp, "/file1 ~800MB");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 ~800MB");
 	PMEMFILE_STATS(pfp);
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
@@ -267,7 +267,7 @@ test_trunc(PMEMfilepool *pfp)
 
 	PMEMFILE_CLOSE(pfp, f1);
 	PMEMFILE_CLOSE(pfp, f2);
-	_pmemfile_list_root(pfp, "/file1,file2 25600");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1,file2 25600");
 	PMEMFILE_STATS(pfp);
 
 	f1 = PMEMFILE_OPEN(pfp, "/file1", O_RDWR | O_TRUNC, 0);
@@ -281,7 +281,7 @@ test_trunc(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f1);
 	PMEMFILE_CLOSE(pfp, f2);
 
-	_pmemfile_list_root(pfp, "/file1 0, /file2 128");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 0, /file2 128");
 	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_UNLINK(pfp, "/file1");
@@ -334,22 +334,22 @@ main(int argc, char *argv[])
 
 	PMEMFILE_STATS(pfp);
 
-	_pmemfile_list_root(pfp, "no files");
+	PMEMFILE_LIST_FILES(pfp, "/", "no files");
 
 	test1(pfp);
-	_pmemfile_list_root(pfp, "no files");
+	PMEMFILE_LIST_FILES(pfp, "/", "no files");
 	PMEMFILE_STATS(pfp);
 
 	test2(pfp);
-	_pmemfile_list_root(pfp, "no files");
+	PMEMFILE_LIST_FILES(pfp, "/", "no files");
 	PMEMFILE_STATS(pfp);
 
 	test_trunc(pfp);
-	_pmemfile_list_root(pfp, "no files");
+	PMEMFILE_LIST_FILES(pfp, "/", "no files");
 	PMEMFILE_STATS(pfp);
 
 	test_o_append(pfp);
-	_pmemfile_list_root(pfp, "no files");
+	PMEMFILE_LIST_FILES(pfp, "/", "no files");
 	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);

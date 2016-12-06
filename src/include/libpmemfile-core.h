@@ -111,7 +111,6 @@ int pmemfile_fchdir(PMEMfilepool *, PMEMfile *dir);
 char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t size);
 
 /* temporary debugging functions, do NOT use outside of tests */
-void _pmemfile_list_root(PMEMfilepool *pfp, const char *msg);
 
 struct pmemfile_stats {
 	unsigned inodes;

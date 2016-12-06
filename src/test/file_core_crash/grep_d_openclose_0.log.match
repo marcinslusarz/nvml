@@ -1,8 +1,0 @@
-START 
-parent 0x$(X) ppath /
-- ref    inode nlink   size   flags name
-*   3 0x$(X)     2   4008 0040777 .
-*   3 0x$(X)     2   4008 0040777 ..
-*   1 0x$(X)     1      0 0100644 aaa
-*   1 0x$(X)     1      0 0100644 bbb
-STOP  

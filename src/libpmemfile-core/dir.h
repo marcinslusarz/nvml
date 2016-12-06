@@ -81,6 +81,4 @@ struct pmemfile_vinode *pool_get_dir_for_path(PMEMfilepool *pfp, PMEMfile *dir,
 int _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path);
 
-void _pmemfile_list(PMEMfilepool *pfp, struct pmemfile_vinode *parent);
-
 #endif

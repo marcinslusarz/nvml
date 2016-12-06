@@ -255,3 +255,93 @@ PMEMFILE_GETCWD(PMEMfilepool *pfp, char *buf, size_t size, const char *cmp)
 		UT_FATAL("%s != %s", ret, cmp);
 	return ret;
 }
+
+static const char *
+timespec_to_str(const struct timespec *t)
+{
+	char *s = asctime(localtime(&t->tv_sec));
+	s[strlen(s) - 1] = 0;
+	return s;
+}
+
+void
+PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
+		unsigned length, int print_attrs)
+{
+	struct stat statbuf;
+	char *buf = (void *)dirp;
+
+	for (unsigned i = 0; i < length; ) {
+		i += 8;
+		i += 8;
+
+		unsigned short int reclen = *(unsigned short *)&buf[i];
+		i += 2;
+
+		char type = *(char *)&buf[i];
+		i += 1;
+
+		PMEMFILE_FSTATAT(pfp, dir, buf + i, &statbuf, 0);
+		if (type == DT_REG)
+			UT_ASSERTeq(S_ISREG(statbuf.st_mode), 1);
+		else if (type == DT_DIR)
+			UT_ASSERTeq(S_ISDIR(statbuf.st_mode), 1);
+		else
+			UT_ASSERT(0);
+
+		UT_OUT("%c%c%c%c%c%c%c%c%c%c %ld %d %d %6ld %s %s",
+				type == DT_DIR ? 'd' : '-',
+				statbuf.st_mode & S_IRUSR ? 'r' : '-',
+				statbuf.st_mode & S_IWUSR ? 'w' : '-',
+				statbuf.st_mode & S_IXUSR ? 'x' : '-',
+				statbuf.st_mode & S_IRGRP ? 'r' : '-',
+				statbuf.st_mode & S_IWGRP ? 'w' : '-',
+				statbuf.st_mode & S_IXGRP ? 'x' : '-',
+				statbuf.st_mode & S_IROTH ? 'r' : '-',
+				statbuf.st_mode & S_IWOTH ? 'w' : '-',
+				statbuf.st_mode & S_IXOTH ? 'x' : '-',
+				statbuf.st_nlink,
+				print_attrs ? statbuf.st_uid : 0,
+				print_attrs ? statbuf.st_gid : 0,
+				statbuf.st_size,
+				print_attrs ? timespec_to_str(&statbuf.st_mtim)
+						: "",
+				buf + i);
+		i += reclen;
+		i -= 8 + 8 + 2 + 1;
+	}
+}
+
+static void
+_PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path, const char *txt,
+		int print_attr)
+{
+	UT_OUT("LIST_FILES start, %s", txt);
+	PMEMfile *f = PMEMFILE_OPEN(pfp, path, O_DIRECTORY | O_RDONLY);
+
+	char buf[32758];
+	while (1) {
+		int r = pmemfile_getdents64(pfp, f, (void *)buf, sizeof(buf));
+		UT_ASSERT(r >= 0);
+		if (r == 0)
+			break;
+
+		PMEMFILE_PRINT_FILES64(pfp, f, buf, (unsigned)r, print_attr);
+	}
+
+	PMEMFILE_CLOSE(pfp, f);
+	UT_OUT("LIST_FILES end,   %s", txt);
+}
+
+void
+PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path, const char *txt)
+{
+	_PMEMFILE_LIST_FILES(pfp, path, txt, 0);
+}
+
+void
+PMEMFILE_LIST_FILES_WITH_ATTRS(PMEMfilepool *pfp, const char *path,
+		const char *txt)
+{
+	_PMEMFILE_LIST_FILES(pfp, path, txt, 1);
+}

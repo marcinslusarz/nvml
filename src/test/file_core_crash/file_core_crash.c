@@ -54,7 +54,7 @@ open_pool(const char *path)
 	if (!pfp)
 		UT_FATAL("!pmemfile_pool_open %s", path);
 
-	_pmemfile_list_root(pfp, "");
+	PMEMFILE_LIST_FILES(pfp, "/", "");
 	PMEMFILE_STATS(pfp);
 
 	return pfp;
