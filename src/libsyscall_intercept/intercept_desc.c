@@ -132,8 +132,8 @@ mark_jump(const struct intercept_desc *desc, const unsigned char *addr)
 	if (addr >= desc->text_start && addr <= desc->text_end) {
 		uint64_t offset = (uint64_t)(addr - desc->text_start);
 
-		desc->jump_table[offset / 8] |=
-			(unsigned char)(1 << (offset % 8));
+		unsigned char tmp = (unsigned char)(1 << (offset % 8));
+		desc->jump_table[offset / 8] |= tmp;
 	}
 }
 
