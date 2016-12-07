@@ -210,7 +210,9 @@ inode_zero_extend_block(PMEMfilepool *pfp,
 	 * We can safely skip tx_add_range, because there's no user visible
 	 * data at this address.
 	 */
+	VALGRIND_ADD_TO_TX(addr, len);
 	pmemobj_memset_persist(pfp->pop, addr, 0, len);
+	VALGRIND_REMOVE_FROM_TX(addr, len);
 
 	inode_extend_block_meta_data(inode, block_array, block, len);
 }
