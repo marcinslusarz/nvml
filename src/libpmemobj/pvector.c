@@ -185,7 +185,6 @@ pvector_array_constr(void *ctx, void *ptr, size_t usable_size, void *arg)
 	PMEMobjpool *pop = ctx;
 	VALGRIND_ADD_TO_TX(ptr, usable_size);
 	pmemops_memset_persist(&pop->p_ops, ptr, 0, usable_size);
-	VALGRIND_REMOVE_FROM_TX(ptr, usable_size);
 
 	return 0;
 }
@@ -262,8 +261,12 @@ pvector_pop_back(struct pvector_context *ctx, entry_op_callback cb)
 	if (cb)
 		cb(ctx->pop, &arrp[s.pos]);
 
-	if (s.pos == 0 && s.idx != 0 /* the array 0 is embedded */)
+	if (s.pos == 0 && s.idx != 0 /* the array 0 is embedded */) {
+		size_t usable_size = sizeof(uint64_t) *
+				(1ULL << (s.idx + PVECTOR_INIT_SHIFT));
+		VALGRIND_REMOVE_FROM_TX(arrp, usable_size);
 		pfree(ctx->pop, &ctx->vec->arrays[s.idx]);
+	}
 
 	ctx->nvalues--;
 
