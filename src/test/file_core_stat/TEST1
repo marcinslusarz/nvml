@@ -31,20 +31,21 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-export UNITTEST_NAME=file_core_dirs/TEST0
-export UNITTEST_NUM=0
+export UNITTEST_NAME=file_core_stat/TEST1
+export UNITTEST_NUM=1
 
 # standard unit test setup
 . ../unittest/unittest.sh
 
-require_test_type short
+require_test_type medium
 require_fs_type any
 require_build_type debug nondebug
+configure_valgrind memcheck force-enable
 
 setup
 
 export PMEM_IS_PMEM_FORCE=1
 
-expect_normal_exit ./file_core_dirs$EXESUFFIX $DIR/testfile1
+expect_normal_exit ./file_core_stat$EXESUFFIX $DIR/testfile1
 
 pass
