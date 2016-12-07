@@ -144,7 +144,8 @@ file_reset_cache(PMEMfile *file, struct pmemfile_inode *inode,
  * file_allocate_block -- allocates new block
  */
 static void
-file_allocate_block(PMEMfile *file,
+file_allocate_block(PMEMfilepool *pfp,
+		PMEMfile *file,
 		struct pmemfile_inode *inode,
 		struct pmemfile_pos *pos,
 		struct pmemfile_block *block,
@@ -167,6 +168,16 @@ file_allocate_block(PMEMfile *file,
 	TX_ADD_DIRECT(block);
 	block->data = TX_XALLOC(char, sz, POBJ_XALLOC_NO_FLUSH);
 	sz = pmemobj_alloc_usable_size(block->data.oid);
+
+#ifdef DEBUG
+	/* poison block data */
+	void *data = D_RW(block->data);
+	VALGRIND_ADD_TO_TX(data, sz);
+	pmemobj_memset_persist(pfp->pop, data, 0x66, sz);
+	VALGRIND_REMOVE_FROM_TX(data, sz);
+	VALGRIND_DO_MAKE_MEM_UNDEFINED(data, sz);
+#endif
+
 	ASSERT(sz <= UINT32_MAX);
 	block->size = (uint32_t)sz;
 
@@ -264,7 +275,7 @@ file_seek_within_block(PMEMfilepool *pfp,
 {
 	if (block->size == 0) {
 		if (extend)
-			file_allocate_block(file, inode, pos, block,
+			file_allocate_block(pfp, file, inode, pos, block,
 					offset_left);
 		else
 			return 0;
@@ -330,7 +341,7 @@ file_write_within_block(PMEMfilepool *pfp,
 		bool is_last)
 {
 	if (block->size == 0)
-		file_allocate_block(file, inode, pos, block, count_left);
+		file_allocate_block(pfp, file, inode, pos, block, count_left);
 
 	/* How much data should we write to this block? */
 	uint32_t len = (uint32_t)min((size_t)block->size - pos->block_offset,
