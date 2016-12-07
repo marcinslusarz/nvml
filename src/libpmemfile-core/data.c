@@ -281,50 +281,33 @@ file_seek_within_block(PMEMfilepool *pfp,
 			return 0;
 	}
 
-	/*
-	 * Is anticipated position within the current block?
-	 */
-	if (pos->block_offset + offset_left < block->size) {
-		ASSERT(offset_left <= UINT32_MAX);
-		/*
-		 * Is anticipated position between the end of
-		 * used space and the end of block?
-		 */
-		if (is_last && pos->block_offset + offset_left
-				> inode->last_block_fill) {
-			if (!extend) {
-				uint32_t sz = inode->last_block_fill -
-						pos->block_offset;
-				pos->block_offset += sz;
-				pos->global_offset += sz;
-
-				return sz;
-			}
-
-			inode_zero_extend_block(pfp, inode, pos->block_array,
-					block, (uint32_t)(offset_left -
-					inode->last_block_fill));
-
-			ASSERT(inode->last_block_fill <= block->size);
-		}
-
-		pos->block_offset += (uint32_t)offset_left;
-		pos->global_offset += offset_left;
-
-		ASSERTeq(pos->global_offset, file->offset);
-
-		return offset_left;
+	uint32_t max_off;
+	if (is_last) {
+		ASSERT(inode->last_block_fill >= pos->block_offset);
+		max_off = inode->last_block_fill - pos->block_offset;
+	} else {
+		ASSERT(block->size >= pos->block_offset);
+		max_off = block->size - pos->block_offset;
 	}
+	uint32_t seeked = (uint32_t)min((size_t)max_off, offset_left);
 
-	/*
-	 * Now we know offset lies in one of the consecutive blocks.
-	 * So we can go to the next block.
-	 */
-	uint32_t sz = block->size - pos->block_offset;
-	pos->block_offset += sz;
-	pos->global_offset += sz;
+	pos->block_offset += seeked;
+	pos->global_offset += seeked;
+	offset_left -= seeked;
 
-	return sz;
+	if (offset_left == 0 || pos->block_offset == block->size)
+		return seeked;
+
+	ASSERTeq(is_last, true);
+
+	uint32_t extended = (uint32_t)min(offset_left,
+			(size_t)(block->size - inode->last_block_fill));
+	inode_zero_extend_block(pfp, inode, pos->block_array, block, extended);
+
+	pos->block_offset += extended;
+	pos->global_offset += extended;
+
+	return seeked + extended;
 }
 
 /*
