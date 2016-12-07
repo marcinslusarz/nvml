@@ -20,11 +20,11 @@ drwxrwxrwx 2 0 0   4008  .
 drwxrwxrwx 2 0 0   4008  ..
 -rw-r--r-- 1 0 0      9  file1
 LIST_FILES end,   /file1 9
-LIST_FILES start, /file1 9+100+4=113
+LIST_FILES start, /file1 9+100+4+4096+11=4220
 drwxrwxrwx 2 0 0   4008  .
 drwxrwxrwx 2 0 0   4008  ..
--rw-r--r-- 1 0 0    113  file1
-LIST_FILES end,   /file1 9+100+4=113
+-rw-r--r-- 1 0 0   4220  file1
+LIST_FILES end,   /file1 9+100+4+4096+11=4220
 inodes 2 dirs 0 block_arrays 0 inode_arrays 0 blocks 1
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
 LIST_FILES start, /file1 8192

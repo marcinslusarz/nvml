@@ -169,11 +169,17 @@ test1(PMEMfilepool *pfp)
 			sizeof(data2) - 9 - 100 - 4), 0);
 
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9 + 100 + 4);
+	PMEMFILE_LSEEK(pfp, f, 4096, SEEK_END, 9 + 100 + 4 + 4096);
+	PMEMFILE_WRITE(pfp, f, "NEXT BLOCK\0", 11, 11);
+	PMEMFILE_LSEEK(pfp, f, 9 + 100 + 4, SEEK_SET, 9 + 100 + 4);
+	memset(data2, 0xff, sizeof(data2));
+	PMEMFILE_READ(pfp, f, data2, 4096, 4096);
+	UT_ASSERTeq(memcmp(data2, buf00, 4096), 0);
 
 	PMEMFILE_CLOSE(pfp, f);
 
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9+100+4=113");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9+100+4+4096+11=4220");
 
 	PMEMFILE_STATS(pfp);
 
