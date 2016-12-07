@@ -102,7 +102,7 @@ dump_linux_dirents64(void *dirp, unsigned length)
 		UT_OUTF(OF_NOPREFIX, " ");
 
 		char type = *(char *)&buf[i];
-		UT_OUT("d_type.txt: %hd", type);
+		UT_OUT("d_type.txt: %hhd", type);
 		UT_OUTF(OF_NONL, "d_type.bin: ");
 		for (int j = 0; j < 1; ++j, ++i)
 			UT_OUTF(OF_NONL | OF_NOPREFIX, "0x%02hhx ", buf[i]);
