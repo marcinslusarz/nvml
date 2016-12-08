@@ -117,7 +117,7 @@ fetch_fd(long fd)
 
 	result.kernel_fd = fd;
 
-	if (fd == AT_FDCWD) {
+	if ((int)fd == AT_FDCWD) {
 		result.pmem_fda.pool = cwd_pool;
 		result.pmem_fda.file = PMEMFILE_AT_CWD;
 	} else if (fd_pool_has_allocated(fd)) {
