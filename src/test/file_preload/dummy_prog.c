@@ -126,6 +126,18 @@ main(int argc, char **argv)
 	if (fstatat(fd, inner_file, &stat_buf, 0) != 0)
 		err(1, "fstatat \"%s/%s\"", dir_to_list_path, inner_file);
 
+	if (fchdir(fd) != 0)
+		err(1, "fchdir");
+
+	if (unlinkat(AT_FDCWD, inner_file, AT_REMOVEDIR) == 0)
+		errx(1, "unlinkat \"%s/%s\" AT_REMOVEDIR",
+		    dir_to_list_path, inner_file);
+
+	errno = 0;
+
+	if (unlinkat(AT_FDCWD, inner_file, 0) != 0)
+		err(1, "unlinkat \"%s/%s\"", dir_to_list_path, inner_file);
+
 	if (close(fd) != 0)
 		err(1, "close \"%s\"", dir_to_list_path);
 

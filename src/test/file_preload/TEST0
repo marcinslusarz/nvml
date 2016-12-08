@@ -65,10 +65,8 @@ expect_normal_exit ./dummy_prog$EXESUFFIX \
 	b > root_dir.log
 
 LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /a > a.dump
-LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /b > b.dump
 
 cmp a.dump a.expected_dump
-cmp b.dump b.expected_dump
 cmp root_dir.log root_dir.expected_log
 
 pass
