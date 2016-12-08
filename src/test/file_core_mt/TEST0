@@ -42,7 +42,7 @@ require_fs_type any
 
 setup
 
-if [ "$FS" = "pmem" ]; then
+if [ "$REAL_FS" = "pmem" ]; then
 	ops=10000
 else
 	ops=10
