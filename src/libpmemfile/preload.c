@@ -60,6 +60,10 @@
 #include "libpmemfile-core.h"
 #include "util.h"
 
+#define FATAL(str) syscall_no_intercept(SYS_write, 2, str, strlen(str))
+
+#include "sys_util.h"
+
 #include "fd_pool.h"
 
 #include "preload.h"
@@ -610,12 +614,12 @@ hook(long syscall_number,
 	int is_hooked;
 
 	if (syscall_needs_pmem_cwd_rlock[syscall_number])
-		pthread_rwlock_rdlock(&pmem_cwd_lock);
+		util_rwlock_rdlock(&pmem_cwd_lock);
 
 	if (syscall_needs_fd_rlock[syscall_number])
-		pthread_rwlock_rdlock(&fd_lock);
+		util_rwlock_rdlock(&fd_lock);
 	else if (syscall_needs_fd_wlock[syscall_number])
-		pthread_rwlock_wrlock(&fd_lock);
+		util_rwlock_wrlock(&fd_lock);
 
 	if (syscall_has_fd_first_arg[syscall_number] &&
 	    !fd_pool_has_allocated(arg0)) {
@@ -631,10 +635,10 @@ hook(long syscall_number,
 
 	if (syscall_needs_fd_rlock[syscall_number] ||
 	    syscall_needs_fd_wlock[syscall_number])
-		pthread_rwlock_unlock(&fd_lock);
+		util_rwlock_unlock(&fd_lock);
 
 	if (syscall_needs_pmem_cwd_rlock[syscall_number])
-		pthread_rwlock_unlock(&pmem_cwd_lock);
+		util_rwlock_unlock(&pmem_cwd_lock);
 
 	reenter = false;
 
@@ -779,7 +783,7 @@ hook_chdir(const char *path)
 
 	log_write("%s: \"%s\"", __func__, path);
 
-	pthread_rwlock_wrlock(&pmem_cwd_lock);
+	util_rwlock_wrlock(&pmem_cwd_lock);
 
 	resolve_path(cwd_desc(), path, &where, resolve_last_slink);
 
@@ -800,7 +804,7 @@ hook_chdir(const char *path)
 
 	log_write("%s : \"%s\"", __func__, where.path);
 
-	pthread_rwlock_unlock(&pmem_cwd_lock);
+	util_rwlock_unlock(&pmem_cwd_lock);
 
 	return result;
 }
@@ -815,7 +819,7 @@ hook_fchdir(long fd)
 
 	log_write("%s: \"%ld\"", __func__, fd);
 
-	pthread_rwlock_wrlock(&pmem_cwd_lock);
+	util_rwlock_wrlock(&pmem_cwd_lock);
 
 	if (fd_pool_has_allocated(fd)) {
 		struct fd_association *where = fd_table + fd;
@@ -831,7 +835,7 @@ hook_fchdir(long fd)
 
 	log_write("%s : %ld", __func__, fd);
 
-	pthread_rwlock_unlock(&pmem_cwd_lock);
+	util_rwlock_unlock(&pmem_cwd_lock);
 
 	return result;
 }
