@@ -78,11 +78,12 @@ expect_normal_exit ls -o --time-style=+"" $DIR/dummy_mount_point | sed 's/\s\+/ 
 expect_normal_exit rmdir $DIR/dummy_mount_point/dummy_dir_a
 expect_normal_exit ls -o --time-style=+"" $DIR/dummy_mount_point | sed 's/\s\+/ /g' > file_preload_lsl_with_nodir1.log
 
-check
-
 # todo: when rm works...
+#  only faccessat seems to be missing for rm to work
 # expect_normal_exit rm $DIR/dummy_mount_point/file_a
 # expect_normal_exit ls $DIR/dummy_mount_point > pmemfile_ls_root_after_rm.log
 # cmp pmemfile_ls_root_after_rm.log ls_root_after_rm_expected_log
+
+check
 
 pass

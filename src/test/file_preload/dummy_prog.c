@@ -52,13 +52,14 @@ main(int argc, char **argv)
 	char buf0[] = "Hello #0 World!\n";
 	char buf1[] = "Hello #1 World!\n";
 
-	if (argc < 5)
+	if (argc < 6)
 		return 1;
 
 	const char *full_path = argv[1];
 	const char *chdir_path = argv[2];
 	const char *relative_path = argv[3];
 	const char *dir_to_list_path = argv[4];
+	const char *inner_file = argv[5];
 
 	/*
 	 * Creating a file with an absolute path,
@@ -116,6 +117,17 @@ main(int argc, char **argv)
 
 	if (closedir(dir_to_list) != 0)
 		err(1, "closedir at \"%s\"", dir_to_list_path);
+
+	if ((fd = open(dir_to_list_path, O_RDONLY | O_DIRECTORY)) < 0)
+		err(1, "open \"%s\"", dir_to_list_path);
+
+
+	struct stat stat_buf;
+	if (fstatat(fd, inner_file, &stat_buf, 0) != 0)
+		err(1, "fstatat \"%s/%s\"", dir_to_list_path, inner_file);
+
+	if (close(fd) != 0)
+		err(1, "close \"%s\"", dir_to_list_path);
 
 	return 0;
 }

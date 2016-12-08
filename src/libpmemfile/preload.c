@@ -192,6 +192,7 @@ init_hooking(void)
 	syscall_number_filter[SYS_close] = true;
 	syscall_number_filter[SYS_stat] = true;
 	syscall_number_filter[SYS_lstat] = true;
+	syscall_number_filter[SYS_newfstatat] = true;
 	syscall_number_filter[SYS_access] = true;
 	syscall_number_filter[SYS_faccessat] = true;
 	syscall_number_filter[SYS_fstat] = true;
@@ -216,23 +217,20 @@ init_hooking(void)
 	syscall_needs_fd_rlock[SYS_lseek] = true;
 	syscall_needs_fd_rlock[SYS_getdents] = true;
 	syscall_needs_fd_rlock[SYS_getdents64] = true;
+	syscall_needs_fd_rlock[SYS_newfstatat] = true;
+	syscall_needs_fd_rlock[SYS_unlinkat] = true;
+	syscall_needs_fd_rlock[SYS_fstat] = true;
+	syscall_needs_fd_rlock[SYS_faccessat] = true;
+	syscall_needs_fd_rlock[SYS_mkdirat] = true;
+	syscall_needs_fd_rlock[SYS_linkat] = true;
+	syscall_needs_fd_rlock[SYS_getdents] = true;
+	syscall_needs_fd_rlock[SYS_getdents64] = true;
+	syscall_needs_fd_rlock[SYS_fgetxattr] = true;
+	syscall_needs_fd_rlock[SYS_fsetxattr] = true;
 
 	syscall_needs_fd_wlock[SYS_open] = true;
 	syscall_needs_fd_wlock[SYS_openat] = true;
 	syscall_needs_fd_wlock[SYS_close] = true;
-	syscall_needs_fd_wlock[SYS_linkat] = true;
-	syscall_needs_fd_wlock[SYS_unlinkat] = true;
-	syscall_needs_fd_wlock[SYS_newfstatat] = true;
-	syscall_needs_fd_wlock[SYS_fstat] = true;
-	syscall_needs_fd_wlock[SYS_getdents] = true;
-	syscall_needs_fd_wlock[SYS_getdents64] = true;
-	syscall_needs_fd_wlock[SYS_getxattr] = true;
-	syscall_needs_fd_wlock[SYS_setxattr] = true;
-	syscall_needs_fd_wlock[SYS_fgetxattr] = true;
-	syscall_needs_fd_wlock[SYS_fsetxattr] = true;
-	syscall_needs_fd_wlock[SYS_mkdirat] = true;
-	syscall_needs_fd_wlock[SYS_access] = true;
-	syscall_needs_fd_wlock[SYS_faccessat] = true;
 
 	syscall_needs_pmem_cwd_rlock[SYS_open] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_openat] = true;
@@ -242,6 +240,7 @@ init_hooking(void)
 	syscall_needs_pmem_cwd_rlock[SYS_unlinkat] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_stat] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_lstat] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_newfstatat] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_access] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_faccessat] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_getxattr] = true;
