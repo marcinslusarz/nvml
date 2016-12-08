@@ -57,7 +57,12 @@ export PMEMFILE_PRELOAD_LOG=pmemfile_preload.log
 export INTERCEPT_LOG=intercept.log
 export INTERCEPT_LOG_NO_PID=1
 
-expect_normal_exit ./dummy_prog$EXESUFFIX $DIR/some_dir/some_link/a $DIR dummy_mount_point/b dummy_mount_point > root_dir.log
+expect_normal_exit ./dummy_prog$EXESUFFIX \
+	$DIR/some_dir/some_link/a \
+	$DIR \
+	dummy_mount_point/b \
+	dummy_mount_point \
+	b > root_dir.log
 
 LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /a > a.dump
 LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /b > b.dump
