@@ -60,7 +60,12 @@
 #include "libpmemfile-core.h"
 #include "util.h"
 
-#define FATAL(str) syscall_no_intercept(SYS_write, 2, str, strlen(str))
+static inline void
+FATAL(const char *str)
+{
+	syscall_no_intercept(SYS_write, 2, str, strlen(str));
+	syscall_no_intercept(SYS_exit_group, 128 + 7);
+}
 
 #include "sys_util.h"
 
