@@ -60,9 +60,7 @@ FILE_TESTS = \
 	file_core_rw\
 	file_core_stat
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
-
-ifeq ($(CAPSTONE_AVAILABLE),y)
+ifeq ($(HAS_CAPSTONE),y)
 FILE_TESTS += libsyscall_intercept file_preload
 else
 $(info NOTE: Skipping pmemfile interposing library tests because \

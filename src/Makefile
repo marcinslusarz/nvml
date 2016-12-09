@@ -46,9 +46,7 @@ DEBUG_RELEASE_TARGETS = common libpmem libvmem libpmemblk libpmemlog libpmemobj\
 	libpmempool libvmmalloc librpmem libpmemfile-core
 RELEASE_TARGETS = tools examples benchmarks
 
-CAPSTONE_AVAILABLE := $(call check_package, capstone)
-
-ifeq ($(CAPSTONE_AVAILABLE),y)
+ifeq ($(HAS_CAPSTONE),y)
 ALL_TARGETS += libsyscall_intercept libpmemfile
 DEBUG_RELEASE_TARGETS += libsyscall_intercept libpmemfile
 else
