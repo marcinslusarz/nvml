@@ -184,6 +184,7 @@ check_ibv_fork_init = $(shell echo "\#include <infiniband/verbs.h> int main(void
 	$(CC) -c $(CFLAGS) -x c -o /dev/null -libverbs - 2>/dev/null && echo y || echo n)
 
 export HAS_LIBFABRIC := $(call check_package, libfabric)
+export HAS_CAPSTONE := $(call check_package, capstone)
 
 ifeq ($(HAS_LIBFABRIC),y)
 ifeq ($(RPMEM_DISABLE_LIBIBVERBS),y)
