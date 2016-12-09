@@ -39,10 +39,6 @@ export UNITTEST_NUM=2
 
 require_test_type medium
 
-# XXX libpmemobj has races that are there by design and are considered safe.
-# remove the below line when they are removed or properly annotated
-exit 0
-
 require_fs_type pmem
 configure_valgrind helgrind force-enable
 
