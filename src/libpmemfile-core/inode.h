@@ -104,10 +104,6 @@ struct pmemfile_inode_map *inode_map_alloc(void);
 
 void inode_map_free(struct pmemfile_inode_map *c);
 
-struct pmemfile_vinode *inode_get_vinode(PMEMfilepool *pfp,
-		TOID(struct pmemfile_inode) inode,
-		bool ref);
-
 struct pmemfile_vinode *inode_ref(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		struct pmemfile_vinode *parent,
