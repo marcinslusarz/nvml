@@ -127,11 +127,10 @@ vinode_destroy_data_state(struct pmemfile_vinode *vinode)
 }
 
 /*
- * file_reset_cache -- resets position pointer to the beginning of the file
+ * pos_reset -- resets position pointer to the beginning of the file
  */
 static void
-file_reset_cache(PMEMfile *file, struct pmemfile_inode *inode,
-		struct pmemfile_pos *pos)
+pos_reset(struct pmemfile_pos *pos, struct pmemfile_inode *inode)
 {
 	pos->block_array = &inode->file_data.blocks;
 	pos->block_id = 0;
@@ -409,7 +408,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	struct pmemfile_pos *pos = &file->pos;
 
 	if (pos->block_array == NULL)
-		file_reset_cache(file, inode, pos);
+		pos_reset(pos, inode);
 
 	if (file->offset != pos->global_offset) {
 		size_t block_start = pos->global_offset - pos->block_offset;
@@ -436,7 +435,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->global_offset -= pos->block_offset;
 			pos->block_offset = 0;
 		} else {
-			file_reset_cache(file, inode, pos);
+			pos_reset(pos, inode);
 		}
 	}
 
@@ -597,7 +596,7 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 			pos->global_offset -= pos->block_offset;
 			pos->block_offset = 0;
 		} else {
-			file_reset_cache(file, inode, pos);
+			pos_reset(pos, inode);
 
 			if (pos->block_array == NULL)
 				return false;
@@ -617,7 +616,7 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	struct pmemfile_pos *pos = &file->pos;
 
 	if (unlikely(pos->block_array == NULL)) {
-		file_reset_cache(file, inode, pos);
+		pos_reset(pos, inode);
 
 		if (pos->block_array == NULL)
 			return 0;
