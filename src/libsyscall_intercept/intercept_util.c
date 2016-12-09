@@ -794,13 +794,15 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_hex, arg1,
 				f_hex, arg2,
 				result);
+#ifdef SYS_execveat
 	} else if (nr == SYS_execveat) {
-		buf = print_syscall(buf, "execve", 4,
+		buf = print_syscall(buf, "execveat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_hex, arg2,
 				f_hex, arg3,
 				result);
+#endif
 	} else if (nr == SYS_exit_group) {
 		buf += sprintf(buf, "exit_group(%d)", (int)arg0);
 	} else if (nr == SYS_exit) {
