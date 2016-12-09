@@ -56,10 +56,10 @@ struct file_block_info {
 };
 
 /*
- * insert_block_to_cache -- inserts block into the tree
+ * block_cache_insert_block -- inserts block into the tree
  */
 static void
-insert_block_to_cache(struct ctree *c,
+block_cache_insert_block(struct ctree *c,
 		struct pmemfile_block_array *block_array,
 		unsigned block_id,
 		size_t off)
@@ -90,7 +90,7 @@ vinode_rebuild_block_tree(struct pmemfile_vinode *vinode)
 
 			if (block->size == 0)
 				break;
-			insert_block_to_cache(c, block_array, i, off);
+			block_cache_insert_block(c, block_array, i, off);
 
 			off += block->size;
 		}
@@ -183,7 +183,7 @@ file_allocate_block(PMEMfilepool *pfp,
 	TX_ADD_DIRECT(&inode->last_block_fill);
 	inode->last_block_fill = 0;
 
-	insert_block_to_cache(file->vinode->blocks, block_array,
+	block_cache_insert_block(file->vinode->blocks, block_array,
 			(unsigned)(block - &block_array->blocks[0]),
 			pos->global_offset);
 }
