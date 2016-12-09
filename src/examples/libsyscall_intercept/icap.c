@@ -6,10 +6,10 @@
 #include "libsyscall_intercept_hook_point.h"
 
 static int hook(long syscall_number,
-                        long arg0, long arg1,
-                        long arg2, long arg3,
-                        long arg4, long arg5,
-                        long *result)
+		long arg0, long arg1,
+		long arg2, long arg3,
+		long arg4, long arg5,
+		long *result)
 {
 	if (syscall_number == SYS_write) {
 		char buf_copy[0x1000];
@@ -29,7 +29,6 @@ static int hook(long syscall_number,
 		return 0;
 	}
 	return 1;
-	
 }
 
 static __attribute__((constructor)) void
