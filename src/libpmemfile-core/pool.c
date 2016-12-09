@@ -47,10 +47,10 @@
 #include "util.h"
 
 /*
- * file_initialize_super -- (internal) initializes super block
+ * initialize_super_block -- (internal) initializes super block
  */
 static int
-file_initialize_super(PMEMfilepool *pfp)
+initialize_super_block(PMEMfilepool *pfp)
 {
 	LOG(LDBG, "pfp %p", pfp);
 
@@ -97,10 +97,10 @@ file_initialize_super(PMEMfilepool *pfp)
 }
 
 /*
- * file_cleanup_inode_array_single -- (internal) cleans up one batch of inodes
+ * cleanup_orphanded_inodes_single -- (internal) cleans up one batch of inodes
  */
 static void
-file_cleanup_inode_array_single(PMEMfilepool *pfp,
+cleanup_orphanded_inodes_single(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode_array) single)
 {
 	LOG(LDBG, "pfp %p arr 0x%lx", pfp, single.oid.off);
@@ -124,11 +124,11 @@ file_cleanup_inode_array_single(PMEMfilepool *pfp,
 }
 
 /*
- * file_cleanup_inode_array -- (internal) removes inodes (and frees if there are
+ * cleanup_orphanded_inodes -- (internal) removes inodes (and frees if there are
  * no dirents referencing it) from specified list
  */
 static void
-file_cleanup_inode_array(PMEMfilepool *pfp,
+cleanup_orphanded_inodes(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode_array) single)
 {
 	LOG(LDBG, "pfp %p", pfp);
@@ -146,7 +146,7 @@ file_cleanup_inode_array(PMEMfilepool *pfp,
 			TX_ADD(single);
 
 			if (D_RO(single)->used > 0)
-				file_cleanup_inode_array_single(pfp, single);
+				cleanup_orphanded_inodes_single(pfp, single);
 		}
 
 		if (!TOID_IS_NULL(last)) {
@@ -201,7 +201,7 @@ pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode)
 		goto inode_map_fail;
 	}
 
-	if (file_initialize_super(pfp)) {
+	if (initialize_super_block(pfp)) {
 		oerrno = errno;
 		goto init_failed;
 	}
@@ -259,12 +259,12 @@ pmemfile_pool_open(const char *pathname)
 		goto inode_map_fail;
 	}
 
-	if (file_initialize_super(pfp)) {
+	if (initialize_super_block(pfp)) {
 		oerrno = errno;
 		goto init_failed;
 	}
 
-	file_cleanup_inode_array(pfp, D_RO(pfp->super)->orphaned_inodes);
+	cleanup_orphanded_inodes(pfp, D_RO(pfp->super)->orphaned_inodes);
 
 	return pfp;
 
