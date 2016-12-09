@@ -37,14 +37,16 @@
 
 include ../../common.inc
 
-all: icap.so
+ifeq ($(HAS_CAPSTONE),y)
+LIBRARIES = icap
+endif
 
-icap.so: icap.c
-	$(CC) $(CFLAGS) -g -I../../include -L../../debug -lsyscall_intercept \
-	-shared -fpic  icap.c -o icap.so
+LIBS = -lsyscall_intercept -lcapstone
+
+include ../../Makefile.inc
 
 fun:
 	LD_LIBRARY_PATH=../../debug LD_PRELOAD=./icap.so cat icap.c
 
-debug:
+debug_fun:
 	LD_LIBRARY_PATH=../../debug LD_PRELOAD=./icap.so LIBC_HOOK_CMDLINE_FILTER=cat gdb --args cat icap.c
