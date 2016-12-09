@@ -838,6 +838,7 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 	struct pmemfile_vinode *vinode = file->vinode;
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	off64_t ret;
+	int new_errno = EINVAL;
 
 	util_mutex_lock(&file->mutex);
 
@@ -853,6 +854,28 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 			ret = (off64_t)inode->size + offset;
 			util_rwlock_unlock(&vinode->rwlock);
 			break;
+		case SEEK_DATA:
+			util_rwlock_rdlock(&vinode->rwlock);
+			if (offset < 0) {
+				ret = 0;
+			} else if ((uint64_t)offset > inode->size) {
+				ret = -1;
+				new_errno = ENXIO;
+			} else {
+				ret = offset;
+			}
+			util_rwlock_unlock(&vinode->rwlock);
+			break;
+		case SEEK_HOLE:
+			util_rwlock_rdlock(&vinode->rwlock);
+			if ((uint64_t)offset > inode->size) {
+				ret = -1;
+				new_errno = ENXIO;
+			} else {
+				ret = (off64_t)inode->size;
+			}
+			util_rwlock_unlock(&vinode->rwlock);
+			break;
 		default:
 			ret = -1;
 			break;
@@ -860,7 +883,7 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 
 	if (ret < 0) {
 		ret = -1;
-		errno = EINVAL;
+		errno = new_errno;
 	} else {
 		if (file->offset != (size_t)ret)
 			LOG(LDBG, "off diff: old %lu != new %lu", file->offset,
