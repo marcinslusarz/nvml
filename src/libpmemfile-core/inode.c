@@ -242,7 +242,7 @@ vinode_unregister_locked(PMEMfilepool *pfp,
  * _inode_get -- (internal) deals with vinode life time related to inode
  */
 static struct pmemfile_vinode *
-_inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode, bool ref,
+_inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode,
 		bool is_new, struct pmemfile_vinode *parent,
 		volatile bool *parent_refed,
 		const char *name)
@@ -345,8 +345,7 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode, bool ref,
 			vinode);
 
 end:
-	if (ref)
-		__sync_fetch_and_add(&vinode->ref, 1);
+	__sync_fetch_and_add(&vinode->ref, 1);
 	if (is_new && tx)
 		rwlock_tx_unlock_on_commit(&c->rwlock);
 	else
@@ -368,7 +367,7 @@ inode_ref_new(PMEMfilepool *pfp,
 		volatile bool *parent_refed,
 		const char *name)
 {
-	return _inode_get(pfp, inode, true, true, parent, parent_refed, name);
+	return _inode_get(pfp, inode, true, parent, parent_refed, name);
 }
 
 /*
@@ -384,7 +383,7 @@ inode_ref(PMEMfilepool *pfp,
 		volatile bool *parent_refed,
 		const char *name)
 {
-	return _inode_get(pfp, inode, true, false, parent, parent_refed, name);
+	return _inode_get(pfp, inode, false, parent, parent_refed, name);
 }
 
 /*
