@@ -352,18 +352,6 @@ end:
 }
 
 /*
- * inode_get_vinode -- returns volatile inode
- *
- * May be called outside of transaction.
- */
-struct pmemfile_vinode *
-inode_get_vinode(PMEMfilepool *pfp,
-		TOID(struct pmemfile_inode) inode, bool ref)
-{
-	return _inode_get(pfp, inode, ref, false, NULL, NULL);
-}
-
-/*
  * inode_ref_new -- increases inode reference counter
  *
  * Assumes inode was allocated in the same transaction.
