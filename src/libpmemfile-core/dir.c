@@ -57,7 +57,7 @@
  * Works only in DEBUG mode.
  * Assumes child inode is already locked.
  */
-static void
+void
 vinode_set_debug_path_locked(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		struct pmemfile_vinode *child_vinode,
@@ -99,6 +99,20 @@ vinode_set_debug_path(PMEMfilepool *pfp,
 	vinode_set_debug_path_locked(pfp, parent_vinode, child_vinode, name);
 
 	util_rwlock_unlock(&child_vinode->rwlock);
+}
+
+/*
+ * vinode_clear_debug_path -- clears full path in runtime structures
+ */
+void
+vinode_clear_debug_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
+{
+	util_rwlock_wrlock(&vinode->rwlock);
+#ifdef DEBUG
+	Free(vinode->path);
+	vinode->path = NULL;
+#endif
+	util_rwlock_unlock(&vinode->rwlock);
 }
 
 /*
@@ -211,9 +225,8 @@ vinode_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	}
 
 	struct pmemfile_time t;
-	struct pmemfile_vinode *child =
-		inode_alloc(pfp, S_IFDIR | mode, &t, parent, parent_refed);
-	vinode_set_debug_path_locked(pfp, parent, child, name);
+	struct pmemfile_vinode *child = inode_alloc(pfp, S_IFDIR | mode, &t,
+			parent, parent_refed, name);
 
 	/* add . and .. to new directory */
 	vinode_add_dirent(pfp, child, ".", child, &t);
@@ -332,15 +345,11 @@ vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		vinode_lookup_dirent_by_name_locked(pfp, parent, name);
 	if (dirent) {
 		bool parent_refed = false;
-		vinode = inode_ref(pfp, dirent->inode, parent, &parent_refed);
-		if (vinode) {
-			if (vinode != parent)
-				vinode_set_debug_path(pfp, parent, vinode,
-						name);
-		} else {
-			if (parent_refed)
-				vinode_unref_tx(pfp, parent);
-		}
+		vinode = inode_ref(pfp, dirent->inode, parent, &parent_refed,
+				name);
+
+		if (!vinode && parent_refed)
+			vinode_unref_tx(pfp, parent);
 	}
 
 end:
@@ -375,7 +384,7 @@ vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	if (inode_is_dir(inode))
 		pmemobj_tx_abort(EISDIR);
 
-	*vinode = inode_ref(pfp, tinode, parent, parent_refed);
+	*vinode = inode_ref(pfp, tinode, parent, parent_refed, NULL);
 	rwlock_tx_wlock(&(*vinode)->rwlock);
 
 	ASSERT(inode->nlink > 0);

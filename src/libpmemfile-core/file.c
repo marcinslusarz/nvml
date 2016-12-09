@@ -177,8 +177,8 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 
 	rwlock_tx_wlock(&parent_vinode->rwlock);
 
-	struct pmemfile_vinode *vinode =
-			inode_alloc(pfp, S_IFREG | mode, &t, NULL, NULL);
+	struct pmemfile_vinode *vinode = inode_alloc(pfp, S_IFREG | mode, &t,
+			parent_vinode, NULL, filename);
 
 	if ((flags & O_TMPFILE) == O_TMPFILE)
 		vinode_orphan(pfp, vinode);
@@ -318,9 +318,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		error = 1;
 		txerrno = errno;
 	} TX_END
-
-	if (!error)
-		vinode_set_debug_path(pfp, vparent, vinode, pathname);
 
 	if (vparent)
 		vinode_unref_tx(pfp, vparent);
@@ -501,8 +498,10 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		oerrno = errno;
 	} TX_END
 
-	if (oerrno == 0)
+	if (oerrno == 0) {
+		vinode_clear_debug_path(pfp, src.vinode);
 		vinode_set_debug_path(pfp, dst.vinode, src.vinode, newpath);
+	}
 
 end:
 	vinode_unref_tx(pfp, dst.vinode);

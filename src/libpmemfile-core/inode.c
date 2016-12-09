@@ -244,7 +244,8 @@ vinode_unregister_locked(PMEMfilepool *pfp,
 static struct pmemfile_vinode *
 _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode, bool ref,
 		bool is_new, struct pmemfile_vinode *parent,
-		volatile bool *parent_refed)
+		volatile bool *parent_refed,
+		const char *name)
 {
 	struct pmemfile_inode_map *c = pfp->inode_map;
 	int tx = 0;
@@ -331,6 +332,9 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode, bool ref,
 			*parent_refed = true;
 	}
 
+	if (parent && name)
+		vinode_set_debug_path_locked(pfp, parent, vinode, name);
+
 	b->arr[empty_slot].pinode = inode;
 	b->arr[empty_slot].vinode = vinode;
 	c->inodes++;
@@ -361,9 +365,10 @@ struct pmemfile_vinode *
 inode_ref_new(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		struct pmemfile_vinode *parent,
-		volatile bool *parent_refed)
+		volatile bool *parent_refed,
+		const char *name)
 {
-	return _inode_get(pfp, inode, true, true, parent, parent_refed);
+	return _inode_get(pfp, inode, true, true, parent, parent_refed, name);
 }
 
 /*
@@ -376,9 +381,10 @@ struct pmemfile_vinode *
 inode_ref(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		struct pmemfile_vinode *parent,
-		volatile bool *parent_refed)
+		volatile bool *parent_refed,
+		const char *name)
 {
-	return _inode_get(pfp, inode, true, false, parent, parent_refed);
+	return _inode_get(pfp, inode, true, false, parent, parent_refed, name);
 }
 
 /*
@@ -455,7 +461,8 @@ file_get_time(struct pmemfile_time *t)
  */
 struct pmemfile_vinode *
 inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t,
-		struct pmemfile_vinode *parent, volatile bool *parent_refed)
+		struct pmemfile_vinode *parent, volatile bool *parent_refed,
+		const char *name)
 {
 	LOG(LDBG, "flags 0x%lx", flags);
 
@@ -488,7 +495,7 @@ inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t,
 		inode->size = sizeof(inode->file_data);
 	}
 
-	return inode_ref_new(pfp, tinode, parent, parent_refed);
+	return inode_ref_new(pfp, tinode, parent, parent_refed, name);
 }
 
 /*
