@@ -615,7 +615,39 @@ vinode_stat(struct pmemfile_vinode *vinode, struct stat *buf)
 		errno = EOVERFLOW;
 		return -1;
 	}
-	buf->st_blocks = (blkcnt_t)inode->size;
+
+	blkcnt_t blks = 0;
+	if (inode_is_regular_file(inode)) {
+		const struct pmemfile_block_array *arr =
+				&inode->file_data.blocks;
+		size_t sz = 0;
+		while (arr) {
+			for (uint32_t i = 0; i < arr->length; ++i)
+				sz += arr->blocks[i].size;
+			arr = D_RO(arr->next);
+		}
+
+		/*
+		 * XXX This doesn't match reality. It will match once we start
+		 * getting 4k-aligned blocks from pmemobj allocator.
+		 */
+		blks = (blkcnt_t)((sz + 511) / 512);
+	} else if (inode_is_dir(inode)) {
+		const struct pmemfile_dir *arr = &inode->file_data.dir;
+		size_t sz = 0;
+		while (arr) {
+			sz += pmemobj_alloc_usable_size(arr->next.oid);
+			arr = D_RO(arr->next);
+		}
+
+		/*
+		 * XXX This doesn't match reality. It will match once we start
+		 * getting 4k-aligned blocks from pmemobj allocator.
+		 */
+		blks = (blkcnt_t)((sz + 511) / 512);
+	} else
+		ASSERT(0);
+	buf->st_blocks = blks;
 	buf->st_atim = pmemfile_time_to_timespec(&inode->atime);
 	buf->st_ctim = pmemfile_time_to_timespec(&inode->ctime);
 	buf->st_mtim = pmemfile_time_to_timespec(&inode->mtime);
