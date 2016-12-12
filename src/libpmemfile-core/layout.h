@@ -44,6 +44,7 @@ POBJ_LAYOUT_ROOT(pmemfile, struct pmemfile_super);
 POBJ_LAYOUT_TOID(pmemfile, struct pmemfile_inode);
 POBJ_LAYOUT_TOID(pmemfile, struct pmemfile_dir);
 POBJ_LAYOUT_TOID(pmemfile, struct pmemfile_block_array);
+POBJ_LAYOUT_TOID(pmemfile, struct pmemfile_block);
 POBJ_LAYOUT_TOID(pmemfile, struct pmemfile_inode_array);
 POBJ_LAYOUT_TOID(pmemfile, char);
 POBJ_LAYOUT_END(pmemfile);
@@ -51,6 +52,9 @@ POBJ_LAYOUT_END(pmemfile);
 struct pmemfile_block {
 	TOID(char) data;
 	uint32_t size;
+	uint32_t flags;
+	uint64_t offset;
+	TOID(struct pmemfile_block) next;
 };
 
 /* File */

@@ -67,16 +67,13 @@ struct pmemfile_file {
 
 	/* Current position cache. */
 	struct pmemfile_pos {
-		/* Current block array. */
-		struct pmemfile_block_array *block_array;
-
-		/* Block number in current block array. */
-		unsigned block_id;
+		/* Current block. */
+		struct pmemfile_block *block;
 
 		/* Offset from the beginning of current block. */
 		uint32_t block_offset;
 
-		/* Above maps to below. */
+		/* Above fields are mapped to field below. */
 
 		/* Offset from the beginning of file. */
 		size_t global_offset;

@@ -50,25 +50,13 @@
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
-struct file_block_info {
-	struct pmemfile_block_array *arr;
-	unsigned block_id;
-};
-
 /*
  * block_cache_insert_block -- inserts block into the tree
  */
 static void
-block_cache_insert_block(struct ctree *c,
-		struct pmemfile_block_array *block_array,
-		unsigned block_id,
-		size_t off)
+block_cache_insert_block(struct ctree *c, struct pmemfile_block *block)
 {
-	struct file_block_info *info = Malloc(sizeof(*info));
-	info->arr = block_array;
-	info->block_id = block_id;
-
-	ctree_insert_unlocked(c, off, (uintptr_t)info);
+	ctree_insert_unlocked(c, block->offset, (uintptr_t)block);
 }
 
 /*
@@ -82,7 +70,6 @@ vinode_rebuild_block_tree(struct pmemfile_vinode *vinode)
 		return;
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	struct pmemfile_block_array *block_array = &inode->file_data.blocks;
-	size_t off = 0;
 
 	while (block_array != NULL) {
 		for (unsigned i = 0; i < block_array->length; ++i) {
@@ -90,15 +77,19 @@ vinode_rebuild_block_tree(struct pmemfile_vinode *vinode)
 
 			if (block->size == 0)
 				break;
-			block_cache_insert_block(c, block_array, i, off);
-
-			off += block->size;
+			block_cache_insert_block(c, block);
 		}
 
 		block_array = D_RW(block_array->next);
 	}
 
 	vinode->blocks = c;
+}
+
+static struct pmemfile_block *
+find_block(struct pmemfile_vinode *vinode, uint64_t *off)
+{
+	return (void *)(uintptr_t)ctree_find_le_unlocked(vinode->blocks, off);
 }
 
 /*
@@ -112,10 +103,8 @@ vinode_destroy_data_state(struct pmemfile_vinode *vinode)
 		return;
 
 	uint64_t key = UINT64_MAX;
-	struct file_block_info *info;
-	while ((info = (void *)(uintptr_t)ctree_find_le_unlocked(blocks,
-			&key))) {
-		Free(info);
+	struct pmemfile_block *block;
+	while ((block = find_block(vinode, &key))) {
 		uint64_t k = ctree_remove_unlocked(blocks, key, 1);
 		ASSERTeq(k, key);
 
@@ -124,19 +113,8 @@ vinode_destroy_data_state(struct pmemfile_vinode *vinode)
 
 	ctree_delete(blocks);
 	vinode->blocks = NULL;
-}
 
-/*
- * pos_reset -- resets position pointer to the beginning of the file
- */
-static void
-pos_reset(struct pmemfile_pos *pos, struct pmemfile_inode *inode)
-{
-	pos->block_array = &inode->file_data.blocks;
-	pos->block_id = 0;
-	pos->block_offset = 0;
-
-	pos->global_offset = 0;
+	memset(&vinode->first_free_block, 0, sizeof(vinode->first_free_block));
 }
 
 /*
@@ -147,11 +125,10 @@ file_allocate_block(PMEMfilepool *pfp,
 		PMEMfile *file,
 		struct pmemfile_inode *inode,
 		struct pmemfile_pos *pos,
+		struct pmemfile_block *prev,
 		struct pmemfile_block *block,
 		size_t count)
 {
-	struct pmemfile_block_array *block_array = pos->block_array;
-
 	size_t sz = min(pmemfile_core_block_size, 1U << 31);
 	if (sz == 0) {
 		if (count < 4096)
@@ -180,22 +157,26 @@ file_allocate_block(PMEMfilepool *pfp,
 	ASSERT(sz <= UINT32_MAX);
 	block->size = (uint32_t)sz;
 
+	block->flags = 0;
+	block->offset = pos->global_offset;
+	block->next = TOID_NULL(struct pmemfile_block);
+
+	if (prev) {
+		TX_ADD_DIRECT(&prev->next);
+		prev->next = (TOID(struct pmemfile_block))pmemobj_oid(block);
+	}
+
 	TX_ADD_DIRECT(&inode->last_block_fill);
 	inode->last_block_fill = 0;
 
-	block_cache_insert_block(file->vinode->blocks, block_array,
-			(unsigned)(block - &block_array->blocks[0]),
-			pos->global_offset);
+	block_cache_insert_block(file->vinode->blocks, block);
 }
 
 /*
  * inode_extend_block_meta_data -- updates metadata of the current block
  */
 static void
-inode_extend_block_meta_data(struct pmemfile_inode *inode,
-		struct pmemfile_block_array *block_array,
-		struct pmemfile_block *block,
-		uint32_t len)
+inode_extend_block_meta_data(struct pmemfile_inode *inode, uint32_t len)
 {
 	TX_ADD_FIELD_DIRECT(inode, last_block_fill);
 	inode->last_block_fill += len;
@@ -210,7 +191,6 @@ inode_extend_block_meta_data(struct pmemfile_inode *inode,
 static void
 inode_zero_extend_block(PMEMfilepool *pfp,
 		struct pmemfile_inode *inode,
-		struct pmemfile_block_array *block_array,
 		struct pmemfile_block *block,
 		uint32_t len)
 {
@@ -224,37 +204,72 @@ inode_zero_extend_block(PMEMfilepool *pfp,
 	pmemobj_memset_persist(pfp->pop, addr, 0, len);
 	VALGRIND_REMOVE_FROM_TX(addr, len);
 
-	inode_extend_block_meta_data(inode, block_array, block, len);
+	inode_extend_block_meta_data(inode, len);
+}
+
+static struct pmemfile_block *
+get_free_block(struct pmemfile_vinode *vinode, bool extend)
+{
+	struct pmemfile_inode *inode = D_RW(vinode->inode);
+	struct block_info *binfo = &vinode->first_free_block;
+	struct pmemfile_block_array *prev = NULL;
+
+	if (!binfo->arr) {
+		binfo->arr = &inode->file_data.blocks;
+		binfo->idx = 0;
+	}
+
+	while (binfo->arr) {
+		while (binfo->idx < binfo->arr->length) {
+			if (binfo->arr->blocks[binfo->idx].size == 0)
+				return &binfo->arr->blocks[binfo->idx++];
+			binfo->idx++;
+		}
+
+		if (!extend && TOID_IS_NULL(binfo->arr->next))
+			return NULL;
+
+		prev = binfo->arr;
+		binfo->arr = D_RW(binfo->arr->next);
+		binfo->idx = 0;
+	}
+
+	TOID(struct pmemfile_block_array) next =
+			TX_ZALLOC(struct pmemfile_block_array, 4096);
+	D_RW(next)->length = (uint32_t)
+			((pmemobj_alloc_usable_size(next.oid) -
+			sizeof(struct pmemfile_block_array)) /
+			sizeof(struct pmemfile_block));
+	TX_SET_DIRECT(prev, next, next);
+
+	binfo->arr = D_RW(next);
+	binfo->idx = 0;
+
+	return &binfo->arr->blocks[binfo->idx];
 }
 
 /*
- * pos_next_block_array -- changes current block array to the next one
+ * is_last_block -- returns true when specified block is the last one in a file
  */
 static bool
-pos_next_block_array(struct pmemfile_pos *pos, bool extend)
+is_last_block(struct pmemfile_block *block)
 {
-	/* Transition to the next block array in block array list. */
-	TOID(struct pmemfile_block_array) next = pos->block_array->next;
+	return TOID_IS_NULL(block->next);
+}
 
-	if (TOID_IS_NULL(next)) {
-		if (!extend)
-			return false;
-
-		next = TX_ZALLOC(struct pmemfile_block_array, 4096);
-		D_RW(next)->length = (uint32_t)
-				((pmemobj_alloc_usable_size(next.oid) -
-				sizeof(struct pmemfile_block_array)) /
-				sizeof(struct pmemfile_block));
-		TX_SET_DIRECT(pos->block_array, next, next);
-	}
-
-	pos->block_array = D_RW(next);
-
-	/* We changed the block array, so we have to reset block position. */
-	pos->block_id = 0;
+/*
+ * pos_reset -- resets position pointer to the beginning of the file
+ */
+static void
+pos_reset(struct pmemfile_pos *pos, struct pmemfile_vinode *vinode)
+{
+	uint64_t off = 0;
+	pos->block = find_block(vinode, &off);
+	if (!pos->block)
+		pos->block = get_free_block(vinode, false);
 	pos->block_offset = 0;
 
-	return true;
+	pos->global_offset = 0;
 }
 
 /*
@@ -267,20 +282,21 @@ file_seek_within_block(PMEMfilepool *pfp,
 		PMEMfile *file,
 		struct pmemfile_inode *inode,
 		struct pmemfile_pos *pos,
+		struct pmemfile_block *prev,
 		struct pmemfile_block *block,
 		size_t offset_left,
-		bool extend,
-		bool is_last)
+		bool extend)
 {
 	if (block->size == 0) {
 		if (extend)
-			file_allocate_block(pfp, file, inode, pos, block,
+			file_allocate_block(pfp, file, inode, pos, prev, block,
 					offset_left);
 		else
 			return 0;
 	}
 
 	uint32_t max_off;
+	bool is_last = is_last_block(block);
 	if (is_last) {
 		ASSERT(inode->last_block_fill >= pos->block_offset);
 		max_off = inode->last_block_fill - pos->block_offset;
@@ -301,7 +317,7 @@ file_seek_within_block(PMEMfilepool *pfp,
 
 	uint32_t extended = (uint32_t)min(offset_left,
 			(size_t)(block->size - inode->last_block_fill));
-	inode_zero_extend_block(pfp, inode, pos->block_array, block, extended);
+	inode_zero_extend_block(pfp, inode, block, extended);
 
 	pos->block_offset += extended;
 	pos->global_offset += extended;
@@ -317,13 +333,14 @@ file_write_within_block(PMEMfilepool *pfp,
 		PMEMfile *file,
 		struct pmemfile_inode *inode,
 		struct pmemfile_pos *pos,
+		struct pmemfile_block *prev,
 		struct pmemfile_block *block,
 		const void *buf,
-		size_t count_left,
-		bool is_last)
+		size_t count_left)
 {
 	if (block->size == 0)
-		file_allocate_block(pfp, file, inode, pos, block, count_left);
+		file_allocate_block(pfp, file, inode, pos, prev, block,
+				count_left);
 
 	/* How much data should we write to this block? */
 	uint32_t len = (uint32_t)min((size_t)block->size - pos->block_offset,
@@ -334,6 +351,7 @@ file_write_within_block(PMEMfilepool *pfp,
 	pmemobj_memcpy_persist(pfp->pop, dest, buf, len);
 	VALGRIND_REMOVE_FROM_TX(dest, len);
 
+	bool is_last = is_last_block(block);
 	if (is_last) {
 		/*
 		 * If new size is beyond the block used size, then we
@@ -343,8 +361,7 @@ file_write_within_block(PMEMfilepool *pfp,
 			uint32_t new_used = pos->block_offset + len
 					- inode->last_block_fill;
 
-			inode_extend_block_meta_data(inode, pos->block_array,
-					block, new_used);
+			inode_extend_block_meta_data(inode, new_used);
 		}
 
 		ASSERT(inode->last_block_fill <= block->size);
@@ -386,18 +403,6 @@ inode_read_from_block(struct pmemfile_inode *inode,
 }
 
 /*
- * is_last_block -- returns true when specified block is the last one in a file
- */
-static bool
-is_last_block(unsigned block_id, struct pmemfile_block_array *block_array)
-{
-	if (block_id == block_array->length - 1)
-		return TOID_IS_NULL(block_array->next);
-	else
-		return block_array->blocks[block_id + 1].size == 0;
-}
-
-/*
  * file_write -- writes to file
  */
 static void
@@ -406,24 +411,20 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 {
 	/* Position cache. */
 	struct pmemfile_pos *pos = &file->pos;
+	struct pmemfile_vinode *vinode = file->vinode;
 
-	if (pos->block_array == NULL)
-		pos_reset(pos, inode);
+	if (pos->block == NULL)
+		pos_reset(pos, vinode);
 
 	if (file->offset != pos->global_offset) {
 		size_t block_start = pos->global_offset - pos->block_offset;
 		size_t off = file->offset;
 
 		if (off < block_start ||
-				off >= block_start +
-			pos->block_array->blocks[pos->block_id].size) {
-
-			struct file_block_info *info = (void *)(uintptr_t)
-				ctree_find_le_unlocked(file->vinode->blocks,
-						&off);
-			if (info) {
-				pos->block_array = info->arr;
-				pos->block_id = info->block_id;
+				off >= block_start + pos->block->size) {
+			struct pmemfile_block *block = find_block(vinode, &off);
+			if (block) {
+				pos->block = block;
 				pos->block_offset = 0;
 				pos->global_offset = off;
 			}
@@ -435,7 +436,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			pos->global_offset -= pos->block_offset;
 			pos->block_offset = 0;
 		} else {
-			pos_reset(pos, inode);
+			pos_reset(pos, vinode);
 		}
 	}
 
@@ -445,26 +446,26 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	 * Find the position, possibly extending and/or zeroing unused space.
 	 */
 
+	struct pmemfile_block *prev = NULL;
 	while (offset_left > 0) {
-		struct pmemfile_block_array *block_array = pos->block_array;
-		struct pmemfile_block *block =
-				&block_array->blocks[pos->block_id];
-		bool is_last = is_last_block(pos->block_id, block_array);
+		struct pmemfile_block *block = pos->block;
 
 		size_t seeked = file_seek_within_block(pfp, file, inode, pos,
-				block, offset_left, true, is_last);
+				prev, block, offset_left, true);
 
 		ASSERT(seeked <= offset_left);
 
 		offset_left -= seeked;
 
 		if (offset_left > 0) {
-			pos->block_id++;
+			pos->block = D_RW(block->next);
 			pos->block_offset = 0;
 
-			if (pos->block_id == block_array->length)
-				pos_next_block_array(pos, true);
+			if (pos->block == NULL)
+				pos->block = get_free_block(vinode, false);
 		}
+
+		prev = block;
 	}
 
 	/*
@@ -475,13 +476,10 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 
 	size_t count_left = count;
 	while (count_left > 0) {
-		struct pmemfile_block_array *block_array = pos->block_array;
-		struct pmemfile_block *block =
-				&block_array->blocks[pos->block_id];
-		bool is_last = is_last_block(pos->block_id, block_array);
+		struct pmemfile_block *block = pos->block;
 
 		size_t written = file_write_within_block(pfp, file, inode, pos,
-				block, buf, count_left, is_last);
+				prev, block, buf, count_left);
 
 		ASSERT(written <= count_left);
 
@@ -489,12 +487,14 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		count_left -= written;
 
 		if (count_left > 0) {
-			pos->block_id++;
+			pos->block = D_RW(block->next);
 			pos->block_offset = 0;
 
-			if (pos->block_id == block_array->length)
-				pos_next_block_array(pos, true);
+			if (pos->block == NULL)
+				pos->block = get_free_block(vinode, true);
 		}
+
+		prev = block;
 	}
 }
 
@@ -577,16 +577,12 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 	size_t block_start = pos->global_offset - pos->block_offset;
 	size_t off = file->offset;
 
-	if (off < block_start || off >= block_start +
-		pos->block_array->blocks[pos->block_id].size) {
-
-		struct file_block_info *info = (void *)(uintptr_t)
-			ctree_find_le_unlocked(file->vinode->blocks, &off);
-		if (!info)
+	if (off < block_start || off >= block_start + pos->block->size) {
+		struct pmemfile_block *block = find_block(file->vinode, &off);
+		if (!block)
 			return false;
 
-		pos->block_array = info->arr;
-		pos->block_id = info->block_id;
+		pos->block = block;
 		pos->block_offset = 0;
 		pos->global_offset = off;
 	}
@@ -596,9 +592,9 @@ file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
 			pos->global_offset -= pos->block_offset;
 			pos->block_offset = 0;
 		} else {
-			pos_reset(pos, inode);
+			pos_reset(pos, file->vinode);
 
-			if (pos->block_array == NULL)
+			if (pos->block == NULL)
 				return false;
 		}
 	}
@@ -615,10 +611,10 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 {
 	struct pmemfile_pos *pos = &file->pos;
 
-	if (unlikely(pos->block_array == NULL)) {
-		pos_reset(pos, inode);
+	if (unlikely(pos->block == NULL)) {
+		pos_reset(pos, file->vinode);
 
-		if (pos->block_array == NULL)
+		if (pos->block == NULL)
 			return 0;
 	}
 
@@ -632,14 +628,13 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 
 	size_t offset_left = file->offset - pos->global_offset;
 
+	struct pmemfile_block *prev = NULL;
 	while (offset_left > 0) {
-		struct pmemfile_block_array *block_array = pos->block_array;
-		struct pmemfile_block *block =
-				&block_array->blocks[pos->block_id];
-		bool is_last = is_last_block(pos->block_id, block_array);
+		struct pmemfile_block *block = pos->block;
 
 		size_t seeked = file_seek_within_block(pfp, file, inode, pos,
-				block, offset_left, false, is_last);
+				prev, block, offset_left, false);
+		bool is_last = is_last_block(pos->block);
 
 		if (seeked == 0) {
 			uint32_t used = is_last ?
@@ -661,15 +656,16 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			if (is_last && inode->last_block_fill != block->size)
 				return 0;
 
-			pos->block_id++;
+			pos->block = D_RW(block->next);
 			pos->block_offset = 0;
 
-			if (pos->block_id == block_array->length) {
-				if (!pos_next_block_array(pos, false))
-					/* EOF */
-					return 0;
+			if (pos->block == NULL) {
+				/* EOF */
+				return 0;
 			}
 		}
+
+		prev = block;
 	}
 
 	/*
@@ -681,10 +677,8 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	size_t bytes_read = 0;
 	size_t count_left = count;
 	while (count_left > 0) {
-		struct pmemfile_block_array *block_array = pos->block_array;
-		struct pmemfile_block *block =
-				&block_array->blocks[pos->block_id];
-		bool is_last = is_last_block(pos->block_id, block_array);
+		struct pmemfile_block *block = pos->block;
+		bool is_last = is_last_block(pos->block);
 
 		size_t read1 = inode_read_from_block(inode, pos, block, buf,
 				count_left, is_last);
@@ -711,13 +705,12 @@ file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			if (is_last && inode->last_block_fill != block->size)
 				break;
 
-			pos->block_id++;
+			pos->block = D_RW(block->next);
 			pos->block_offset = 0;
 
-			if (pos->block_id == block_array->length) {
-				if (!pos_next_block_array(pos, false))
-					/* EOF */
-					return 0;
+			if (pos->block == NULL) {
+				/* EOF */
+				return 0;
 			}
 		}
 	}

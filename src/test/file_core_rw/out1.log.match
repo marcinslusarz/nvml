@@ -43,7 +43,7 @@ drwxrwxrwx 2 0 0   4008  .
 drwxrwxrwx 2 0 0   4008  ..
 -rw-r--r-- 1 0 0 838858752  file1
 LIST_FILES end,   /file1 ~800MB
-inodes 2 dirs 0 block_arrays 1211 inode_arrays 1 blocks 204800
+inodes 2 dirs 0 block_arrays 2438 inode_arrays 1 blocks 204800
 LIST_FILES start, no files
 drwxrwxrwx 2 0 0   4008  .
 drwxrwxrwx 2 0 0   4008  ..
