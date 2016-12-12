@@ -318,20 +318,17 @@ test_tmpfile(const char *path)
 
 	PMEMFILE_STATS(pfp);
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_O_TMPFILE before, files: . ..");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 
 	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_TMPFILE | O_WRONLY, 0644);
 	PMEMFILE_WRITE(pfp, f, "qwerty", 6, 6);
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_O_TMPFILE middle, files: . ..");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
 
 	PMEMFILE_CLOSE(pfp, f);
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_O_TMPFILE end, files: . ..");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);

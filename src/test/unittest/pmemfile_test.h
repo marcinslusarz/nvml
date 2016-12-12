@@ -79,6 +79,7 @@ void PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
 void PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path, const char *txt);
 void PMEMFILE_LIST_FILES_WITH_ATTRS(PMEMfilepool *pfp, const char *path,
 		const char *txt);
+void PMEMFILE_ASSERT_EMPTY_DIR(PMEMfilepool *pfp, const char *path);
 
 #ifdef __cplusplus
 }

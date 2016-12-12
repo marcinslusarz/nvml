@@ -345,3 +345,43 @@ PMEMFILE_LIST_FILES_WITH_ATTRS(PMEMfilepool *pfp, const char *path,
 {
 	_PMEMFILE_LIST_FILES(pfp, path, txt, 1);
 }
+
+void
+PMEMFILE_ASSERT_EMPTY_DIR(PMEMfilepool *pfp, const char *path)
+{
+	PMEMfile *f = PMEMFILE_OPEN(pfp, path, O_DIRECTORY | O_RDONLY);
+	int dot = 0, dotdot = 0;
+
+	char buf[32758];
+	while (1) {
+		int r = pmemfile_getdents64(pfp, f, (void *)buf, sizeof(buf));
+		UT_ASSERT(r >= 0);
+		if (r == 0)
+			break;
+
+		for (unsigned i = 0; i < (unsigned)r; ) {
+			i += 8;
+			i += 8;
+
+			unsigned short int reclen = *(unsigned short *)&buf[i];
+			i += 2;
+
+			i += 1;
+
+			if (strcmp(buf + i, ".") == 0)
+				dot++;
+			else if (strcmp(buf + i, "..") == 0)
+				dotdot++;
+			else
+				UT_FATAL("unexpected file %s", buf + i);
+
+			i += reclen;
+			i -= 8 + 8 + 2 + 1;
+		}
+	}
+
+	PMEMFILE_CLOSE(pfp, f);
+
+	UT_ASSERTeq(dot, 1);
+	UT_ASSERTeq(dotdot, 1);
+}
