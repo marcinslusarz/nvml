@@ -364,27 +364,26 @@ main(int argc, char *argv[])
 	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
 	PMEMFILE_STATS(pfp);
-
-	PMEMFILE_LIST_FILES(pfp, "/", "no files");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 
 	test1(pfp);
-	PMEMFILE_LIST_FILES(pfp, "/", "no files");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
 
 	test2(pfp);
-	PMEMFILE_LIST_FILES(pfp, "/", "no files");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
 
 	test_trunc(pfp);
-	PMEMFILE_LIST_FILES(pfp, "/", "no files");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
 
 	test_o_append(pfp);
-	PMEMFILE_LIST_FILES(pfp, "/", "no files");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
 
 	test_sparse_files(pfp);
-	PMEMFILE_LIST_FILES(pfp, "/", "no files");
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);

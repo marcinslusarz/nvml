@@ -1,10 +1,6 @@
 file_core_rw/TEST1: START: file_core_rw
  ./file_core_rw$(nW) $(nW)
 inodes 1 dirs 0 block_arrays 0 inode_arrays 0 blocks 0
-LIST_FILES start, no files
-drwxrwxrwx 2 0 0   4008  .
-drwxrwxrwx 2 0 0   4008  ..
-LIST_FILES end,   no files
 LIST_FILES start, /file1 0
 drwxrwxrwx 2 0 0   4008  .
 drwxrwxrwx 2 0 0   4008  ..
@@ -33,10 +29,6 @@ drwxrwxrwx 2 0 0   4008  ..
 -rw-r--r-- 1 0 0   8192  file1
 LIST_FILES end,   /file1 8192
 inodes 2 dirs 0 block_arrays 0 inode_arrays 1 blocks 2
-LIST_FILES start, no files
-drwxrwxrwx 2 0 0   4008  .
-drwxrwxrwx 2 0 0   4008  ..
-LIST_FILES end,   no files
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
 LIST_FILES start, /file1 ~800MB
 drwxrwxrwx 2 0 0   4008  .
@@ -44,10 +36,6 @@ drwxrwxrwx 2 0 0   4008  ..
 -rw-r--r-- 1 0 0 838858752  file1
 LIST_FILES end,   /file1 ~800MB
 inodes 2 dirs 0 block_arrays 2438 inode_arrays 1 blocks 204800
-LIST_FILES start, no files
-drwxrwxrwx 2 0 0   4008  .
-drwxrwxrwx 2 0 0   4008  ..
-LIST_FILES end,   no files
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
 LIST_FILES start, /file1,file2 25600
 drwxrwxrwx 2 0 0   4008  .
@@ -63,19 +51,7 @@ drwxrwxrwx 2 0 0   4008  ..
 -rw-r--r-- 1 0 0    128  file2
 LIST_FILES end,   /file1 0, /file2 128
 inodes 3 dirs 0 block_arrays 0 inode_arrays 1 blocks 1
-LIST_FILES start, no files
-drwxrwxrwx 2 0 0   4008  .
-drwxrwxrwx 2 0 0   4008  ..
-LIST_FILES end,   no files
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
-LIST_FILES start, no files
-drwxrwxrwx 2 0 0   4008  .
-drwxrwxrwx 2 0 0   4008  ..
-LIST_FILES end,   no files
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
-LIST_FILES start, no files
-drwxrwxrwx 2 0 0   4008  .
-drwxrwxrwx 2 0 0   4008  ..
-LIST_FILES end,   no files
 inodes 1 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
 file_core_rw/TEST1: Done
