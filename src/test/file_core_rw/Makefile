@@ -36,6 +36,7 @@
 TARGET = file_core_rw
 OBJS = file_core_rw.o
 
+LIBPMEMCOMMON=y
 LIBPMEM=y
 LIBPMEMOBJ=y
 LIBPMEMFILE_CORE=y

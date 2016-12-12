@@ -36,6 +36,7 @@
 
 #include "unittest.h"
 #include "pmemfile_test.h"
+#include "util.h"
 
 static void
 test1(PMEMfilepool *pfp)
@@ -326,6 +327,30 @@ test_o_append(PMEMfilepool *pfp)
 	PMEMFILE_UNLINK(pfp, "/file1");
 }
 
+static void
+test_sparse_files(PMEMfilepool *pfp)
+{
+	unsigned char buf[8192];
+	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1",
+			O_CREAT | O_EXCL | O_RDWR,
+			0644);
+	PMEMFILE_LSEEK(pfp, f, 4096, SEEK_SET, 4096);
+	PMEMFILE_PATH_SIZE(pfp, "/file1", 0);
+	PMEMFILE_WRITE(pfp, f, "test", 5, 5);
+	PMEMFILE_PATH_SIZE(pfp, "/file1", 4096 + 5);
+
+	PMEMFILE_LSEEK(pfp, f, 0, SEEK_SET, 0);
+	memset(buf, 0xff, sizeof(buf));
+	PMEMFILE_READ(pfp, f, buf, 8192, 4096 + 5);
+	UT_ASSERTeq(util_is_zeroed(buf, 4096), 1);
+	UT_ASSERTeq(memcmp(buf + 4096, "test", 5), 0);
+	UT_ASSERTeq(buf[4096 + 5], 0xff);
+
+	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_UNLINK(pfp, "/file1");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -355,6 +380,10 @@ main(int argc, char *argv[])
 	PMEMFILE_STATS(pfp);
 
 	test_o_append(pfp);
+	PMEMFILE_LIST_FILES(pfp, "/", "no files");
+	PMEMFILE_STATS(pfp);
+
+	test_sparse_files(pfp);
 	PMEMFILE_LIST_FILES(pfp, "/", "no files");
 	PMEMFILE_STATS(pfp);
 
