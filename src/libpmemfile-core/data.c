@@ -60,7 +60,7 @@ block_cache_insert_block(struct ctree *c, struct pmemfile_block *block)
 }
 
 /*
- * file_rebuild_block_tree -- rebuilds runtime tree of blocks
+ * vinode_rebuild_block_tree -- rebuilds runtime tree of blocks
  */
 static void
 vinode_rebuild_block_tree(struct pmemfile_vinode *vinode)
@@ -93,26 +93,15 @@ find_block(struct pmemfile_vinode *vinode, uint64_t *off)
 }
 
 /*
- * file_destroy_data_state -- destroys file state related to data
+ * vinode_destroy_data_state -- destroys file state related to data
  */
 void
 vinode_destroy_data_state(struct pmemfile_vinode *vinode)
 {
-	struct ctree *blocks = vinode->blocks;
-	if (!blocks)
-		return;
-
-	uint64_t key = UINT64_MAX;
-	struct pmemfile_block *block;
-	while ((block = find_block(vinode, &key))) {
-		uint64_t k = ctree_remove_unlocked(blocks, key, 1);
-		ASSERTeq(k, key);
-
-		key = UINT64_MAX;
+	if (vinode->blocks) {
+		ctree_delete(vinode->blocks);
+		vinode->blocks = NULL;
 	}
-
-	ctree_delete(blocks);
-	vinode->blocks = NULL;
 
 	memset(&vinode->first_free_block, 0, sizeof(vinode->first_free_block));
 }
@@ -913,7 +902,7 @@ pmemfile_lseek(PMEMfilepool *pfp, PMEMfile *file, off_t offset, int whence)
 }
 
 /*
- * file_truncate -- changes file size to 0
+ * vinode_truncate -- changes file size to 0
  */
 void
 vinode_truncate(struct pmemfile_vinode *vinode)
