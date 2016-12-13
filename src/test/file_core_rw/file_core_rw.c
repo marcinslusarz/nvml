@@ -192,6 +192,14 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 
 
+	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
+	/* check read after EOF returns 0 */
+	PMEMFILE_LSEEK(pfp, f, 8192, SEEK_SET, 8192);
+	PMEMFILE_READ(pfp, f, data2, 4096, 0);
+
+	PMEMFILE_CLOSE(pfp, f);
+
+
 	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9+100+4+4096+11=4220");
 
 	PMEMFILE_STATS(pfp);

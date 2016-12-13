@@ -314,7 +314,7 @@ file_seek_within_block(PMEMfilepool *pfp,
 	pos->global_offset += seeked;
 	offset_left -= seeked;
 
-	if (offset_left == 0 || pos->block_offset == block->size)
+	if (offset_left == 0 || pos->block_offset == block->size || !extend)
 		return seeked;
 
 	ASSERTeq(is_last, true);
