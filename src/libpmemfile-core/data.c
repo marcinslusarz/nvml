@@ -131,11 +131,11 @@ file_allocate_block(PMEMfilepool *pfp,
 {
 	size_t sz = min(pmemfile_core_block_size, 1U << 31);
 	if (sz == 0) {
-		if (count < 4096)
+		if (count <= 4096)
 			sz = 16 * 1024;
-		else if (count < 64 * 1024)
+		else if (count <= 64 * 1024)
 			sz = 256 * 1024;
-		else if (count < 1024 * 1024)
+		else if (count <= 1024 * 1024)
 			sz = 4 * 1024 * 1024;
 		else
 			sz = 64 * 1024 * 1024;
