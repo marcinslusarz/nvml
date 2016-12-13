@@ -766,7 +766,8 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 
 	if (!vinode->blocks) {
 		util_rwlock_wrlock(&vinode->rwlock);
-		vinode_rebuild_block_tree(vinode);
+		if (!vinode->blocks)
+			vinode_rebuild_block_tree(vinode);
 	} else {
 		util_rwlock_rdlock(&vinode->rwlock);
 	}
