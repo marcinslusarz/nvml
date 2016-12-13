@@ -57,28 +57,30 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9");
 
-	/* file is opened write-only */
+	/* try to read write-only file */
 	PMEMFILE_READ(pfp, f, data2, len, -1, EBADF);
 	PMEMFILE_CLOSE(pfp, f);
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
+	/* read only what we wrote and check nothing else was read */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, len, len);
 	UT_ASSERTeq(memcmp(data, data2, len), 0);
 	UT_ASSERTeq(memcmp(data2 + len, bufFF, sizeof(data2) - len), 0);
 
-	/* file is opened read-only */
+	/* try to write to read-only file */
 	PMEMFILE_WRITE(pfp, f, data, len, -1, EBADF);
 
 	memset(data2, 0, sizeof(data2));
-	/* end of file */
+	/* read from end of file */
 	PMEMFILE_READ(pfp, f, data2, len, 0);
 	PMEMFILE_CLOSE(pfp, f);
 
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
+	/* read as much as possible and check that we read only what we wrote */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), len);
 	UT_ASSERTeq(memcmp(data, data2, len), 0);
@@ -89,11 +91,13 @@ test1(PMEMfilepool *pfp)
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
+	/* partial read */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, 5, 5);
 	UT_ASSERTeq(memcmp(data, data2, 5), 0);
 	UT_ASSERTeq(memcmp(data2 + 5, bufFF, sizeof(data2) - 5), 0);
 
+	/* another partial read till the end of file */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, 15, 4);
 	UT_ASSERTeq(memcmp(data + 5, data2, 4), 0);
@@ -106,6 +110,7 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_WRITE(pfp, f, "pmem", 4, 4);
 
+	/* validate that write and read use the same offset */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 5);
 	UT_ASSERTeq(memcmp(data + 4, data2, 5), 0);
@@ -119,6 +124,7 @@ test1(PMEMfilepool *pfp)
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
 
+	/* check that what we wrote previously is still there */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 9);
 	UT_ASSERTeq(memcmp("pmem", data2, 4), 0);
@@ -127,11 +133,12 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_CLOSE(pfp, f);
 
-
+	/* validate SEEK_CUR */
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 0);
 	PMEMFILE_LSEEK(pfp, f, 3, SEEK_CUR, 3);
 
+	/* check that after "seek" "read" reads correct data */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 6);
 	UT_ASSERTeq(memcmp("min S\0", data2, 6), 0);
@@ -140,6 +147,7 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9);
 	PMEMFILE_LSEEK(pfp, f, -7, SEEK_CUR, 2);
 
+	/* check that seeking backward works */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 7);
 	UT_ASSERTeq(memcmp("emin S\0", data2, 7), 0);
@@ -150,17 +158,20 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_LSEEK(pfp, f, -3, SEEK_END, 6);
 
+	/* again, seeking backward works */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 3);
 	UT_ASSERTeq(memcmp(" S\0", data2, 3), 0);
 	UT_ASSERTeq(memcmp(data2 + 3, bufFF, sizeof(data2) - 3), 0);
 
+	/* check that writing past the end of file works */
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9);
 	PMEMFILE_LSEEK(pfp, f, 100, SEEK_END, 9 + 100);
 	PMEMFILE_WRITE(pfp, f, "XYZ\0", 4, 4);
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9 + 100 + 4);
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_SET, 0);
 
+	/* validate the whole file contents */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 9 + 100 + 4);
 	UT_ASSERTeq(memcmp("pmemin S\0", data2, 9), 0);
@@ -169,6 +180,7 @@ test1(PMEMfilepool *pfp)
 	UT_ASSERTeq(memcmp(data2 + 9 + 100 + 4, bufFF,
 			sizeof(data2) - 9 - 100 - 4), 0);
 
+	/* write 4k past the end of file and check the hole is empty */
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9 + 100 + 4);
 	PMEMFILE_LSEEK(pfp, f, 4096, SEEK_END, 9 + 100 + 4 + 4096);
 	PMEMFILE_WRITE(pfp, f, "NEXT BLOCK\0", 11, 11);
@@ -191,6 +203,7 @@ test1(PMEMfilepool *pfp)
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_RDWR, 0644);
 
+	/* check that writing slightly bigger files and seeking in them works */
 	PMEMFILE_WRITE(pfp, f, buf00, 4096, 4096);
 	PMEMFILE_FILE_SIZE(pfp, f, 4096);
 
@@ -215,6 +228,7 @@ test1(PMEMfilepool *pfp)
 static void
 test2(PMEMfilepool *pfp)
 {
+	/* write 800MB of random data and read it back */
 	char buf00[128], bufFF[128], bufd[4096 * 4], buftmp[4096 * 4];
 
 	memset(buf00, 0x00, sizeof(buf00));
@@ -254,6 +268,7 @@ test2(PMEMfilepool *pfp)
 static void
 test_trunc(PMEMfilepool *pfp)
 {
+	/* check that O_TRUNC works */
 	char bufFF[128], bufDD[128], buftmp[128];
 
 	memset(bufFF, 0xFF, sizeof(bufFF));
@@ -299,6 +314,7 @@ test_trunc(PMEMfilepool *pfp)
 static void
 test_o_append(PMEMfilepool *pfp)
 {
+	/* check that O_APPEND works */
 	char bufFF[128], bufDD[128];
 	PMEMfile *f;
 
