@@ -139,6 +139,21 @@ file_allocate_block(PMEMfilepool *pfp,
 			sz = 4 * 1024 * 1024;
 		else
 			sz = 64 * 1024 * 1024;
+	} else if (sz == 1) {
+		if (count <= 4096)
+			sz = 4096;
+		else if (count >= 64 * 1024 * 1024)
+			sz = 64 * 1024 * 1024;
+		else {
+			/* next power of 2 */
+			sz = count - 1;
+			sz |= sz >> 1;
+			sz |= sz >> 2;
+			sz |= sz >> 4;
+			sz |= sz >> 8;
+			sz |= sz >> 16;
+			sz++;
+		}
 	}
 
 	TX_ADD_DIRECT(block);
