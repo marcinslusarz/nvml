@@ -764,11 +764,13 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 
 	util_mutex_lock(&file->mutex);
 
-	if (!vinode->blocks) {
+	util_rwlock_rdlock(&vinode->rwlock);
+	while (!vinode->blocks) {
+		util_rwlock_unlock(&vinode->rwlock);
 		util_rwlock_wrlock(&vinode->rwlock);
 		if (!vinode->blocks)
 			vinode_rebuild_block_tree(vinode);
-	} else {
+		util_rwlock_unlock(&vinode->rwlock);
 		util_rwlock_rdlock(&vinode->rwlock);
 	}
 
