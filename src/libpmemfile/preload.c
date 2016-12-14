@@ -610,6 +610,10 @@ hook(long syscall_number,
 	if (reenter)
 		return NOT_HOOKED;
 
+	if (syscall_number == SYS_open &&
+	    strncmp((char *)arg0, "/etc/", 5) == 0)
+		return NOT_HOOKED;
+
 	reenter = true;
 
 	if (syscall_number == SYS_chdir) {
@@ -801,7 +805,7 @@ hook_chdir(const char *path)
 
 	long result;
 
-	log_write("%s: \"%s\"", __func__, path);
+	log_write("%s(\"%s\")", __func__, path);
 
 	util_rwlock_wrlock(&pmem_cwd_lock);
 
@@ -820,9 +824,9 @@ hook_chdir(const char *path)
 			result = 0;
 		else
 			result = -errno;
+		log_write("pmemfile_chdir(%p, \"%s\") = %ld",
+		    cwd_pool->pool, where.path, result);
 	}
-
-	log_write("%s : \"%s\"", __func__, where.path);
 
 	util_rwlock_unlock(&pmem_cwd_lock);
 
@@ -837,7 +841,7 @@ hook_fchdir(long fd)
 
 	long result;
 
-	log_write("%s: \"%ld\"", __func__, fd);
+	log_write("%s(\"%ld\")", __func__, fd);
 
 	util_rwlock_wrlock(&pmem_cwd_lock);
 
@@ -849,11 +853,11 @@ hook_fchdir(long fd)
 		} else {
 			result = -errno;
 		}
+		log_write("pmemfile_fchdir(%p, %p) = %ld",
+		    where->pool->pool, where->file, result);
 	} else {
 		result = syscall_no_intercept(SYS_fchdir, fd);
 	}
-
-	log_write("%s : %ld", __func__, fd);
 
 	util_rwlock_unlock(&pmem_cwd_lock);
 
@@ -1198,8 +1202,13 @@ hook_openat(struct fd_desc at, long arg0, long flags, long mode)
 				((int)flags) & ~O_NONBLOCK,
 				(mode_t)mode);
 
-		log_write("pmemfile_open(\"%s\") = %p",
-		    where.path, (void *)file);
+		log_write("pmemfile_openat(%p, %p, \"%s\", %d, %u) = %p",
+				(void *)where.at.pmem_fda.pool->pool,
+				(void *)where.at.pmem_fda.file,
+				where.path,
+				((int)flags) & ~O_NONBLOCK,
+				(mode_t)mode,
+				file);
 
 		if (file != NULL) {
 			fd_table[fd].pool = where.at.pmem_fda.pool;
