@@ -1174,7 +1174,7 @@ hook_mkdirat(struct fd_desc at, long path_arg, long mode)
 	long r = pmemfile_mkdirat(where.at.pmem_fda.pool->pool,
 	    where.at.pmem_fda.file, where.path, (mode_t)mode);
 
-	log_write("pmemfile_mkdirat(%p, \"%s\", %ld) = %ld",
+	log_write("pmemfile_mkdirat(%p, \"%s\", 0%lo) = %ld",
 	    (void *)where.at.pmem_fda.pool->pool, where.path, mode, r);
 
 	if (r == 0)
@@ -1222,7 +1222,7 @@ hook_openat(struct fd_desc at, long arg0, long flags, long mode)
 				((int)flags) & ~O_NONBLOCK,
 				(mode_t)mode);
 
-		log_write("pmemfile_openat(%p, %p, \"%s\", %d, %u) = %p",
+		log_write("pmemfile_openat(%p, %p, \"%s\", 0x%x, %u) = %p",
 				(void *)where.at.pmem_fda.pool->pool,
 				(void *)where.at.pmem_fda.file,
 				where.path,
