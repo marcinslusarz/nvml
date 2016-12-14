@@ -878,7 +878,7 @@ hook_getcwd(char *buf, size_t size)
 	if (mlen >= size)
 		return -ERANGE;
 	strcpy(buf, cwd_pool->mount_point);
-	if (pmemfile_getcwd(cwd_pool->pool, buf + mlen, size - mlen) == NULL)
+	if (pmemfile_getcwd(cwd_pool->pool, buf + mlen, size - mlen) != NULL)
 		return 0;
 	else
 		return -errno;
