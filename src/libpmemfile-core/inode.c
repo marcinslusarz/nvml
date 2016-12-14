@@ -738,29 +738,7 @@ pmemfile_fstatat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 int
 pmemfile_stat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 {
-	struct pmemfile_vinode *at;
-	bool at_unref;
-
-	if (!path) {
-		errno = ENOENT;
-		return -1;
-	}
-
-	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, path, &at_unref);
-
-	int ret = _pmemfile_fstatat(pfp, at, path, buf, 0);
-
-	int oerrno;
-	if (ret)
-		oerrno = errno;
-
-	if (at_unref)
-		vinode_unref_tx(pfp, at);
-
-	if (ret)
-		errno = oerrno;
-
-	return ret;
+	return pmemfile_fstatat(pfp, PMEMFILE_AT_CWD, path, buf, 0);
 }
 
 /*
