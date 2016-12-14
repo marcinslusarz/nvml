@@ -583,8 +583,11 @@ dispatch_syscall(long syscall_number,
 	if (syscall_number == SYS_fsetxattr)
 		return -ENOTSUP;
 
-	if (syscall_number == SYS_fcntl)
+	if (syscall_number == SYS_fcntl) {
+		if (arg1 == F_SETLK || arg1 == F_UNLCK)
+			return 0;
 		return -ENOTSUP;
+	}
 
 	if (syscall_number == SYS_fdatasync)
 		return 0;
