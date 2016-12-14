@@ -211,6 +211,8 @@ enter_pool(struct resolved_path *result, struct pool_description *pool,
 	result->at.pmem_fda.file = PMEMFILE_AT_CWD;
 	*resolved = 1;
 	*size -= end;
+	if (*size == 0)
+		*size = 1;
 	result->path[*size] = '\0';
 }
 
@@ -251,7 +253,7 @@ resolve_path(struct fd_desc at,
 		;
 
 	if (path[0] == '/')
-		at.pmem_fda.pool = NULL;
+		result->at.pmem_fda.pool = NULL;
 
 	while (result->path[resolved] != '\0' && result->error_code == 0) {
 		size_t end = resolved;
