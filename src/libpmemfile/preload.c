@@ -455,6 +455,7 @@ static long hook_getdents64(long fd, long dirp, unsigned count);
 
 static long hook_chdir(const char *path);
 static long hook_fchdir(long fd);
+static long hook_getcwd(char *buf, size_t size);
 
 static long
 dispatch_syscall(long syscall_number,
@@ -619,6 +620,13 @@ hook(long syscall_number,
 	}
 	if (syscall_number == SYS_fchdir) {
 		*syscall_return_value = hook_fchdir(arg0);
+		reenter = false;
+		return HOOKED;
+	}
+	if (syscall_number == SYS_getcwd) {
+		util_rwlock_rdlock(&pmem_cwd_lock);
+		*syscall_return_value = hook_getcwd((char *)arg0, (size_t)arg1);
+		util_rwlock_unlock(&pmem_cwd_lock);
 		reenter = false;
 		return HOOKED;
 	}
@@ -858,6 +866,22 @@ hook_fchdir(long fd)
 	util_rwlock_unlock(&pmem_cwd_lock);
 
 	return result;
+}
+
+static long
+hook_getcwd(char *buf, size_t size)
+{
+	if (cwd_pool == NULL)
+		return syscall_no_intercept(SYS_getcwd, buf, size);
+
+	size_t mlen = strlen(cwd_pool->mount_point);
+	if (mlen >= size)
+		return -ERANGE;
+	strcpy(buf, cwd_pool->mount_point);
+	if (pmemfile_getcwd(cwd_pool->pool, buf + mlen, size - mlen) == NULL)
+		return 0;
+	else
+		return -errno;
 }
 
 static long log_fd = -1;
