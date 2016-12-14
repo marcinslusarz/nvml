@@ -89,6 +89,12 @@ off64_t pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset,
 		int whence);
 #endif
 
+ssize_t pmemfile_pwrite(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
+		size_t count, off_t offset);
+
+ssize_t pmemfile_pread(PMEMfilepool *pfp, PMEMfile *file, void *buf,
+		size_t count, off_t offset);
+
 int pmemfile_stat(PMEMfilepool *, const char *path, struct stat *buf);
 int pmemfile_lstat(PMEMfilepool *, const char *path, struct stat *buf);
 int pmemfile_fstat(PMEMfilepool *, PMEMfile *file, struct stat *buf);
