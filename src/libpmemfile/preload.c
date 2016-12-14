@@ -218,6 +218,8 @@ init_hooking(void)
 	syscall_number_filter[SYS_rmdir] = true;
 	syscall_number_filter[SYS_pread64] = true;
 	syscall_number_filter[SYS_pwrite64] = true;
+	syscall_number_filter[SYS_fcntl] = true;
+	syscall_number_filter[SYS_fdatasync] = true;
 
 	syscall_needs_fd_rlock[SYS_pread64] = true;
 	syscall_needs_fd_rlock[SYS_pwrite64] = true;
@@ -236,6 +238,8 @@ init_hooking(void)
 	syscall_needs_fd_rlock[SYS_getdents64] = true;
 	syscall_needs_fd_rlock[SYS_fgetxattr] = true;
 	syscall_needs_fd_rlock[SYS_fsetxattr] = true;
+	syscall_needs_fd_rlock[SYS_fcntl] = true;
+	syscall_needs_fd_rlock[SYS_fdatasync] = true;
 
 	syscall_needs_fd_wlock[SYS_open] = true;
 	syscall_needs_fd_wlock[SYS_openat] = true;
@@ -271,6 +275,8 @@ init_hooking(void)
 	syscall_has_fd_first_arg[SYS_pwrite64] = true;
 	syscall_has_fd_first_arg[SYS_getdents] = true;
 	syscall_has_fd_first_arg[SYS_getdents64] = true;
+	syscall_has_fd_first_arg[SYS_fcntl] = true;
+	syscall_has_fd_first_arg[SYS_fdatasync] = true;
 
 	// Install the callback to be calleb by the syscall intercepting library
 	intercept_hook_point = &hook;
@@ -576,6 +582,12 @@ dispatch_syscall(long syscall_number,
 
 	if (syscall_number == SYS_fsetxattr)
 		return -ENOTSUP;
+
+	if (syscall_number == SYS_fcntl)
+		return -ENOTSUP;
+
+	if (syscall_number == SYS_fdatasync)
+		return 0;
 
 	// Did we miss something?
 	assert(false);
