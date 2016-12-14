@@ -899,29 +899,7 @@ pmemfile_mkdirat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 int
 pmemfile_mkdir(PMEMfilepool *pfp, const char *path, mode_t mode)
 {
-	struct pmemfile_vinode *at;
-	bool at_unref;
-
-	if (!path) {
-		errno = ENOENT;
-		return -1;
-	}
-
-	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, path, &at_unref);
-
-	int ret = _pmemfile_mkdirat(pfp, at, path, mode);
-
-	int oerrno;
-	if (ret)
-		oerrno = errno;
-
-	if (at_unref)
-		vinode_unref_tx(pfp, at);
-
-	if (ret)
-		errno = oerrno;
-
-	return ret;
+	return pmemfile_mkdirat(pfp, PMEMFILE_AT_CWD, path, mode);
 }
 
 int
