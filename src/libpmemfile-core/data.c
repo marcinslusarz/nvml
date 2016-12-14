@@ -502,11 +502,9 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	}
 }
 
-/*
- * pmemfile_write -- writes to file
- */
-ssize_t
-pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
+static ssize_t
+pmemfile_write_locked(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
+		size_t count)
 {
 	LOG(LDBG, "file %p buf %p count %zu", file, buf, count);
 
@@ -528,8 +526,6 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 	struct pmemfile_vinode *vinode = file->vinode;
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	struct pmemfile_pos pos;
-
-	util_mutex_lock(&file->mutex);
 
 	memcpy(&pos, &file->pos, sizeof(pos));
 	int txerrno = 0;
@@ -560,14 +556,27 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 		file->offset += count;
 	} TX_END
 
-	util_mutex_unlock(&file->mutex);
-
 	if (error) {
 		errno = txerrno;
 		return -1;
 	}
 
 	return (ssize_t)count;
+}
+
+/*
+ * pmemfile_write -- writes to file
+ */
+ssize_t
+pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
+{
+	ssize_t ret;
+
+	util_mutex_lock(&file->mutex);
+	ret = pmemfile_write_locked(pfp, file, buf, count);
+	util_mutex_unlock(&file->mutex);
+
+	return ret;
 }
 
 /*
@@ -736,11 +745,8 @@ time_cmp(const struct pmemfile_time *t1, const struct pmemfile_time *t2)
 	return 0;
 }
 
-/*
- * pmemfile_read -- reads file
- */
-ssize_t
-pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
+static ssize_t
+pmemfile_read_locked(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 {
 	LOG(LDBG, "file %p buf %p count %zu", file, buf, count);
 
@@ -761,8 +767,6 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 
 	struct pmemfile_vinode *vinode = file->vinode;
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
-
-	util_mutex_lock(&file->mutex);
 
 	util_rwlock_rdlock(&vinode->rwlock);
 	while (!vinode->blocks) {
@@ -808,17 +812,31 @@ pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 
 	file->offset += bytes_read;
 
-	util_mutex_unlock(&file->mutex);
-
 	ASSERT(bytes_read <= count);
 	return (ssize_t)bytes_read;
 }
 
 /*
+ * pmemfile_read -- reads file
+ */
+ssize_t
+pmemfile_read(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
+{
+	ssize_t ret;
+
+	util_mutex_lock(&file->mutex);
+	ret = pmemfile_read_locked(pfp, file, buf, count);
+	util_mutex_unlock(&file->mutex);
+
+	return ret;
+}
+
+/*
  * pmemfile_lseek64 -- changes file current offset
  */
-off64_t
-pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
+static off64_t
+pmemfile_lseek64_locked(PMEMfilepool *pfp, PMEMfile *file, off64_t offset,
+		int whence)
 {
 	LOG(LDBG, "file %p offset %lu whence %d", file, offset, whence);
 
@@ -838,8 +856,6 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	off64_t ret;
 	int new_errno = EINVAL;
-
-	util_mutex_lock(&file->mutex);
 
 	switch (whence) {
 		case SEEK_SET:
@@ -890,6 +906,19 @@ pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
 		file->offset = (size_t)ret;
 	}
 
+	return ret;
+}
+
+/*
+ * pmemfile_lseek64 -- changes file current offset
+ */
+off64_t
+pmemfile_lseek64(PMEMfilepool *pfp, PMEMfile *file, off64_t offset, int whence)
+{
+	off64_t ret;
+
+	util_mutex_lock(&file->mutex);
+	ret = pmemfile_lseek64_locked(pfp, file, offset, whence);
 	util_mutex_unlock(&file->mutex);
 
 	return ret;
@@ -902,6 +931,56 @@ off_t
 pmemfile_lseek(PMEMfilepool *pfp, PMEMfile *file, off_t offset, int whence)
 {
 	return pmemfile_lseek64(pfp, file, offset, whence);
+}
+
+ssize_t
+pmemfile_pread(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count,
+		off_t offset)
+{
+	/* XXX this is hacky implementation */
+	ssize_t ret;
+	util_mutex_lock(&file->mutex);
+
+	size_t cur_off = file->offset;
+
+	if (pmemfile_lseek64_locked(pfp, file, offset, SEEK_SET) != offset) {
+		ret = -1;
+		goto end;
+	}
+
+	ret = pmemfile_read_locked(pfp, file, buf, count);
+
+	file->offset = cur_off;
+
+end:
+	util_mutex_unlock(&file->mutex);
+
+	return ret;
+}
+
+ssize_t
+pmemfile_pwrite(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
+		size_t count, off_t offset)
+{
+	/* XXX this is hacky implementation */
+	ssize_t ret;
+	util_mutex_lock(&file->mutex);
+
+	size_t cur_off = file->offset;
+
+	if (pmemfile_lseek64_locked(pfp, file, offset, SEEK_SET) != offset) {
+		ret = -1;
+		goto end;
+	}
+
+	ret = pmemfile_write_locked(pfp, file, buf, count);
+
+	file->offset = cur_off;
+
+end:
+	util_mutex_unlock(&file->mutex);
+
+	return ret;
 }
 
 /*
