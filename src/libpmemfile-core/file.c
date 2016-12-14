@@ -384,12 +384,6 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 PMEMfile *
 pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 {
-	if (!pathname) {
-		LOG(LUSR, "NULL pathname");
-		errno = ENOENT;
-		return NULL;
-	}
-
 	va_list ap;
 	va_start(ap, flags);
 	mode_t mode = 0;
@@ -397,22 +391,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 		mode = va_arg(ap, mode_t);
 	va_end(ap);
 
-	struct pmemfile_vinode *at;
-	bool at_unref;
-	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, pathname, &at_unref);
-
-	PMEMfile *f = _pmemfile_openat(pfp, at, pathname, flags, mode);
-	int oerrno;
-	if (!f)
-		oerrno = errno;
-
-	if (at_unref)
-		vinode_unref_tx(pfp, at);
-
-	if (!f)
-		errno = oerrno;
-
-	return f;
+	return pmemfile_openat(pfp, PMEMFILE_AT_CWD, pathname, flags, mode);
 }
 
 /*
@@ -679,30 +658,7 @@ pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 int
 pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 {
-	struct pmemfile_vinode *at;
-	bool at_unref;
-
-	if (!pathname) {
-		LOG(LUSR, "NULL pathname");
-		errno = ENOENT;
-		return -1;
-	}
-
-	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, pathname, &at_unref);
-
-	int ret = _pmemfile_unlinkat(pfp, at, pathname);
-
-	int oerrno;
-	if (ret)
-		oerrno = errno;
-
-	if (at)
-		vinode_unref_tx(pfp, at);
-
-	if (ret)
-		errno = oerrno;
-
-	return ret;
+	return pmemfile_unlinkat(pfp, PMEMFILE_AT_CWD, pathname, 0);
 }
 
 /*
