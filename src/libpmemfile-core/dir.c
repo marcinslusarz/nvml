@@ -134,7 +134,8 @@ vinode_add_dirent(PMEMfilepool *pfp,
 
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
 
-	if (strlen(name) > PMEMFILE_MAX_FILE_NAME) {
+	size_t namelen = strlen(name);
+	if (namelen > PMEMFILE_MAX_FILE_NAME) {
 		LOG(LUSR, "file name too long");
 		pmemobj_tx_abort(ENAMETOOLONG);
 	}
@@ -177,12 +178,13 @@ vinode_add_dirent(PMEMfilepool *pfp,
 		dir = D_RW(dir->next);
 	} while (dir);
 
-	TX_ADD_DIRECT(dirent);
+	pmemobj_tx_add_range_direct(dirent,
+			sizeof(dirent->inode) + namelen + 1);
 
 	dirent->inode = child_vinode->inode;
 
-	strncpy(dirent->name, name, PMEMFILE_MAX_FILE_NAME);
-	dirent->name[PMEMFILE_MAX_FILE_NAME] = '\0';
+	strncpy(dirent->name, name, namelen);
+	dirent->name[namelen] = '\0';
 
 	TX_ADD_FIELD(child_vinode->inode, nlink);
 	D_RW(child_vinode->inode)->nlink++;
