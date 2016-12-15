@@ -139,11 +139,10 @@ inode_array_unregister(PMEMfilepool *pfp,
 
 	ASSERT(cur->used > 0);
 
-	COMPILE_ERROR_ON(offsetof(struct pmemfile_inode_array, mtx) != 0);
-	pmemobj_tx_add_range_direct(
-		(char *)cur + sizeof(cur->mtx),
-		sizeof(*cur) - sizeof(cur->mtx));
+	TX_ADD_DIRECT(&cur->inodes[idx]);
 	cur->inodes[idx] = TOID_NULL(struct pmemfile_inode);
+
+	TX_ADD_DIRECT(&cur->used);
 	cur->used--;
 
 	mutex_tx_unlock_on_commit(&cur->mtx);
