@@ -392,7 +392,7 @@ vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	ASSERT(inode->nlink > 0);
 
 	TX_ADD_FIELD(tinode, nlink);
-	TX_ADD_DIRECT(dirent);
+	pmemobj_tx_add_range_direct(dirent, sizeof(dirent->inode) + 1);
 
 	struct pmemfile_time tm;
 	file_get_time(&tm);
