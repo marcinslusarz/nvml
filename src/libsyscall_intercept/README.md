@@ -180,7 +180,7 @@ db2b9: retq                   | db2b9: retq                |
 ```
 *Hotpatching using a trampoline jump:*
 Replace a syscall instruction with a short jmp instruction,
-the destination of which if is a regular jmp instruction. 
+the destination of which if is a regular jmp instruction.
 The reason to use this, is that a short jmp instruction
 consumes only two bytes, thus fits in the place of a syscall
 instruction. Sometimes the instructions directly preceding
