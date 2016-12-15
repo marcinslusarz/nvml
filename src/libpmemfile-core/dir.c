@@ -973,11 +973,12 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			}
 		}
 
-		TX_ADD_DIRECT(dirdot);
+		pmemobj_tx_add_range_direct(dirdot, sizeof(dirdot->inode) + 1);
 		dirdot->name[0] = '\0';
 		dirdot->inode = TOID_NULL(struct pmemfile_inode);
 
-		TX_ADD_DIRECT(dirdotdot);
+		pmemobj_tx_add_range_direct(dirdotdot,
+				sizeof(dirdotdot->inode) + 1);
 		dirdotdot->name[0] = '\0';
 		dirdotdot->inode = TOID_NULL(struct pmemfile_inode);
 
@@ -985,7 +986,7 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		TX_ADD_DIRECT(&idir->nlink);
 		idir->nlink = 0;
 
-		TX_ADD_DIRECT(dirent);
+		pmemobj_tx_add_range_direct(dirent, sizeof(dirent->inode) + 1);
 		dirent->name[0] = '\0';
 		dirent->inode = TOID_NULL(struct pmemfile_inode);
 
