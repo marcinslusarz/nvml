@@ -1063,7 +1063,12 @@ hook_faccessat(struct fd_desc at, long path_arg, long mode, long flags)
 		    where.at.kernel_fd, where.path, mode, flags);
 	}
 
-	return -ENOTSUP;
+	struct stat stat;
+	/* XXX implement for real! */
+	if (pmemfile_fstatat(where.at.pmem_fda.pool->pool,
+			where.at.pmem_fda.file, where.path, &stat, 0))
+		return -errno;
+	return 0;
 
 	/*
 	 *
