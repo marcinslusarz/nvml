@@ -54,15 +54,12 @@ inode_array_add_single(PMEMfilepool *pfp,
 		if (!TOID_IS_NULL(cur->inodes[i]))
 			continue;
 
-		COMPILE_ERROR_ON(
-			offsetof(struct pmemfile_inode_array, mtx) != 0);
-
 		mutex_tx_unlock_on_abort(&cur->mtx);
 
-		pmemobj_tx_add_range_direct(
-			(char *)cur + sizeof(cur->mtx),
-			sizeof(*cur) - sizeof(cur->mtx));
+		TX_ADD_DIRECT(&cur->inodes[i]);
 		cur->inodes[i] = vinode->inode;
+
+		TX_ADD_DIRECT(&cur->used);
 		cur->used++;
 
 		if (ins)
