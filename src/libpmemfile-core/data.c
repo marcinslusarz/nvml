@@ -145,7 +145,11 @@ file_allocate_block(PMEMfilepool *pfp,
 		}
 	}
 
-	TX_ADD_DIRECT(block);
+	/* XXX, snapshot separated to let pmemobj use small object cache  */
+	pmemobj_tx_add_range_direct(block, 32);
+	pmemobj_tx_add_range_direct((char *)block + 32, 16);
+	COMPILE_ERROR_ON(sizeof(*block) != 48);
+
 	block->data = TX_XALLOC(char, sz, POBJ_XALLOC_NO_FLUSH);
 	sz = pmemobj_alloc_usable_size(block->data.oid);
 
