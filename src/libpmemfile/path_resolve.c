@@ -243,9 +243,16 @@ resolve_path(struct fd_desc at,
 
 	size_t resolved; // How many chars are resolved already?
 	size_t size; // The length of the whole path to be resolved.
+	bool last_component_is_dir = false;
 
 	for (size = 0; path[size] != '\0'; ++size)
 		result->path[size] = path[size];
+
+	if (result->path[size - 1] == '/') {
+		last_component_is_dir = true;
+		while (result->path[size - 1] == '/')
+			--size;
+	}
 
 	result->path[size] = '\0';
 
@@ -275,13 +282,13 @@ resolve_path(struct fd_desc at,
 		bool is_last_component = (result->path[end] == '\0');
 
 		if (is_last_component && follow_last == no_resolve_last_slink)
-			return;
+			break;
 
 		result->path[end] = '\0';
 
 		struct stat stat_buf;
 		if (get_stat(result, &stat_buf) != 0)
-			return;
+			break;
 
 		if (!is_last_component)
 			result->path[end] = '/';
@@ -294,7 +301,7 @@ resolve_path(struct fd_desc at,
 			if (!is_last_component)
 				result->error_code = -ENOTDIR;
 
-			return;
+			break;
 		} else if (is_fda_null(&result->at.pmem_fda)) {
 			struct pool_description *pool;
 
@@ -313,5 +320,11 @@ resolve_path(struct fd_desc at,
 
 		for (resolved = end; result->path[resolved] == '/'; ++resolved)
 			;
+	}
+
+	if (last_component_is_dir && result->path[size - 1] != '/') {
+		result->path[size] = '/';
+		++size;
+		result->path[size] = '\0';
 	}
 }
