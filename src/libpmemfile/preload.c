@@ -819,6 +819,8 @@ hook_chdir(const char *path)
 		result = where.error_code;
 	} else if (is_fda_null(&where.at.pmem_fda)) {
 		result = syscall_no_intercept(SYS_chdir, where.path);
+		if (result == 0)
+			cwd_pool = NULL;
 	} else {
 		if (cwd_pool != where.at.pmem_fda.pool) {
 			cwd_pool = where.at.pmem_fda.pool;
@@ -861,6 +863,8 @@ hook_fchdir(long fd)
 		    where->pool->pool, where->file, result);
 	} else {
 		result = syscall_no_intercept(SYS_fchdir, fd);
+		if (result == 0)
+			cwd_pool = NULL;
 	}
 
 	util_rwlock_unlock(&pmem_cwd_lock);
