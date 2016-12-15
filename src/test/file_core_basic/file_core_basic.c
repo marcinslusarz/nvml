@@ -320,6 +320,7 @@ test_tmpfile(const char *path)
 
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 
+#ifdef O_TMPFILE
 	PMEMfile *f = PMEMFILE_OPEN(pfp, "/", O_TMPFILE | O_WRONLY, 0644);
 	PMEMFILE_WRITE(pfp, f, "qwerty", 6, 6);
 
@@ -330,6 +331,7 @@ test_tmpfile(const char *path)
 
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 	PMEMFILE_STATS(pfp);
+#endif
 
 	pmemfile_pool_close(pfp);
 }

@@ -54,6 +54,16 @@
 #include "sys_util.h"
 #include "util.h"
 
+static bool
+is_tmpfile(int flags)
+{
+#ifdef O_TMPFILE
+	return (flags & O_TMPFILE) == O_TMPFILE;
+#else
+	return false;
+#endif
+}
+
 /*
  * check_flags -- (internal) open(2) flags tester
  */
@@ -87,11 +97,13 @@ check_flags(int flags)
 		flags &= ~O_DIRECT;
 	}
 
+#ifdef O_TMPFILE
 	/* O_TMPFILE contains O_DIRECTORY */
 	if ((flags & O_TMPFILE) == O_TMPFILE) {
 		LOG(LTRC, "O_TMPFILE");
 		flags &= ~O_TMPFILE;
 	}
+#endif
 
 	if (flags & O_DIRECTORY) {
 		LOG(LSUP, "O_DIRECTORY");
@@ -180,7 +192,7 @@ create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
 	struct pmemfile_vinode *vinode = inode_alloc(pfp, S_IFREG | mode, &t,
 			parent_vinode, NULL, filename);
 
-	if ((flags & O_TMPFILE) == O_TMPFILE)
+	if (is_tmpfile(flags))
 		vinode_orphan(pfp, vinode);
 	else
 		vinode_add_dirent(pfp, parent_vinode, filename, vinode, &t);
@@ -233,8 +245,10 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	va_start(ap, flags);
 	mode_t mode = 0;
 
+	bool tmpfile_used = false;
+
 	/* NOTE: O_TMPFILE contains O_DIRECTORY */
-	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
+	if ((flags & O_CREAT) || is_tmpfile(flags)) {
 		mode = va_arg(ap, mode_t);
 		LOG(LDBG, "mode %o", mode);
 		if (mode & ~(mode_t)(S_IRWXU | S_IRWXG | S_IRWXO)) {
@@ -265,7 +279,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		if (strchr(info.remaining, '/'))
 			pmemobj_tx_abort(ENOENT);
 
-		if ((flags & O_TMPFILE) == O_TMPFILE) {
+		if (is_tmpfile(flags)) {
 			if (!vinode_is_dir(vinode))
 				pmemobj_tx_abort(ENOTDIR);
 			if (info.remaining[0])
@@ -355,7 +369,7 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	va_list ap;
 	va_start(ap, flags);
 	mode_t mode = 0;
-	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE)
+	if ((flags & O_CREAT) || is_tmpfile(flags))
 		mode = va_arg(ap, mode_t);
 	va_end(ap);
 
@@ -387,7 +401,7 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 	va_list ap;
 	va_start(ap, flags);
 	mode_t mode = 0;
-	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE)
+	if ((flags & O_CREAT) || is_tmpfile(flags))
 		mode = va_arg(ap, mode_t);
 	va_end(ap);
 
