@@ -1,51 +1,14 @@
-[comment]: <> (Copyright 2016, Intel Corporation)
-
-[comment]: <> (Redistribution and use in source and binary forms, with or without)
-[comment]: <> (modification, are permitted provided that the following conditions)
-[comment]: <> (are met:)
-[comment]: <> (    * Redistributions of source code must retain the above copyright)
-[comment]: <> (      notice, this list of conditions and the following disclaimer.)
-[comment]: <> (    * Redistributions in binary form must reproduce the above copyright)
-[comment]: <> (      notice, this list of conditions and the following disclaimer in)
-[comment]: <> (      the documentation and/or other materials provided with the)
-[comment]: <> (      distribution.)
-[comment]: <> (    * Neither the name of the copyright holder nor the names of its)
-[comment]: <> (      contributors may be used to endorse or promote products derived)
-[comment]: <> (      from this software without specific prior written permission.)
-
-[comment]: <> (THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS)
-[comment]: <> ("AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT)
-[comment]: <> (LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR)
-[comment]: <> (A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT)
-[comment]: <> (OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,)
-[comment]: <> (SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT)
-[comment]: <> (LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,)
-[comment]: <> (DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY)
-[comment]: <> (THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT)
-[comment]: <> ((INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE)
-[comment]: <> (OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.)
-
-[comment]: <> (libcintercept.3 -- man page for libcintercept)
-
-[NAME](#name)<br />
-[SYNOPSIS](#synopsis)<br />
-[DESCRIPTION](#description)<br />
-[EXAMPLE](#example)<br />
-[UNDER THE HOOD](#under-the-hood)<br />
-[LIMITATIONS](#limitations)<br />
-
-
-# NAME #
-
-**libcintercept** -- Syscall intercepting library
+Syscall intercepting library
+============================
+**libsyscall_intercept** -- Syscall intercepting library
 
 # SYNOPSIS #
 
 ```c
-#include <libcintercept_hook_point.h>
+#include <libsyscall_intercept_hook_point.h>
 ```
 ```sh
-cc -lcintercept -fpic -shared
+cc -lsyscall_intercept -fpic -shared
 ```
 
 ##### Description: #####
@@ -55,7 +18,7 @@ for hooking Linux system calls in user space. This is achieved
 by hotpatching the machine code of the standard C library in the
 memory of a process. The user of this library can provide the
 functionality of almost any syscall in user space, using the very
-simple API spcified in the libcintercept\_hook\_point.h header file:
+simple API spcified in the libsyscall_intercept\_hook\_point.h header file:
 ```c
 int (*intercept_hook_point)(long syscall_number,
 			long arg0, long arg1,
@@ -110,7 +73,7 @@ int libc_hook_in_process_allowed(void);
 ##### Example: #####
 
 ```c
-#include <libcintercept_hook_point.h>
+#include <libsyscall_intercept_hook_point.h>
 #include <syscall.h>
 #include <errno.h>
 
@@ -151,7 +114,7 @@ init(void)
 ```
 
 ```sh
-$ cc example.c -lcintercept -fpic -shared -o example.so
+$ cc example.c -lsyscall_intercept -fpic -shared -o example.so
 $ LD_LIBRARY_PATH=. LD_PRELOAD=example.so ls
 ls: reading directory '.': Operation not supported
 ```
@@ -255,8 +218,22 @@ Before:                         After:
 * Only x86\_64 is supported
 * Only tested with glibc, altought perhaps it works
 with some other libc implementations as well
-* The following syscalls can not be hooked:
-  * vfork
+* There are known issues with the following syscalls:
   * clone
-  * execve
   * rt_sigreturn
+
+# Debugging: #
+Besides logging, the most important factor during debugging is to make
+sure the syscalls in the debugger are not intercepted. To achieve this, use
+the LIBC_HOOK_CMDLINE_FILTER variable described above.
+
+```
+LIBC_HOOK_CMDLINE_FILTER=ls \
+	LD_PRELOAD=libsyscall_intercept.so \
+	gdb ls
+```
+
+With this filtering, the intercepting library is not activated in the gdb
+process itself.
+
+
