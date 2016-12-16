@@ -669,6 +669,11 @@ function expect_normal_exit() {
 			dump_last_n_lines $RPMEMD_LOG_FILE
 		fi
 
+		if [ "${LIST_DIR_ON_ERROR}" = "1" ]; then
+			echo "ls -lR $DIR" >&2
+			ls -lR $DIR >&2
+		fi
+
 		[ $NODES_MAX -ge 0 ] && clean_all_remote_nodes
 
 		false
