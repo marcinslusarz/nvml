@@ -245,8 +245,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	va_start(ap, flags);
 	mode_t mode = 0;
 
-	bool tmpfile_used = false;
-
 	/* NOTE: O_TMPFILE contains O_DIRECTORY */
 	if ((flags & O_CREAT) || is_tmpfile(flags)) {
 		mode = va_arg(ap, mode_t);
