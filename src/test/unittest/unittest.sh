@@ -677,6 +677,10 @@ function expect_normal_exit() {
 			ls -lR $DIR >&2
 		fi
 
+		for c in ${DUMP_FILES_ON_ERROR}; do
+			dump_last_n_lines "$c"
+		done
+
 		[ $NODES_MAX -ge 0 ] && clean_all_remote_nodes
 
 		false
