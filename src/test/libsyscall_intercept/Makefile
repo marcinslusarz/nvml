@@ -42,7 +42,7 @@ test_libcintercept_libc.o: test_libcintercept.c
 	$(CC) -ggdb $< -c -o $@
 
 test_libcintercept_libc_lpthread: test_libcintercept_libc_lpthread.o
-	$(CC) -ggdb -lpthread $< -o $@
+	$(CC) -ggdb $< -o $@ -pthread
 
 test_libcintercept_libc_lpthread.o: test_libcintercept.c
 	$(CC) -ggdb -DUSE_CLONE=1 $< -c -o $@
