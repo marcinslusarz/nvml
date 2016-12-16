@@ -56,6 +56,7 @@ export PMEMFILE_POOLS=$DIR/dummy_mount_point:$DIR/dummy_fs
 export PMEMFILE_PRELOAD_LOG=pmemfile_preload.log
 export INTERCEPT_LOG=intercept.log
 export INTERCEPT_LOG_NO_PID=1
+export LIST_DIR_ON_ERROR=1
 
 expect_normal_exit ./dummy_prog$EXESUFFIX \
 	$DIR/some_dir/some_link/a \
