@@ -330,8 +330,8 @@ test_tmpfile(const char *path)
 	PMEMFILE_CLOSE(pfp, f);
 
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
-	PMEMFILE_STATS(pfp);
 #endif
+	PMEMFILE_STATS(pfp);
 
 	pmemfile_pool_close(pfp);
 }
