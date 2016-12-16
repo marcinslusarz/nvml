@@ -757,7 +757,30 @@ pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
 		return -1;
 	}
 
-	return vinode_stat(file->vinode, buf);
+	struct pmemfile_vinode *vinode;
+
+	bool unref = false;
+	if (file == PMEMFILE_AT_CWD) {
+		unref = true;
+		vinode = pool_get_cwd(pfp);
+	} else {
+		vinode = file->vinode;
+	}
+
+	int ret = vinode_stat(vinode, buf);
+
+	if (unref) {
+		int oerrno;
+		if (ret)
+			oerrno = errno;
+
+		vinode_unref_tx(pfp, vinode);
+
+		if (ret)
+			errno = oerrno;
+	}
+
+	return ret;
 }
 
 /*
