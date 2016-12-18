@@ -227,6 +227,15 @@ exit_pool(struct resolved_path *result,
 	*size -= end;
 }
 
+static size_t
+skip_slashes(const char *path, size_t resolved)
+{
+	for (; path[resolved] == '/'; ++resolved)
+		;
+
+	return resolved;
+}
+
 void
 resolve_path(struct fd_desc at,
 			const char *path,
@@ -256,13 +265,17 @@ resolve_path(struct fd_desc at,
 
 	result->path[size] = '\0';
 
-	for (resolved = 0; result->path[resolved] == '/'; ++resolved)
-		;
-
 	if (path[0] == '/')
 		result->at.pmem_fda.pool = NULL;
 
-	while (result->path[resolved] != '\0' && result->error_code == 0) {
+	/*
+	 * XXX
+	 * This code is too convoluted, and new bugs are found in it weekly.
+	 * Must be rewritten after the holidays.
+	 */
+	for (resolved = skip_slashes(result->path, 0);
+	    result->path[resolved] != '\0' && result->error_code == 0;
+	    resolved = skip_slashes(result->path, resolved)) {
 		size_t end = resolved;
 
 		while (result->path[end] != '\0' && result->path[end] != '/')
