@@ -320,6 +320,10 @@ resolve_path(struct fd_desc at,
 
 			pool = lookup_pd_by_inode(stat_buf.st_ino);
 			if (pool != NULL) {
+				if (pool->pool == NULL) {
+					result->error_code = -EIO;
+					return;
+				}
 				enter_pool(result, pool, &resolved, end, &size);
 				continue;
 			}
