@@ -458,3 +458,31 @@ pmemfile_fchownat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	errno = ENOTSUP;
 	return -1;
 }
+
+int
+pmemfile_utimensat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
+		const struct timespec times[2], int flags)
+{
+	check_pfp(pfp);
+
+	(void) dir;
+	(void) pathname;
+	(void) times;
+	(void) flags;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_futimens(PMEMfilepool *pfp, PMEMfile *file,
+		const struct timespec times[2])
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) times;
+
+	errno = ENOTSUP;
+	return -1;
+}

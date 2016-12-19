@@ -19,6 +19,7 @@ pmemfile_flock
 pmemfile_fstat
 pmemfile_fstatat
 pmemfile_ftruncate
+pmemfile_futimens
 pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
@@ -54,6 +55,7 @@ pmemfile_sync
 pmemfile_truncate
 pmemfile_unlink
 pmemfile_unlinkat
+pmemfile_utimensat
 pmemfile_write
 pmemfile_writev
 ../../nondebug/libpmemfile-core.so:
@@ -76,6 +78,7 @@ pmemfile_flock
 pmemfile_fstat
 pmemfile_fstatat
 pmemfile_ftruncate
+pmemfile_futimens
 pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
@@ -111,5 +114,6 @@ pmemfile_sync
 pmemfile_truncate
 pmemfile_unlink
 pmemfile_unlinkat
+pmemfile_utimensat
 pmemfile_write
 pmemfile_writev
