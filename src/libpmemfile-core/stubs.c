@@ -371,3 +371,75 @@ pmemfile_fcntl(PMEMfilepool *pfp, PMEMfile *file, int cmd, ...)
 	errno = ENOTSUP;
 	return -1;
 }
+
+int
+pmemfile_fchmodat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
+	mode_t mode, int flags)
+{
+	check_pfp(pfp);
+
+	(void) dir;
+	(void) pathname;
+	(void) mode;
+	(void) flags;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_chown(PMEMfilepool *pfp, const char *pathname, uid_t owner,
+		gid_t group)
+{
+	check_pfp(pfp);
+
+	(void) pathname;
+	(void) owner;
+	(void) group;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_fchown(PMEMfilepool *pfp, PMEMfile *file, uid_t owner, gid_t group)
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) owner;
+	(void) group;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_lchown(PMEMfilepool *pfp, const char *pathname, uid_t owner,
+		gid_t group)
+{
+	check_pfp(pfp);
+
+	(void) pathname;
+	(void) owner;
+	(void) group;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_fchownat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
+		uid_t owner, gid_t group, int flags)
+{
+	check_pfp(pfp);
+
+	(void) dir;
+	(void) pathname;
+	(void) owner;
+	(void) group;
+	(void) flags;
+
+	errno = ENOTSUP;
+	return -1;
+}
