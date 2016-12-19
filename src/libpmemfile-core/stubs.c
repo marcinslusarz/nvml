@@ -496,3 +496,22 @@ pmemfile_umask(PMEMfilepool *pfp, mode_t mask)
 
 	return 0;
 }
+
+ssize_t
+pmemfile_copy_file_range(PMEMfilepool *pfp,
+		PMEMfile *file_in, loff_t *off_in,
+		PMEMfile *file_out, loff_t *off_out,
+		size_t len, unsigned flags)
+{
+	check_pfp(pfp);
+
+	(void) file_in;
+	(void) off_in;
+	(void) file_out;
+	(void) off_out;
+	(void) len;
+	(void) flags;
+
+	errno = ENOTSUP;
+	return -1;
+}
