@@ -86,7 +86,9 @@
 
 #include <libpmem.h>
 #include <libpmemblk.h>
+#ifndef _WIN32
 #include <libpmemfile-core.h>
+#endif
 #include <libpmemlog.h>
 #include <libpmemobj.h>
 #include <libpmempool.h>
