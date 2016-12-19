@@ -41,6 +41,7 @@ pmemfile_pwrite
 pmemfile_pwritev
 pmemfile_read
 pmemfile_readlink
+pmemfile_readlinkat
 pmemfile_readv
 pmemfile_rename
 pmemfile_renameat
@@ -97,6 +98,7 @@ pmemfile_pwrite
 pmemfile_pwritev
 pmemfile_read
 pmemfile_readlink
+pmemfile_readlinkat
 pmemfile_readv
 pmemfile_rename
 pmemfile_renameat
