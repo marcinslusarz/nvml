@@ -486,3 +486,13 @@ pmemfile_futimens(PMEMfilepool *pfp, PMEMfile *file,
 	errno = ENOTSUP;
 	return -1;
 }
+
+mode_t
+pmemfile_umask(PMEMfilepool *pfp, mode_t mask)
+{
+	check_pfp(pfp);
+
+	(void) mask;
+
+	return 0;
+}
