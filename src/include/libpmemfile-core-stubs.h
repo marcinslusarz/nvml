@@ -111,4 +111,10 @@ int pmemfile_futimens(PMEMfilepool *, PMEMfile *file,
 		const struct timespec times[2]);
 
 mode_t pmemfile_umask(PMEMfilepool *, mode_t mask);
+
+ssize_t pmemfile_copy_file_range(PMEMfilepool *,
+		PMEMfile *file_in, loff_t *off_in,
+		PMEMfile *file_out, loff_t *off_out,
+		size_t len, unsigned flags);
+
 #endif
