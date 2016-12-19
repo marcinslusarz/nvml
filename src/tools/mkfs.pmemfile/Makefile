@@ -41,4 +41,6 @@ LIBPMEMOBJ=y
 LIBPMEMPOOL=y
 LIBPMEMFILE_CORE=y
 
+INSTALL_TARGET=n
+
 include $(TOP)/src/tools/Makefile.inc
