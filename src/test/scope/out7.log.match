@@ -53,6 +53,7 @@ pmemfile_symlink
 pmemfile_symlinkat
 pmemfile_sync
 pmemfile_truncate
+pmemfile_umask
 pmemfile_unlink
 pmemfile_unlinkat
 pmemfile_utimensat
@@ -112,6 +113,7 @@ pmemfile_symlink
 pmemfile_symlinkat
 pmemfile_sync
 pmemfile_truncate
+pmemfile_umask
 pmemfile_unlink
 pmemfile_unlinkat
 pmemfile_utimensat

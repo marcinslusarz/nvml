@@ -110,4 +110,5 @@ int pmemfile_utimensat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
 int pmemfile_futimens(PMEMfilepool *, PMEMfile *file,
 		const struct timespec times[2]);
 
+mode_t pmemfile_umask(PMEMfilepool *, mode_t mask);
 #endif
