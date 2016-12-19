@@ -487,6 +487,32 @@ pmemfile_fchownat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 }
 
 int
+pmemfile_utime(PMEMfilepool *pfp, const char *filename,
+		const struct utimbuf *times)
+{
+	check_pfp(pfp);
+
+	(void) filename;
+	(void) times;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_utimes(PMEMfilepool *pfp, const char *filename,
+		const struct timeval times[2])
+{
+	check_pfp(pfp);
+
+	(void) filename;
+	(void) times;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
 pmemfile_utimensat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 		const struct timespec times[2], int flags)
 {
