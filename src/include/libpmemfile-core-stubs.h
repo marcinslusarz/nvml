@@ -33,7 +33,7 @@
 /*
  * libpmemfile-core-stubs.h -- definitions of not yet implemented
  * libpmemfile-core entry points. Do not use these. All the routines
- * just set errno to ENUTSUP.
+ * just set errno to ENOTSUP.
  * This is header file, and the symbols exported are used while designing
  * the interface of the library.
  * Everything here is subject to change at any time.
@@ -133,4 +133,35 @@ ssize_t pmemfile_copy_file_range(PMEMfilepool *,
 		PMEMfile *file_out, loff_t *off_out,
 		size_t len, unsigned flags);
 
+/*
+ * Other:
+ *	sendfile
+ *	tee
+ *	splice
+ *	vmsplice
+ *	statfs
+ *	fstatfs
+ *	statvfs
+ *	fstatvfs
+ *	pathconf
+ *	fpathconf
+ *	name_to_handle_at
+ *	open_by_handle_at
+ *	ioctl
+ *
+ * AIO:
+ *	aio_read
+ *	aio_write
+ *	aio_fsync
+ *	aio_error
+ *	aio_return
+ *	aio_suspend
+ *	aio_cancel
+ *	lio_listio
+ *	io_submit
+ *	io_cancel
+ *	io_destroy
+ *	io_getevents
+ *	io_setup
+ */
 #endif
