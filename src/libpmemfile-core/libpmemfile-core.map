@@ -95,6 +95,8 @@
 		pmemfile_unlink;
 		pmemfile_unlinkat;
 		pmemfile_utimensat;
+		pmemfile_utime;
+		pmemfile_utimes;
 		pmemfile_write;
 		pmemfile_writev;
 

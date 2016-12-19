@@ -110,6 +110,11 @@ ssize_t pmemfile_pwritev(PMEMfilepool *, PMEMfile *file,
 
 int pmemfile_fcntl(PMEMfilepool *, PMEMfile *file, int cmd, ...);
 
+struct utimbuf;
+int pmemfile_utime(PMEMfilepool *, const char *filename,
+		const struct utimbuf *times);
+int pmemfile_utimes(PMEMfilepool *, const char *filename,
+		const struct timeval times[2]);
 int pmemfile_utimensat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
 		const struct timespec times[2], int flags);
 int pmemfile_futimens(PMEMfilepool *, PMEMfile *file,

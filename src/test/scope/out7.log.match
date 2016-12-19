@@ -59,7 +59,9 @@ pmemfile_truncate
 pmemfile_umask
 pmemfile_unlink
 pmemfile_unlinkat
+pmemfile_utime
 pmemfile_utimensat
+pmemfile_utimes
 pmemfile_write
 pmemfile_writev
 ../../nondebug/libpmemfile-core.so:
@@ -122,6 +124,8 @@ pmemfile_truncate
 pmemfile_umask
 pmemfile_unlink
 pmemfile_unlinkat
+pmemfile_utime
 pmemfile_utimensat
+pmemfile_utimes
 pmemfile_write
 pmemfile_writev
