@@ -103,6 +103,33 @@ pmemfile_access(PMEMfilepool *pfp, const char *path, mode_t mode)
 }
 
 int
+pmemfile_euidaccess(PMEMfilepool *pfp, const char *pathname, int mode)
+{
+	check_pfp(pfp);
+
+	(void) pathname;
+	(void) mode;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_faccessat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
+		int mode, int flags)
+{
+	check_pfp(pfp);
+
+	(void) dir;
+	(void) pathname;
+	(void) mode;
+	(void) flags;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
 pmemfile_sync(PMEMfilepool *pfp)
 {
 	check_pfp(pfp);
