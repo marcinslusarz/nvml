@@ -80,4 +80,14 @@ void *pmemfile_mremap(PMEMfilepool *, void *old_addr, size_t old_size,
 int pmemfile_msync(PMEMfilepool *, void *addr, size_t len, int flags);
 int pmemfile_mprotect(PMEMfilepool *, void *addr, size_t len, int prot);
 
+struct iovec;
+ssize_t pmemfile_readv(PMEMfilepool *, PMEMfile *file,
+	const struct iovec *iov, int iovcnt);
+ssize_t pmemfile_writev(PMEMfilepool *, PMEMfile *file,
+	const struct iovec *iov, int iovcnt);
+ssize_t pmemfile_preadv(PMEMfilepool *, PMEMfile *file,
+	const struct iovec *iov, int iovcnt, off_t offset);
+ssize_t pmemfile_pwritev(PMEMfilepool *, PMEMfile *file,
+	const struct iovec *iov, int iovcnt, off_t offset);
+
 #endif
