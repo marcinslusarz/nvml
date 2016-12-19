@@ -301,3 +301,61 @@ pmemfile_mprotect(PMEMfilepool *pfp, void *addr, size_t len, int prot)
 	errno = ENOTSUP;
 	return -1;
 }
+
+ssize_t
+pmemfile_readv(PMEMfilepool *pfp, PMEMfile *file, const struct iovec *iov,
+	int iovcnt)
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) iov;
+	(void) iovcnt;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+ssize_t
+pmemfile_writev(PMEMfilepool *pfp, PMEMfile *file, const struct iovec *iov,
+	int iovcnt)
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) iov;
+	(void) iovcnt;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+ssize_t
+pmemfile_preadv(PMEMfilepool *pfp, PMEMfile *file, const struct iovec *iov,
+	int iovcnt, off_t offset)
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) iov;
+	(void) iovcnt;
+	(void) offset;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+ssize_t
+pmemfile_pwritev(PMEMfilepool *pfp, PMEMfile *file, const struct iovec *iov,
+	int iovcnt, off_t offset)
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) iov;
+	(void) iovcnt;
+	(void) offset;
+
+	errno = ENOTSUP;
+	return -1;
+}
