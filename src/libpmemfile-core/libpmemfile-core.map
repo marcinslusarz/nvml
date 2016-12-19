@@ -85,6 +85,7 @@
 		pmemfile_readv;
 		pmemfile_rename;
 		pmemfile_renameat;
+		pmemfile_renameat2;
 		pmemfile_rmdir;
 		pmemfile_stat;
 		pmemfile_symlink;

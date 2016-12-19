@@ -49,6 +49,7 @@ pmemfile_readlinkat
 pmemfile_readv
 pmemfile_rename
 pmemfile_renameat
+pmemfile_renameat2
 pmemfile_rmdir
 pmemfile_stat
 pmemfile_stats
@@ -114,6 +115,7 @@ pmemfile_readlinkat
 pmemfile_readv
 pmemfile_rename
 pmemfile_renameat
+pmemfile_renameat2
 pmemfile_rmdir
 pmemfile_stat
 pmemfile_stats
