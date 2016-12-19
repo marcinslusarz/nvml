@@ -528,6 +528,32 @@ pmemfile_utimes(PMEMfilepool *pfp, const char *filename,
 }
 
 int
+pmemfile_futimes(PMEMfilepool *pfp, PMEMfile *file,
+		const struct timeval tv[2])
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) tv;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+pmemfile_lutimes(PMEMfilepool *pfp, const char *filename,
+		const struct timeval tv[2])
+{
+	check_pfp(pfp);
+
+	(void) filename;
+	(void) tv;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
 pmemfile_utimensat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 		const struct timespec times[2], int flags)
 {
