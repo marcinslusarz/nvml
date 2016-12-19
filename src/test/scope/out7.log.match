@@ -23,6 +23,7 @@ pmemfile_fstat
 pmemfile_fstatat
 pmemfile_ftruncate
 pmemfile_futimens
+pmemfile_futimes
 pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
@@ -32,6 +33,7 @@ pmemfile_linkat
 pmemfile_lseek
 pmemfile_lseek64
 pmemfile_lstat
+pmemfile_lutimes
 pmemfile_mkdir
 pmemfile_mkdirat
 pmemfile_mkfs
@@ -89,6 +91,7 @@ pmemfile_fstat
 pmemfile_fstatat
 pmemfile_ftruncate
 pmemfile_futimens
+pmemfile_futimes
 pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
@@ -98,6 +101,7 @@ pmemfile_linkat
 pmemfile_lseek
 pmemfile_lseek64
 pmemfile_lstat
+pmemfile_lutimes
 pmemfile_mkdir
 pmemfile_mkdirat
 pmemfile_mkfs

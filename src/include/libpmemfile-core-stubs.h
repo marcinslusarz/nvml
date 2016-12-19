@@ -117,6 +117,10 @@ int pmemfile_utime(PMEMfilepool *, const char *filename,
 		const struct utimbuf *times);
 int pmemfile_utimes(PMEMfilepool *, const char *filename,
 		const struct timeval times[2]);
+int pmemfile_futimes(PMEMfilepool *, PMEMfile *file,
+		const struct timeval tv[2]);
+int pmemfile_lutimes(PMEMfilepool *, const char *filename,
+		const struct timeval tv[2]);
 int pmemfile_utimensat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
 		const struct timespec times[2], int flags);
 int pmemfile_futimens(PMEMfilepool *, PMEMfile *file,
