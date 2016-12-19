@@ -105,4 +105,9 @@ ssize_t pmemfile_pwritev(PMEMfilepool *, PMEMfile *file,
 
 int pmemfile_fcntl(PMEMfilepool *, PMEMfile *file, int cmd, ...);
 
+int pmemfile_utimensat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
+		const struct timespec times[2], int flags);
+int pmemfile_futimens(PMEMfilepool *, PMEMfile *file,
+		const struct timespec times[2]);
+
 #endif
