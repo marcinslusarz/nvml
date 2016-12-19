@@ -64,8 +64,19 @@ int pmemfile_ftruncate(PMEMfilepool *, PMEMfile *file, off_t length);
 int pmemfile_symlink(PMEMfilepool *, const char *path1, const char *path2);
 int pmemfile_symlinkat(PMEMfilepool *, const char *path1,
 				PMEMfile *at, const char *path2);
+
 int pmemfile_chmod(PMEMfilepool *, const char *path, mode_t mode);
 int pmemfile_fchmod(PMEMfilepool *, PMEMfile *, mode_t mode);
+int pmemfile_fchmodat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
+	mode_t mode, int flags);
+
+int pmemfile_chown(PMEMfilepool *, const char *pathname, uid_t owner,
+		gid_t group);
+int pmemfile_fchown(PMEMfilepool *, PMEMfile *file, uid_t owner, gid_t group);
+int pmemfile_lchown(PMEMfilepool *, const char *pathname, uid_t owner,
+		gid_t group);
+int pmemfile_fchownat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
+		uid_t owner, gid_t group, int flags);
 
 // De we need dup, dup2 in corelib? Maybe, dunno...
 PMEMfile *pmemfile_dup(PMEMfilepool *, PMEMfile *);
