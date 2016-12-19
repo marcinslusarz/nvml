@@ -359,3 +359,15 @@ pmemfile_pwritev(PMEMfilepool *pfp, PMEMfile *file, const struct iovec *iov,
 	errno = ENOTSUP;
 	return -1;
 }
+
+int
+pmemfile_fcntl(PMEMfilepool *pfp, PMEMfile *file, int cmd, ...)
+{
+	check_pfp(pfp);
+
+	(void) file;
+	(void) cmd;
+
+	errno = ENOTSUP;
+	return -1;
+}
