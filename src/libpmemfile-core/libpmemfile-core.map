@@ -38,12 +38,17 @@
 		pmemfile_access;
 		pmemfile_chdir;
 		pmemfile_chmod;
+		pmemfile_chown;
 		pmemfile_close;
 		pmemfile_dup;
 		pmemfile_dup2;
 		pmemfile_errormsg;
 		pmemfile_fchdir;
 		pmemfile_fchmod;
+		pmemfile_fchmodat;
+		pmemfile_fchown;
+		pmemfile_fchownat;
+		pmemfile_fcntl;
 		pmemfile_fdatasync;
 		pmemfile_flock;
 		pmemfile_fstat;
@@ -52,6 +57,7 @@
 		pmemfile_getcwd;
 		pmemfile_getdents;
 		pmemfile_getdents64;
+		pmemfile_lchown;
 		pmemfile_link;
 		pmemfile_linkat;
 		pmemfile_lseek;
@@ -66,9 +72,12 @@
 		pmemfile_pool_close;
 		pmemfile_pool_open;
 		pmemfile_pread;
+		pmemfile_preadv;
 		pmemfile_pwrite;
+		pmemfile_pwritev;
 		pmemfile_read;
 		pmemfile_readlink;
+		pmemfile_readv;
 		pmemfile_rename;
 		pmemfile_renameat;
 		pmemfile_rmdir;
@@ -80,6 +89,7 @@
 		pmemfile_unlink;
 		pmemfile_unlinkat;
 		pmemfile_write;
+		pmemfile_writev;
 
 		pmemfile_stats;
 	local:
