@@ -24,6 +24,7 @@ pmemfile_fstatat
 pmemfile_ftruncate
 pmemfile_futimens
 pmemfile_futimes
+pmemfile_get_dir_path
 pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
@@ -92,6 +93,7 @@ pmemfile_fstatat
 pmemfile_ftruncate
 pmemfile_futimens
 pmemfile_futimes
+pmemfile_get_dir_path
 pmemfile_getcwd
 pmemfile_getdents
 pmemfile_getdents64
