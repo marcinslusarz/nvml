@@ -54,7 +54,6 @@ export TEST_LD_PRELOAD=libpmemfile.so
 export PMEMFILE_POOLS=$DIR/mount_point:$DIR/fs
 export PMEMFILE_PRELOAD_LOG=pmemfile_preload.log
 export INTERCEPT_LOG=intercept.log
-export INTERCEPT_LOG_NO_PID=1
 export LIST_DIR_ON_ERROR=1
 export DUMP_FILES_ON_ERROR="${INTERCEPT_LOG} ${PMEMFILE_PRELOAD_LOG}"
 export UT_DUMP_LINES=1000

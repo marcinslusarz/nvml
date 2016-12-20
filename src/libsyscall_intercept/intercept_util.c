@@ -108,8 +108,8 @@ intercept_setup_log(const char *path_base)
 	if (path_base == NULL)
 		return;
 
-	if (getenv("INTERCEPT_LOG_NO_PID") == NULL) {
-		snprintf(full_path, sizeof(full_path), "%s.%ld",
+	if (path_base[strlen(path_base) - 1] == '-') {
+		snprintf(full_path, sizeof(full_path), "%s%ld",
 			path_base,
 			syscall_no_intercept(SYS_getpid));
 

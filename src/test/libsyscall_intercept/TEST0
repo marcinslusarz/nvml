@@ -47,7 +47,6 @@ rm -f libcintercept0.all.log
 
 export TEST_LD_PRELOAD=libsyscall_intercept.so
 export INTERCEPT_LOG=libcintercept$UNITTEST_NUM.all.log
-export INTERCEPT_LOG_NO_PID=1
 
 # The test_libcintercept executable is only a dummy program,
 # doing a few file operations. The EXESUFFIX isn't really needed here right now.
