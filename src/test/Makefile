@@ -61,7 +61,7 @@ FILE_TESTS = \
 	file_core_stat
 
 ifeq ($(HAS_CAPSTONE),y)
-FILE_TESTS += libsyscall_intercept file_preload
+FILE_TESTS += libsyscall_intercept file_preload file_sqlite
 else
 $(info NOTE: Skipping pmemfile interposing library tests because \
 capstone is missing.)
