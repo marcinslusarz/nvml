@@ -62,6 +62,7 @@
 		pmemfile_getcwd;
 		pmemfile_getdents;
 		pmemfile_getdents64;
+		pmemfile_get_dir_path;
 		pmemfile_lchown;
 		pmemfile_link;
 		pmemfile_linkat;

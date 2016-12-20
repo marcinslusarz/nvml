@@ -1157,17 +1157,18 @@ pool_get_dir_for_path(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 	return dir->vinode;
 }
 
-char *
-pmemfile_getcwd(PMEMfilepool *pfp, char *buf, size_t size)
+static char *
+_pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
+		char *buf, size_t size)
 {
+	struct pmemfile_vinode *parent = NULL, *child = vinode;
+
 	if (buf && size == 0) {
+		vinode_unref_tx(pfp, child);
+
 		errno = EINVAL;
 		return NULL;
 	}
-
-	struct pmemfile_vinode *parent = NULL, *child;
-
-	child = pool_get_cwd(pfp);
 
 	util_rwlock_rdlock(&child->rwlock);
 	if (child->orphaned.arr) {
@@ -1241,4 +1242,25 @@ range_err:
 	vinode_unref_tx(pfp, child);
 	errno = ERANGE;
 	return NULL;
+}
+
+char *
+pmemfile_get_dir_path(PMEMfilepool *pfp, PMEMfile *dir, char *buf, size_t size)
+{
+	struct pmemfile_vinode *vdir;
+
+	if (dir == PMEMFILE_AT_CWD) {
+		vdir = pool_get_cwd(pfp);
+	} else {
+		vdir = dir->vinode;
+		vinode_ref(pfp, vdir);
+	}
+
+	return _pmemfile_get_dir_path(pfp, vdir, buf, size);
+}
+
+char *
+pmemfile_getcwd(PMEMfilepool *pfp, char *buf, size_t size)
+{
+	return _pmemfile_get_dir_path(pfp, pool_get_cwd(pfp), buf, size);
 }
