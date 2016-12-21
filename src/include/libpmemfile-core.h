@@ -115,6 +115,7 @@ int pmemfile_rmdir(PMEMfilepool *, const char *path);
 int pmemfile_chdir(PMEMfilepool *, const char *path);
 int pmemfile_fchdir(PMEMfilepool *, PMEMfile *dir);
 char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t size);
+int pmemfile_fcntl(PMEMfilepool *, PMEMfile *file, int cmd, ...);
 
 struct pmemfile_stats {
 	unsigned inodes;

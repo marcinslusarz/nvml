@@ -418,18 +418,6 @@ pmemfile_pwritev(PMEMfilepool *pfp, PMEMfile *file, const struct iovec *iov,
 }
 
 int
-pmemfile_fcntl(PMEMfilepool *pfp, PMEMfile *file, int cmd, ...)
-{
-	check_pfp(pfp);
-
-	(void) file;
-	(void) cmd;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_fchmodat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	mode_t mode, int flags)
 {
