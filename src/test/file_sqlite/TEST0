@@ -42,7 +42,7 @@ require_build_type debug nondebug
 require_fs_type any
 
 # XXX uncomment after rebase to master
-#require_binary sqlite3
+#require_command sqlite3
 
 setup
 
