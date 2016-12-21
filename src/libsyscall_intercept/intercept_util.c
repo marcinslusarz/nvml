@@ -213,6 +213,53 @@ print_open_flags(char *buffer, long flags)
 	return c;
 }
 
+static const char *
+fcntl_name(long cmd)
+{
+#define F(x) case x: return #x;
+	switch (cmd) {
+		F(F_DUPFD);
+		F(F_DUPFD_CLOEXEC);
+		F(F_GETFD);
+		F(F_SETFD);
+		F(F_GETFL);
+		F(F_SETFL);
+		F(F_SETLK);
+		F(F_SETLKW);
+		F(F_GETLK);
+		F(F_OFD_SETLK);
+		F(F_OFD_SETLKW);
+		F(F_OFD_GETLK);
+		F(F_GETOWN);
+		F(F_SETOWN);
+		F(F_GETOWN_EX);
+		F(F_SETOWN_EX);
+		F(F_GETSIG);
+		F(F_SETSIG);
+		F(F_SETLEASE);
+		F(F_GETLEASE);
+		F(F_NOTIFY);
+		F(F_SETPIPE_SZ);
+		F(F_GETPIPE_SZ);
+#ifdef F_ADD_SEALS
+		F(F_ADD_SEALS);
+		F(F_GET_SEALS);
+		F(F_SEAL_SEAL);
+		F(F_SEAL_SHRINK);
+		F(F_SEAL_GROW);
+		F(F_SEAL_WRITE);
+#endif
+	}
+	return "unknown";
+#undef F
+}
+
+static char *
+print_fcntl_cmd(char *buffer, long cmd)
+{
+	return buffer + sprintf(buffer, "%ld (%s)", cmd, fcntl_name(cmd));
+}
+
 static void
 print_clone_flags(char buffer[static 0x100], long flags)
 {
@@ -294,7 +341,8 @@ enum {
 	f_hex, /* hexadecimal number, with zero padding e.g. pointers */
 	f_str, /* zero terminated string */
 	f_buf, /* buffer, with a given size */
-	f_open_flags /* only used for oflags in open, openat */
+	f_open_flags, /* only used for oflags in open, openat */
+	f_fnctl_cmd, /* 2nd argument of fcntl */
 };
 
 static char *print_syscall(char *buffer, const char *name, unsigned args, ...);
@@ -465,7 +513,7 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 	} else if (nr == SYS_fcntl) {
 		buf = print_syscall(buf, "fcntl", 3,
 				f_dec, arg0,
-				f_dec, arg1,
+				f_fnctl_cmd, arg1,
 				f_dec, arg1,
 				result);
 	} else if (nr == SYS_flock) {
@@ -967,6 +1015,8 @@ print_syscall(char *b, const char *name, unsigned args, ...)
 			b = xprint_escape(b, data, 0x80, false, size);
 		} else if (format == f_open_flags) {
 			b = print_open_flags(b, va_arg(ap, long));
+		} else if (format == f_fnctl_cmd) {
+			b = print_fcntl_cmd(b, va_arg(ap, long));
 		}
 
 		--args;
