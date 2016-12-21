@@ -456,6 +456,7 @@ static long hook_getdents64(long fd, long dirp, unsigned count);
 static long hook_chdir(const char *path);
 static long hook_fchdir(long fd);
 static long hook_getcwd(char *buf, size_t size);
+static long hook_fcntl(long fd, long cmd, long arg);
 
 static long
 dispatch_syscall(long syscall_number,
@@ -584,11 +585,8 @@ dispatch_syscall(long syscall_number,
 	if (syscall_number == SYS_fsetxattr)
 		return -ENOTSUP;
 
-	if (syscall_number == SYS_fcntl) {
-		if (arg1 == F_SETLK || arg1 == F_UNLCK)
-			return 0;
-		return -ENOTSUP;
-	}
+	if (syscall_number == SYS_fcntl)
+		return hook_fcntl(arg0, arg1, arg2);
 
 	if (syscall_number == SYS_fdatasync)
 		return 0;
@@ -1248,4 +1246,19 @@ hook_openat(struct fd_desc at, long arg0, long flags, long mode)
 			return -errno;
 		}
 	}
+}
+
+static long
+hook_fcntl(long fd, long cmd, long arg)
+{
+	struct fd_association *file = fd_table + fd;
+	long r = pmemfile_fcntl(file->pool->pool, file->file, (int)cmd, arg);
+
+	if (r < 0)
+		r = -errno;
+
+	log_write("pmemfile_fcntl(%p, %p, 0x%lx, 0x%lx) = %ld",
+	    (void *)file->pool, (void *)file->file, cmd, arg, r);
+
+	return r;
 }

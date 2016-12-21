@@ -673,6 +673,20 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 	return pmemfile_unlinkat(pfp, PMEMFILE_AT_CWD, pathname, 0);
 }
 
+int
+pmemfile_fcntl(PMEMfilepool *pfp, PMEMfile *file, int cmd, ...)
+{
+	// XXX
+	if (cmd == F_SETLK || cmd == F_UNLCK)
+		return 0;
+
+	(void) pfp;
+	(void) file;
+
+	errno = ENOTSUP;
+	return -1;
+}
+
 /*
  * pmemfile_stats -- get pool statistics
  */

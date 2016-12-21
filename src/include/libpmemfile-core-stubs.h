@@ -110,8 +110,6 @@ ssize_t pmemfile_preadv(PMEMfilepool *, PMEMfile *file,
 ssize_t pmemfile_pwritev(PMEMfilepool *, PMEMfile *file,
 	const struct iovec *iov, int iovcnt, off_t offset);
 
-int pmemfile_fcntl(PMEMfilepool *, PMEMfile *file, int cmd, ...);
-
 struct utimbuf;
 int pmemfile_utime(PMEMfilepool *, const char *filename,
 		const struct utimbuf *times);
