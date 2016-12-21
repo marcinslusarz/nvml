@@ -676,12 +676,31 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 int
 pmemfile_fcntl(PMEMfilepool *pfp, PMEMfile *file, int cmd, ...)
 {
-	// XXX
-	if (cmd == F_SETLK || cmd == F_UNLCK)
-		return 0;
+	int ret = 0;
 
 	(void) pfp;
 	(void) file;
+
+	switch (cmd) {
+		case F_SETLK:
+		case F_UNLCK:
+			// XXX
+			return 0;
+		case F_GETFL:
+			ret |= O_LARGEFILE;
+			if (file->flags & PFILE_APPEND)
+				ret |= O_APPEND;
+			if (file->flags & PFILE_NOATIME)
+				ret |= O_NOATIME;
+			if ((file->flags & PFILE_READ) == PFILE_READ)
+				ret |= O_RDONLY;
+			if ((file->flags & PFILE_WRITE) == PFILE_WRITE)
+				ret |= O_WRONLY;
+			if ((file->flags & (PFILE_READ | PFILE_WRITE)) ==
+					(PFILE_READ | PFILE_WRITE))
+				ret |= O_RDWR;
+			return ret;
+	}
 
 	errno = ENOTSUP;
 	return -1;
