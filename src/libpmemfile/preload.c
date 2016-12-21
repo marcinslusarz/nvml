@@ -220,6 +220,20 @@ init_hooking(void)
 	syscall_number_filter[SYS_pwrite64] = true;
 	syscall_number_filter[SYS_fcntl] = true;
 	syscall_number_filter[SYS_fdatasync] = true;
+	syscall_number_filter[SYS_syncfs] = true;
+	syscall_number_filter[SYS_flock] = true;
+	syscall_number_filter[SYS_rename] = true;
+	syscall_number_filter[SYS_renameat] = true;
+	syscall_number_filter[SYS_renameat2] = true;
+	syscall_number_filter[SYS_symlink] = true;
+	syscall_number_filter[SYS_symlinkat] = true;
+	syscall_number_filter[SYS_chmod] = true;
+	syscall_number_filter[SYS_fchmod] = true;
+	syscall_number_filter[SYS_fchmodat] = true;
+	syscall_number_filter[SYS_chown] = true;
+	syscall_number_filter[SYS_fchown] = true;
+	syscall_number_filter[SYS_lchown] = true;
+	syscall_number_filter[SYS_fchownat] = true;
 
 	syscall_needs_fd_rlock[SYS_pread64] = true;
 	syscall_needs_fd_rlock[SYS_pwrite64] = true;
@@ -240,6 +254,15 @@ init_hooking(void)
 	syscall_needs_fd_rlock[SYS_fsetxattr] = true;
 	syscall_needs_fd_rlock[SYS_fcntl] = true;
 	syscall_needs_fd_rlock[SYS_fdatasync] = true;
+	syscall_needs_fd_rlock[SYS_syncfs] = true;
+	syscall_needs_fd_rlock[SYS_flock] = true;
+	syscall_needs_fd_rlock[SYS_renameat] = true;
+	syscall_needs_fd_rlock[SYS_renameat2] = true;
+	syscall_needs_fd_rlock[SYS_symlinkat] = true;
+	syscall_needs_fd_rlock[SYS_fchmod] = true;
+	syscall_needs_fd_rlock[SYS_fchmodat] = true;
+	syscall_needs_fd_rlock[SYS_fchown] = true;
+	syscall_needs_fd_rlock[SYS_fchownat] = true;
 
 	syscall_needs_fd_wlock[SYS_open] = true;
 	syscall_needs_fd_wlock[SYS_openat] = true;
@@ -263,6 +286,17 @@ init_hooking(void)
 	syscall_needs_pmem_cwd_rlock[SYS_mkdir] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_mkdirat] = true;
 	syscall_needs_pmem_cwd_rlock[SYS_rmdir] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_rename] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_renameat] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_renameat2] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_truncate] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_symlink] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_symlinkat] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_chmod] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_fchmodat] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_chown] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_lchown] = true;
+	syscall_needs_pmem_cwd_rlock[SYS_fchownat] = true;
 
 	syscall_has_fd_first_arg[SYS_write] = true;
 	syscall_has_fd_first_arg[SYS_read] = true;
@@ -277,6 +311,10 @@ init_hooking(void)
 	syscall_has_fd_first_arg[SYS_getdents64] = true;
 	syscall_has_fd_first_arg[SYS_fcntl] = true;
 	syscall_has_fd_first_arg[SYS_fdatasync] = true;
+	syscall_has_fd_first_arg[SYS_flock] = true;
+	syscall_has_fd_first_arg[SYS_ftruncate] = true;
+	syscall_has_fd_first_arg[SYS_fchmod] = true;
+	syscall_has_fd_first_arg[SYS_fchown] = true;
 
 	// Install the callback to be calleb by the syscall intercepting library
 	intercept_hook_point = &hook;
@@ -456,7 +494,21 @@ static long hook_getdents64(long fd, long dirp, unsigned count);
 static long hook_chdir(const char *path);
 static long hook_fchdir(long fd);
 static long hook_getcwd(char *buf, size_t size);
-static long hook_fcntl(long fd, long cmd, long arg);
+
+static long hook_flock(long fd, int operation);
+static long hook_renameat2(struct fd_desc at_old, const char *path_old,
+		struct fd_desc at_new, const char *path_new, unsigned flags);
+static long hook_truncate(const char *path, off_t length);
+static long hook_ftruncate(long fd, off_t length);
+static long hook_symlinkat(const char *target,
+				struct fd_desc at, const char *linkpath);
+static long hook_fchmod(long fd, mode_t mode);
+static long hook_fchmodat(struct fd_desc at, const char *path,
+				mode_t mode, int flags);
+static long hook_fchown(long fd, uid_t owner, gid_t group);
+static long hook_fchownat(struct fd_desc at, const char *path,
+				uid_t owner, gid_t group, int flags);
+static long hook_fcntl(long fd, int cmd, long arg);
 
 static long
 dispatch_syscall(long syscall_number,
@@ -474,6 +526,19 @@ dispatch_syscall(long syscall_number,
 
 	if (syscall_number == SYS_openat)
 		return hook_openat(fetch_fd(arg0), arg1, arg2, arg3);
+
+	if (syscall_number == SYS_rename)
+		return hook_renameat2(cwd_desc(), (const char *)arg0,
+					cwd_desc(), (const char *)arg1, 0);
+
+	if (syscall_number == SYS_renameat)
+		return hook_renameat2(fetch_fd(arg0), (const char *)arg1,
+					fetch_fd(arg2), (const char *)arg3, 0);
+
+	if (syscall_number == SYS_renameat2)
+		return hook_renameat2(fetch_fd(arg0), (const char *)arg1,
+					fetch_fd(arg2), (const char *)arg3,
+					(unsigned)arg4);
 
 	// Use pmemfile_linkat to implement link, linkat
 	if (syscall_number == SYS_link)
@@ -586,10 +651,57 @@ dispatch_syscall(long syscall_number,
 		return -ENOTSUP;
 
 	if (syscall_number == SYS_fcntl)
-		return hook_fcntl(arg0, arg1, arg2);
+		return hook_fcntl(arg0, (int)arg1, arg2);
+
+	if (syscall_number == SYS_syncfs)
+		return 0;
 
 	if (syscall_number == SYS_fdatasync)
 		return 0;
+
+	if (syscall_number == SYS_flock)
+		return hook_flock(arg0, (int)arg1);
+
+	if (syscall_number == SYS_truncate)
+		return hook_truncate((const char *)arg0, arg1);
+
+	if (syscall_number == SYS_ftruncate)
+		return hook_ftruncate(arg0, arg1);
+
+	if (syscall_number == SYS_symlink)
+		return hook_symlinkat((const char *)arg0,
+					cwd_desc(), (const char *)arg1);
+
+	if (syscall_number == SYS_symlinkat)
+		return hook_symlinkat((const char *)arg0,
+					fetch_fd(arg1), (const char *)arg2);
+
+	if (syscall_number == SYS_chmod)
+		return hook_fchmodat(cwd_desc(), (const char *)arg0,
+					(mode_t)arg1, 0);
+
+	if (syscall_number == SYS_fchmod)
+		return hook_fchmod(arg0, (mode_t)arg1);
+
+	if (syscall_number == SYS_fchmodat)
+		return hook_fchmodat(fetch_fd(arg0), (const char *)arg1,
+					(mode_t)arg2, (int)arg3);
+
+	if (syscall_number == SYS_chown)
+		return hook_fchownat(cwd_desc(), (const char *)arg0,
+					(uid_t)arg1, (gid_t)arg2, 0);
+
+	if (syscall_number == SYS_lchown)
+		return hook_fchownat(cwd_desc(), (const char *)arg0,
+					(uid_t)arg1, (gid_t)arg2,
+					AT_SYMLINK_NOFOLLOW);
+
+	if (syscall_number == SYS_fchown)
+		return hook_fchown(arg0, (uid_t)arg1, (gid_t)arg2);
+
+	if (syscall_number == SYS_fchownat)
+		return hook_fchownat(fetch_fd(arg0), (const char *)arg1,
+					(uid_t)arg2, (gid_t)arg3, (int)arg4);
 
 	// Did we miss something?
 	assert(false);
@@ -1249,16 +1361,225 @@ hook_openat(struct fd_desc at, long arg0, long flags, long mode)
 }
 
 static long
-hook_fcntl(long fd, long cmd, long arg)
+hook_fcntl(long fd, int cmd, long arg)
 {
 	struct fd_association *file = fd_table + fd;
-	long r = pmemfile_fcntl(file->pool->pool, file->file, (int)cmd, arg);
+	int r = pmemfile_fcntl(file->pool->pool, file->file, cmd, arg);
 
 	if (r < 0)
 		r = -errno;
 
-	log_write("pmemfile_fcntl(%p, %p, 0x%lx, 0x%lx) = %ld",
+	log_write("pmemfile_fcntl(%p, %p, 0x%x, 0x%lx) = %d",
 	    (void *)file->pool, (void *)file->file, cmd, arg, r);
+
+	return r;
+}
+
+static long
+hook_flock(long fd, int operation)
+{
+	struct fd_association *file = fd_table + fd;
+	int r = pmemfile_flock(file->pool->pool, file->file, operation);
+
+	if (r < 0)
+		r = -errno;
+
+	log_write("pmemfile_flock(%p, %p, %d) = %d",
+	    (void *)file->pool->pool, (void *)file->file, operation, r);
+
+	return r;
+}
+
+static long
+hook_renameat2(struct fd_desc at_old, const char *path_old,
+		struct fd_desc at_new, const char *path_new, unsigned flags)
+{
+	struct resolved_path where_old;
+	struct resolved_path where_new;
+
+	resolve_path(at_old, path_old, &where_old, no_resolve_last_slink);
+	if (where_old.error_code != 0)
+		return where_old.error_code;
+
+	resolve_path(at_new, path_new, &where_new, no_resolve_last_slink);
+	if (where_new.error_code != 0)
+		return where_new.error_code;
+
+	if (where_new.at.pmem_fda.pool != where_old.at.pmem_fda.pool)
+		return -EXDEV;
+
+	if (where_new.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_renameat2,
+		    where_old.at.kernel_fd, where_old.path,
+		    where_new.at.kernel_fd, where_new.path, flags);
+
+	int r = pmemfile_renameat2(where_old.at.pmem_fda.pool->pool,
+		    where_old.at.pmem_fda.file, where_old.path,
+		    where_new.at.pmem_fda.file, where_new.path, flags);
+
+	if (r != 0)
+		r = -errno;
+
+	log_write("pmemfile_renameat2(%p, \"%s\", \"%s\", %u) = %d",
+	    (void *)where_old.at.pmem_fda.pool->pool,
+	    where_old.path, where_new.path, flags, r);
+
+	return r;
+}
+
+static long
+hook_truncate(const char *path, off_t length)
+{
+	struct resolved_path where;
+
+	resolve_path(cwd_desc(), path, &where, resolve_last_slink);
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_truncate,
+		    where.at.kernel_fd, where.path, length);
+
+	int r = pmemfile_truncate(where.at.pmem_fda.pool->pool,
+					where.path, length);
+
+	if (r != 0)
+		r = -errno;
+
+	log_write("pmemfile_truncate(%p, \"%s\", %lu) = %d",
+	    (void *)where.at.pmem_fda.pool->pool,
+	    where.path, length, r);
+
+	return r;
+}
+
+static long
+hook_ftruncate(long fd, off_t length)
+{
+	struct fd_association *file = fd_table + fd;
+	int r = pmemfile_ftruncate(file->pool->pool, file->file, length);
+
+	if (r < 0)
+		r = -errno;
+
+	log_write("pmemfile_ftruncate(%p, %p, %lu) = %d",
+	    (void *)file->pool->pool, (void *)file->file, length, r);
+
+	return r;
+}
+
+static long
+hook_symlinkat(const char *target, struct fd_desc at, const char *linkpath)
+{
+	struct resolved_path where;
+
+	resolve_path(at, linkpath, &where, resolve_last_slink);
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_symlinkat, target,
+		    where.at.kernel_fd, where.path);
+
+	int r = pmemfile_symlinkat(where.at.pmem_fda.pool->pool, target,
+					where.at.pmem_fda.file, where.path);
+
+	if (r != 0)
+		r = -errno;
+
+	log_write("pmemfile_symlinkat(%p, \"%s\", %p, \"%s\") = %d",
+	    (void *)where.at.pmem_fda.pool->pool, target,
+	    (void *)where.at.pmem_fda.file, where.path, r);
+
+	return r;
+}
+
+static long
+hook_fchmod(long fd, mode_t mode)
+{
+	struct fd_association *file = fd_table + fd;
+	int r = pmemfile_fchmod(file->pool->pool, file->file, mode);
+
+	if (r < 0)
+		r = -errno;
+
+	log_write("pmemfile_fchmod(%p, %p, 0%o) = %d",
+	    (void *)file->pool->pool, (void *)file->file, mode, r);
+
+	return r;
+}
+
+static long
+hook_fchmodat(struct fd_desc at, const char *path,
+				mode_t mode, int flags)
+{
+	struct resolved_path where;
+
+	resolve_path(at, path, &where, resolve_last_slink);
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_fchmodat,
+		    where.at.kernel_fd, where.path, mode, flags);
+
+	int r = pmemfile_fchmodat(where.at.pmem_fda.pool->pool,
+			where.at.pmem_fda.file, where.path, mode, flags);
+
+	if (r != 0)
+		r = -errno;
+
+	log_write("pmemfile_fchmodat(%p, %p, \"%s\", 0%o, %d) = %d",
+	    (void *)where.at.pmem_fda.pool->pool,
+	    (void *)where.at.pmem_fda.file,
+	    where.path, mode, flags, r);
+
+	return r;
+}
+
+static long
+hook_fchown(long fd, uid_t owner, gid_t group)
+{
+	struct fd_association *file = fd_table + fd;
+	int r = pmemfile_fchown(file->pool->pool, file->file, owner, group);
+
+	if (r < 0)
+		r = -errno;
+
+	log_write("pmemfile_fchown(%p, %p, %d, %d) = %d",
+	    (void *)file->pool->pool, (void *)file->file, owner, group, r);
+
+	return r;
+}
+
+static long
+hook_fchownat(struct fd_desc at, const char *path,
+				uid_t owner, gid_t group, int flags)
+{
+	struct resolved_path where;
+
+	resolve_path(at, path, &where,
+	    (flags & AT_SYMLINK_NOFOLLOW)
+	    ? no_resolve_last_slink : resolve_last_slink);
+
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_fchownat,
+		    where.at.kernel_fd, where.path, owner, group, flags);
+
+	int r = pmemfile_fchownat(where.at.pmem_fda.pool->pool,
+			where.at.pmem_fda.file, where.path, owner, group,
+			flags);
+
+	if (r != 0)
+		r = -errno;
+
+	log_write("pmemfile_fchownat(%p, %p, \"%s\", %d, %d, %d) = %d",
+	    (void *)where.at.pmem_fda.pool->pool,
+	    (void *)where.at.pmem_fda.file,
+	    where.path, owner, group, flags, r);
 
 	return r;
 }
