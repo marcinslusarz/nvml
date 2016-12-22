@@ -73,6 +73,10 @@ FATAL(const char *str)
 
 #include "preload.h"
 
+#if !defined(SYS_renameat2) && defined(__x86_64__)
+#define SYS_renameat2 316
+#endif
+
 static int hook(long syscall_number,
 			long arg0, long arg1,
 			long arg2, long arg3,
