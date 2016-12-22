@@ -62,7 +62,6 @@ int pmemfile_faccessat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
 
 int pmemfile_sync(PMEMfilepool *);
 int pmemfile_fdatasync(PMEMfilepool *, PMEMfile *);
-int pmemfile_rename(PMEMfilepool *, const char *old_path, const char *new_path);
 int pmemfile_renameat(PMEMfilepool *, PMEMfile *old_at, const char *old_path,
 				PMEMfile *new_at, const char *new_path);
 int pmemfile_renameat2(PMEMfilepool *, PMEMfile *old_at, const char *old_path,

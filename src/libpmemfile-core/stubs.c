@@ -148,18 +148,6 @@ pmemfile_fdatasync(PMEMfilepool *pfp, PMEMfile *file)
 }
 
 int
-pmemfile_rename(PMEMfilepool *pfp, const char *old_path, const char *new_path)
-{
-	check_pfp(pfp);
-
-	(void) *old_path;
-	(void) *new_path;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_renameat(PMEMfilepool *pfp, PMEMfile *old_at, const char *old_path,
 				PMEMfile *new_at, const char *new_path)
 {

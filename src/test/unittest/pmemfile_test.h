@@ -61,6 +61,8 @@ void PMEMFILE_CHDIR(PMEMfilepool *pfp, const char *path);
 void PMEMFILE_FCHDIR(PMEMfilepool *pfp, PMEMfile *dir);
 char *PMEMFILE_GETCWD(PMEMfilepool *pfp, char *buf, size_t size,
 		const char *cmp);
+void PMEMFILE_RENAME(PMEMfilepool *pfp, const char *old_path,
+		const char *new_path);
 
 void PMEMFILE_STAT(PMEMfilepool *pfp, const char *path, struct stat *buf);
 void PMEMFILE_LSTAT(PMEMfilepool *pfp, const char *path, struct stat *buf);

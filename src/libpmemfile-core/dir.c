@@ -369,16 +369,18 @@ end:
 void
 vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *name, struct pmemfile_vinode *volatile *vinode,
-		volatile bool *parent_refed)
+		volatile bool *parent_refed, bool abort_on_ENOENT)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
 			pmfi_path(parent), name);
 
 	struct pmemfile_dirent *dirent =
 			vinode_lookup_dirent_by_name_locked(pfp, parent, name);
-
-	if (!dirent)
+	if (!dirent) {
+		if (errno == ENOENT && !abort_on_ENOENT)
+			return;
 		pmemobj_tx_abort(errno);
+	}
 
 	TOID(struct pmemfile_inode) tinode = dirent->inode;
 	struct pmemfile_inode *inode = D_RW(tinode);

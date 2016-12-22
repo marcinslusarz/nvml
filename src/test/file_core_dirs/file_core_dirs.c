@@ -418,6 +418,45 @@ test5(PMEMfilepool *pfp)
 	PMEMFILE_RMDIR(pfp, "/dir1");
 	PMEMFILE_CHDIR(pfp, "/");
 }
+static void
+test6(PMEMfilepool *pfp)
+{
+	UT_OUT("test6");
+	// struct stat stat;
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
+	PMEMFILE_MKDIR(pfp, "/dir2", 0755);
+
+	PMEMFILE_CREATE(pfp, "/dir1/file1", 0, 0755);
+	PMEMFILE_CREATE(pfp, "/dir2/file2", 0, 0755);
+	PMEMFILE_CREATE(pfp, "/file3", 0, 0755);
+
+	PMEMFILE_LIST_FILES(pfp, "/", "dir1 dir2 file3");
+	PMEMFILE_LIST_FILES(pfp, "/dir1", "file1");
+	PMEMFILE_LIST_FILES(pfp, "/dir2", "file2");
+
+	PMEMFILE_RENAME(pfp, "/file3", "/file4");
+	PMEMFILE_LIST_FILES(pfp, "/", "dir1 dir2 file4");
+	PMEMFILE_RENAME(pfp, "/dir1/file1", "/dir1/file11");
+	PMEMFILE_LIST_FILES(pfp, "/dir1", "file11");
+	PMEMFILE_RENAME(pfp, "/dir2/file2", "/dir2/file22");
+	PMEMFILE_LIST_FILES(pfp, "/dir2", "file22");
+
+	PMEMFILE_RENAME(pfp, "/file4", "/dir2/file4");
+	PMEMFILE_LIST_FILES(pfp, "/", "dir1 dir2");
+	PMEMFILE_LIST_FILES(pfp, "/dir2", "file22 file4");
+	PMEMFILE_RENAME(pfp, "/dir1/file11", "/dir2/file11");
+	PMEMFILE_LIST_FILES(pfp, "/dir1", "empty");
+	PMEMFILE_LIST_FILES(pfp, "/dir2", "file11 file22 file4");
+	PMEMFILE_RENAME(pfp, "/dir2/file11", "/dir2/file22");
+	PMEMFILE_LIST_FILES(pfp, "/dir2", "file22 file4");
+
+	PMEMFILE_UNLINK(pfp, "/dir2/file22");
+	PMEMFILE_UNLINK(pfp, "/dir2/file4");
+
+	PMEMFILE_RMDIR(pfp, "/dir2");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+}
 
 int
 main(int argc, char *argv[])
@@ -443,6 +482,8 @@ main(int argc, char *argv[])
 	list_files(pfp, "/", 2, 1, "after test4");
 	test5(pfp);
 	list_files(pfp, "/", 2, 1, "after test5");
+	test6(pfp);
+	list_files(pfp, "/", 2, 1, "after test6");
 
 	pmemfile_pool_close(pfp);
 
