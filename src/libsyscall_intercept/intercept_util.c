@@ -227,9 +227,11 @@ fcntl_name(long cmd)
 		F(F_SETLK);
 		F(F_SETLKW);
 		F(F_GETLK);
+#ifdef F_OFD_SETLK
 		F(F_OFD_SETLK);
 		F(F_OFD_SETLKW);
 		F(F_OFD_GETLK);
+#endif
 		F(F_GETOWN);
 		F(F_SETOWN);
 		F(F_GETOWN_EX);
