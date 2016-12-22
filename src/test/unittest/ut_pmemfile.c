@@ -256,6 +256,13 @@ PMEMFILE_GETCWD(PMEMfilepool *pfp, char *buf, size_t size, const char *cmp)
 	return ret;
 }
 
+void
+PMEMFILE_RENAME(PMEMfilepool *pfp, const char *old_path, const char *new_path)
+{
+	int ret = pmemfile_rename(pfp, old_path, new_path);
+	UT_ASSERTeq(ret, 0);
+}
+
 static const char *
 timespec_to_str(const struct timespec *t)
 {

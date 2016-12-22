@@ -603,7 +603,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 		rwlock_tx_wlock(&vparent->rwlock);
 		vinode_unlink_dirent(pfp, vparent, info.name, &vinode2,
-				&parent_refed);
+				&parent_refed, true);
 		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		oerrno = errno;
@@ -671,6 +671,172 @@ int
 pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 {
 	return pmemfile_unlinkat(pfp, PMEMFILE_AT_CWD, pathname, 0);
+}
+
+static int
+_pmemfile_rename(PMEMfilepool *pfp,
+		struct pmemfile_vinode *olddir, const char *oldpath,
+		struct pmemfile_vinode *newdir, const char *newpath,
+		int flags)
+{
+	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
+
+	if (flags) {
+		LOG(LSUP, "0 flags supported in rename");
+		errno = EINVAL;
+		return -1;
+	}
+
+	struct pmemfile_vinode *volatile dst_unlinked = NULL;
+	struct pmemfile_vinode *volatile src_unlinked = NULL;
+	volatile bool dst_parent_refed = false;
+	volatile bool src_parent_refed = false;
+
+	struct pmemfile_path_info src, dst;
+	traverse_path(pfp, olddir, oldpath, true, &src);
+	traverse_path(pfp, newdir, newpath, true, &dst);
+
+	int oerrno = 0;
+
+	if (src.remaining[0] != 0 && !vinode_is_dir(src.vinode)) {
+		oerrno = ENOTDIR;
+		goto end;
+	}
+
+	if (dst.remaining[0] != 0 && !vinode_is_dir(dst.vinode)) {
+		oerrno = ENOTDIR;
+		goto end;
+	}
+
+	if (src.remaining[0] != 0 || strchr(dst.remaining, '/')) {
+		oerrno = ENOENT;
+		goto end;
+	}
+
+	struct pmemfile_vinode *src_parent;
+	struct pmemfile_vinode *dst_parent;
+	bool src_is_dir;
+	const char *src_name;
+	const char *dst_name;
+
+	src_parent = src.parent;
+	src_name = src.name;
+	src_is_dir = vinode_is_dir(src.vinode);
+
+	if (src_is_dir) {
+		LOG(LSUP, "renaming directories is not supported yet");
+		oerrno = ENOTSUP;
+		goto end;
+	}
+
+	if (dst.remaining[0] == 0) {
+		dst_parent = dst.parent;
+		dst_name = dst.name;
+	} else {
+		dst_parent = dst.vinode;
+		dst_name = dst.remaining;
+	}
+
+	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
+		// XXX, when src dir == dst dir we can just update dirent,
+		// without linking and unlinking
+
+		if (src_parent == dst_parent)
+			rwlock_tx_wlock(&dst_parent->rwlock);
+		else if (src_parent < dst_parent) {
+			rwlock_tx_wlock(&src_parent->rwlock);
+			rwlock_tx_wlock(&dst_parent->rwlock);
+		} else {
+			rwlock_tx_wlock(&dst_parent->rwlock);
+			rwlock_tx_wlock(&src_parent->rwlock);
+		}
+
+		vinode_unlink_dirent(pfp, dst_parent, dst_name,
+				&dst_unlinked, &dst_parent_refed, false);
+
+		struct pmemfile_time t;
+		file_get_time(&t);
+		vinode_add_dirent(pfp, dst_parent, dst_name, src.vinode, &t);
+
+		vinode_unlink_dirent(pfp, src_parent, src_name,
+				&src_unlinked, &src_parent_refed, true);
+
+		if (src_unlinked != src.vinode) // XXX restart?
+			pmemobj_tx_abort(ENOENT);
+
+		if (src_parent == dst_parent)
+			rwlock_tx_unlock_on_commit(&dst_parent->rwlock);
+		else {
+			rwlock_tx_unlock_on_commit(&src_parent->rwlock);
+			rwlock_tx_unlock_on_commit(&dst_parent->rwlock);
+		}
+	} TX_ONABORT {
+		oerrno = errno;
+	} TX_END
+
+	if (dst_parent_refed)
+		vinode_unref_tx(pfp, dst_parent);
+
+	if (src_parent_refed)
+		vinode_unref_tx(pfp, src_parent);
+
+	if (dst_unlinked)
+		vinode_unref_tx(pfp, dst_unlinked);
+
+	if (src_unlinked)
+		vinode_unref_tx(pfp, src_unlinked);
+
+	if (oerrno == 0) {
+		vinode_clear_debug_path(pfp, src.vinode);
+		vinode_set_debug_path(pfp, dst.vinode, src.vinode, newpath);
+	}
+
+end:
+	vinode_unref_tx(pfp, dst.vinode);
+	vinode_unref_tx(pfp, src.vinode);
+	if (dst.parent)
+		vinode_unref_tx(pfp, dst.parent);
+	if (src.parent)
+		vinode_unref_tx(pfp, src.parent);
+
+	if (oerrno) {
+		if (dst_parent_refed)
+			vinode_unref_tx(pfp, dst.vinode);
+
+		errno = oerrno;
+		return -1;
+	}
+
+	return 0;
+}
+
+int
+pmemfile_rename(PMEMfilepool *pfp, const char *old_path, const char *new_path)
+{
+	struct pmemfile_vinode *at;
+
+	if (!old_path || !new_path) {
+		LOG(LUSR, "NULL pathname");
+		errno = ENOENT;
+		return -1;
+	}
+
+	if (old_path[0] == '/' && new_path[0] == '/')
+		at = NULL;
+	else
+		at = pool_get_cwd(pfp);
+
+	int ret = _pmemfile_rename(pfp, at, old_path, at, new_path, 0);
+
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+	if (at)
+		vinode_unref_tx(pfp, at);
+	if (ret)
+		errno = oerrno;
+
+	return ret;
 }
 
 int
