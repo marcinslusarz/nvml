@@ -674,10 +674,10 @@ pmemfile_unlink(PMEMfilepool *pfp, const char *pathname)
 }
 
 static int
-_pmemfile_rename(PMEMfilepool *pfp,
+_pmemfile_renameat2(PMEMfilepool *pfp,
 		struct pmemfile_vinode *olddir, const char *oldpath,
 		struct pmemfile_vinode *newdir, const char *newpath,
-		int flags)
+		unsigned flags)
 {
 	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
 
@@ -826,7 +826,7 @@ pmemfile_rename(PMEMfilepool *pfp, const char *old_path, const char *new_path)
 	else
 		at = pool_get_cwd(pfp);
 
-	int ret = _pmemfile_rename(pfp, at, old_path, at, new_path, 0);
+	int ret = _pmemfile_renameat2(pfp, at, old_path, at, new_path, 0);
 
 	int oerrno;
 	if (ret)
@@ -837,6 +837,49 @@ pmemfile_rename(PMEMfilepool *pfp, const char *old_path, const char *new_path)
 		errno = oerrno;
 
 	return ret;
+}
+
+int
+pmemfile_renameat2(PMEMfilepool *pfp, PMEMfile *old_at, const char *old_path,
+		PMEMfile *new_at, const char *new_path, unsigned flags)
+{
+	struct pmemfile_vinode *olddir_at, *newdir_at;
+	bool olddir_at_unref, newdir_at_unref;
+
+	if (!old_path || !new_path) {
+		LOG(LUSR, "NULL pathname");
+		errno = ENOENT;
+		return -1;
+	}
+
+	olddir_at = pool_get_dir_for_path(pfp, old_at, old_path,
+			&olddir_at_unref);
+	newdir_at = pool_get_dir_for_path(pfp, new_at, new_path,
+			&newdir_at_unref);
+
+	int ret = _pmemfile_renameat2(pfp, olddir_at, old_path, newdir_at,
+			new_path, flags);
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+
+	if (olddir_at_unref)
+		vinode_unref_tx(pfp, olddir_at);
+
+	if (newdir_at_unref)
+		vinode_unref_tx(pfp, newdir_at);
+
+	if (ret)
+		errno = oerrno;
+
+	return ret;
+}
+
+int
+pmemfile_renameat(PMEMfilepool *pfp, PMEMfile *old_at, const char *old_path,
+		PMEMfile *new_at, const char *new_path)
+{
+	return pmemfile_renameat2(pfp, old_at, old_path, new_at, new_path, 0);
 }
 
 int
