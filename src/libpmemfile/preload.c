@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,6 +60,29 @@
 #include "libpmemfile-core.h"
 #include "util.h"
 
+/*
+ * Some syscalls that are missing on older kernels.
+ */
+#ifndef SYS_renameat2
+#define SYS_renameat2 316
+#endif
+
+#ifndef SYS_execveat
+#define execveat 322
+#endif
+
+#ifndef SYS_copy_file_range
+#define SYS_copy_file_range 326
+#endif
+
+#ifndef SYS_preadv2
+#define SYS_preadv2 327
+#endif
+
+#ifndef SYS_pwritev2
+#define SYS_pwritev2 328
+#endif
+
 static inline void
 FATAL(const char *str)
 {
@@ -72,10 +95,6 @@ FATAL(const char *str)
 #include "fd_pool.h"
 
 #include "preload.h"
-
-#if !defined(SYS_renameat2) && defined(__x86_64__)
-#define SYS_renameat2 316
-#endif
 
 static int hook(long syscall_number,
 			long arg0, long arg1,
@@ -1412,10 +1431,17 @@ hook_renameat2(struct fd_desc at_old, const char *path_old,
 	if (where_new.at.pmem_fda.pool != where_old.at.pmem_fda.pool)
 		return -EXDEV;
 
-	if (where_new.at.pmem_fda.pool == NULL)
-		return syscall_no_intercept(SYS_renameat2,
-		    where_old.at.kernel_fd, where_old.path,
-		    where_new.at.kernel_fd, where_new.path, flags);
+	if (where_new.at.pmem_fda.pool == NULL) {
+		if (flags == 0) {
+			return syscall_no_intercept(SYS_renameat,
+			    where_old.at.kernel_fd, where_old.path,
+			    where_new.at.kernel_fd, where_new.path);
+		} else {
+			return syscall_no_intercept(SYS_renameat2,
+			    where_old.at.kernel_fd, where_old.path,
+			    where_new.at.kernel_fd, where_new.path, flags);
+		}
+	}
 
 	int r = pmemfile_renameat2(where_old.at.pmem_fda.pool->pool,
 		    where_old.at.pmem_fda.file, where_old.path,
