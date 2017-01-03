@@ -376,7 +376,7 @@ void
 intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 			long arg2, long arg3,
 			long arg4, long arg5, unsigned long syscall_offset,
-			long result)
+			int result_known, long result)
 {
 	if (log_fd < 0)
 		return;
@@ -391,44 +391,44 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_dec, arg0,
 				f_buf, arg2, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_write) {
 		buf = print_syscall(buf, "write", 3,
 				f_dec, arg0,
 				f_buf, arg2, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_open) {
 		buf = print_syscall(buf, "open", 3,
 				f_str, arg0,
 				f_open_flags, arg1,
 				f_oct_mode, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_close) {
 		buf = print_syscall(buf, "close", 1,
 				f_dec, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_stat) {
 		buf = print_syscall(buf, "stat", 2,
 				f_str, arg0,
 				f_hex, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fstat) {
 		buf = print_syscall(buf, "fstat", 2,
 				f_dec, arg0,
 				f_hex, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_lstat) {
 		buf = print_syscall(buf, "lstat", 2,
 				f_str, arg0,
 				f_hex, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_lseek) {
 		buf = print_syscall(buf, "lstat", 3,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_mmap) {
 		buf = print_syscall(buf, "mmap", 6,
 				f_hex, arg0,
@@ -437,59 +437,59 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_dec, arg3,
 				f_dec, arg4,
 				f_hex, arg5,
-				result);
+				result_known, result);
 	} else if (nr == SYS_mprotect) {
 		buf = print_syscall(buf, "mprotect", 3,
 				f_hex, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_munmap) {
 		buf = print_syscall(buf, "munmap", 2,
 				f_hex, arg0,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_brk) {
 		buf = print_syscall(buf, "brk", 1,
 				f_dec, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_ioctl) {
 		buf = print_syscall(buf, "ioctl", 3,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_pread64) {
 		buf = print_syscall(buf, "pread64", 4,
 				f_dec, arg0,
 				f_buf, arg2, arg1,
 				f_dec, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_pwrite64) {
 		buf = print_syscall(buf, "pwrite64", 4,
 				f_dec, arg0,
 				f_buf, arg2, arg1,
 				f_dec, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_readv) {
 		buf = print_syscall(buf, "readv", 3,
 				f_dec, arg0,
 				f_hex, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_writev) {
 		buf = print_syscall(buf, "writev", 3,
 				f_dec, arg0,
 				f_hex, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_access) {
 		buf = print_syscall(buf, "access", 2,
 				f_str, arg0,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_mremap) {
 		buf = print_syscall(buf, "mremap", 5,
 				f_hex, arg0,
@@ -497,195 +497,195 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_dec, arg2,
 				f_dec, arg3,
 				f_hex, arg4,
-				result);
+				result_known, result);
 	} else if (nr == SYS_msync) {
 		buf = print_syscall(buf, "msync", 3,
 				f_hex, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_dup) {
 		buf = print_syscall(buf, "dup", 1,
 				f_dec, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_dup2) {
 		buf = print_syscall(buf, "dup2", 2,
 				f_dec, arg0,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fcntl) {
 		buf = print_syscall(buf, "fcntl", 3,
 				f_dec, arg0,
 				f_fnctl_cmd, arg1,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_flock) {
 		buf = print_syscall(buf, "flock", 2,
 				f_dec, arg0,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fsync) {
 		buf = print_syscall(buf, "fsync", 1,
 				f_dec, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fdatasync) {
 		buf = print_syscall(buf, "fdatasync", 1,
 				f_dec, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_truncate) {
 		buf = print_syscall(buf, "truncate", 2,
 				f_str, arg0,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_ftruncate) {
 		buf = print_syscall(buf, "ftruncate", 2,
 				f_dec, arg0,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_getdents) {
 		buf = print_syscall(buf, "getdents", 3,
 				f_dec, arg0,
 				f_hex, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_getcwd) {
 		buf = print_syscall(buf, "getcwd", 2,
 				f_str, arg0,
 				f_dec, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_chdir) {
 		buf = print_syscall(buf, "chdir", 1,
 				f_str, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fchdir) {
 		buf = print_syscall(buf, "fchdir", 1,
 				f_dec, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_rename) {
 		buf = print_syscall(buf, "rename", 2,
 				f_str, arg0,
 				f_str, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_mkdir) {
 		buf = print_syscall(buf, "mkdir", 2,
 				f_str, arg0,
 				f_oct_mode, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_rmdir) {
 		buf = print_syscall(buf, "rmdir", 1,
 				f_str, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_creat) {
 		buf = print_syscall(buf, "creat", 2,
 				f_str, arg0,
 				f_oct_mode, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_link) {
 		buf = print_syscall(buf, "link", 2,
 				f_str, arg0,
 				f_str, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_unlink) {
 		buf = print_syscall(buf, "unlink", 1,
 				f_str, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_symlink) {
 		buf = print_syscall(buf, "symlink", 2,
 				f_str, arg0,
 				f_str, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_readlink) {
 		buf = print_syscall(buf, "readlink", 3,
 				f_str, arg0,
 				f_buf, arg2, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_chmod) {
 		buf = print_syscall(buf, "chmod", 2,
 				f_str, arg0,
 				f_oct_mode, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fchmod) {
 		buf = print_syscall(buf, "fchmod", 2,
 				f_dec, arg0,
 				f_oct_mode, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_chown) {
 		buf = print_syscall(buf, "chown", 3,
 				f_str, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fchown) {
 		buf = print_syscall(buf, "fchown", 3,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_lchown) {
 		buf = print_syscall(buf, "lchown", 3,
 				f_str, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_umask) {
 		buf = print_syscall(buf, "umask", 1,
 				f_oct_mode, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_mknod) {
 		buf = print_syscall(buf, "mknod", 3,
 				f_str, arg0,
 				f_oct_mode, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_statfs) {
 		buf = print_syscall(buf, "statfs", 2,
 				f_str, arg0,
 				f_hex, arg1,
-				result);
+				result_known, result);
 	} else if (nr == SYS_chroot) {
 		buf = print_syscall(buf, "chroot", 1,
 				f_str, arg0,
-				result);
+				result_known, result);
 	} else if (nr == SYS_readahead) {
 		buf = print_syscall(buf, "readahead", 3,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_getdents64) {
 		buf = print_syscall(buf, "getdents64", 3,
 				f_dec, arg0,
 				f_hex, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fadvise64) {
 		buf = print_syscall(buf, "fadvise64", 4,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_openat) {
 		buf = print_syscall(buf, "openat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_open_flags, arg2,
 				f_oct_mode, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_mkdirat) {
 		buf = print_syscall(buf, "mkdirat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_open_flags, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_mknodat) {
 		buf = print_syscall(buf, "mknodat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_oct_mode, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fchownat) {
 		buf = print_syscall(buf, "fchownat", 5,
 				f_dec, arg0,
@@ -693,33 +693,33 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_dec, arg2,
 				f_dec, arg3,
 				f_dec, arg4,
-				result);
+				result_known, result);
 	} else if (nr == SYS_futimesat) {
 		buf = print_syscall(buf, "futimesat", 3,
 				f_dec, arg0,
 				f_str, arg1,
 				f_hex, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_newfstatat) {
 		buf = print_syscall(buf, "newfstatat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_hex, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_unlinkat) {
 		buf = print_syscall(buf, "unlinkat", 3,
 				f_dec, arg0,
 				f_str, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_renameat) {
 		buf = print_syscall(buf, "renameat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_dec, arg2,
 				f_str, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_linkat) {
 		buf = print_syscall(buf, "linkat", 5,
 				f_dec, arg0,
@@ -727,34 +727,34 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_dec, arg2,
 				f_str, arg3,
 				f_dec, arg4,
-				result);
+				result_known, result);
 	} else if (nr == SYS_symlinkat) {
 		buf = print_syscall(buf, "symlinkat", 3,
 				f_str, arg0,
 				f_dec, arg1,
 				f_str, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_readlinkat) {
 		buf = print_syscall(buf, "readlinkat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_str, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fchmodat) {
 		buf = print_syscall(buf, "fchmodat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_oct_mode, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_faccessat) {
 		buf = print_syscall(buf, "faccessat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_oct_mode, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_splice) {
 		buf = print_syscall(buf, "splice", 6,
 				f_dec, arg0,
@@ -763,54 +763,54 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_hex, arg3,
 				f_dec, arg4,
 				f_dec, arg5,
-				result);
+				result_known, result);
 	} else if (nr == SYS_tee) {
 		buf = print_syscall(buf, "tee", 4,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_sync_file_range) {
 		buf = print_syscall(buf, "sync_file_range", 4,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_utimensat) {
 		buf = print_syscall(buf, "utimensat", 4,
 				f_dec, arg0,
 				f_str, arg1,
 				f_hex, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_fallocate) {
 		buf = print_syscall(buf, "fallocate", 4,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_dup3) {
 		buf = print_syscall(buf, "dup3", 3,
 				f_dec, arg0,
 				f_dec, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_preadv) {
 		buf = print_syscall(buf, "preadv", 4,
 				f_dec, arg0,
 				f_hex, arg1,
 				f_dec, arg2,
 				f_dec, arg3,
-				result);
+				result_known, result);
 	} else if (nr == SYS_pwritev) {
 		buf = print_syscall(buf, "pwritev", 3,
 				f_dec, arg0,
 				f_hex, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_name_to_handle_at) {
 		buf = print_syscall(buf, "name_to_handle_at", 5,
 				f_dec, arg0,
@@ -818,17 +818,17 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_hex, arg2,
 				f_hex, arg3,
 				f_dec, arg4,
-				result);
+				result_known, result);
 	} else if (nr == SYS_open_by_handle_at) {
 		buf = print_syscall(buf, "open_by_handle_at", 3,
 				f_dec, arg0,
 				f_hex, arg1,
 				f_dec, arg2,
-				result);
+				result_known, result);
 	} else if (nr == SYS_syncfs) {
 		buf = print_syscall(buf, "syncfs", 1,
 				f_dec, arg0,
-				result);
+				result_known, result);
 #ifdef SYS_renameat2
 	} else if (nr == SYS_renameat2) {
 		buf = print_syscall(buf, "renameat2", 5,
@@ -837,14 +837,14 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_dec, arg2,
 				f_str, arg3,
 				f_dec, arg4,
-				result);
+				result_known, result);
 #endif
 	} else if (nr == SYS_execve) {
 		buf = print_syscall(buf, "execve", 3,
 				f_str, arg0,
 				f_hex, arg1,
 				f_hex, arg2,
-				result);
+				result_known, result);
 #ifdef SYS_execveat
 	} else if (nr == SYS_execveat) {
 		buf = print_syscall(buf, "execveat", 4,
@@ -852,7 +852,7 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_str, arg1,
 				f_hex, arg2,
 				f_hex, arg3,
-				result);
+				result_known, result);
 #endif
 	} else if (nr == SYS_exit_group) {
 		buf += sprintf(buf, "exit_group(%d)", (int)arg0);
@@ -865,7 +865,7 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 		buf += sprintf(buf, "clone(%s, %p, %p, %p, %ld)",
 		    sflags, (void *)arg1, (void *)arg2, (void *)arg3, arg4);
 	} else if (nr == SYS_fork) {
-		buf = print_syscall(buf, "fork", 0, result);
+		buf = print_syscall(buf, "fork", 0, result_known, result);
 	} else if (nr == SYS_vfork) {
 		buf += sprintf(buf, "vfork()");
 	} else if (nr == SYS_wait4) {
@@ -874,7 +874,7 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_hex, arg1,
 				f_hex, arg2,
 				f_hex, arg3,
-				result);
+				result_known, result);
 	} else {
 		buf = print_syscall(buf, "syscall", 7,
 				f_dec, nr,
@@ -884,7 +884,7 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				f_hex, arg3,
 				f_hex, arg4,
 				f_hex, arg5,
-				result);
+				result_known, result);
 	}
 
 	*buf++ = '\n';
@@ -1026,7 +1026,10 @@ print_syscall(char *b, const char *name, unsigned args, ...)
 		first = false;
 	}
 
-	b += sprintf(b, ") = %ld", va_arg(ap, long));
+	if (va_arg(ap, int))
+		b += sprintf(b, ") = %ld", va_arg(ap, long));
+	else
+		b += sprintf(b, ") = ?");
 
 	va_end(ap);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -234,23 +234,18 @@ intercept_routine(long nr, long arg0, long arg1,
 	long result;
 	int forward_to_kernel = true;
 
+	intercept_log_syscall(libpath, nr,
+	    arg0, arg1, arg2, arg3, arg4, arg5,
+	    syscall_offset, 0, 0);
+
 	if (intercept_hook_point != NULL)
 		forward_to_kernel = intercept_hook_point(nr,
 		    arg0, arg1, arg2, arg3, arg4, arg5, &result);
 
-	if (nr == SYS_exit_group || nr == SYS_exit) {
-		/* can't log these syscalls after-the-fact */
-		intercept_log_syscall(libpath, nr,
-		    arg0, arg1, arg2, arg3, arg4, arg5,
-		    syscall_offset, 0);
-	} else if (nr == SYS_clone ||
+	if (nr == SYS_clone ||
 	    nr == SYS_vfork ||
 	    nr == SYS_rt_sigreturn) {
 		/* can't handle these syscall the normal way */
-		intercept_log_syscall(libpath, nr,
-		    arg0, arg1, arg2, arg3, arg4, arg5,
-		    syscall_offset, 0);
-
 		xlongjmp(return_to_asm_wrapper_syscall, rsp_in_asm_wrapper, nr);
 	}
 
@@ -260,7 +255,7 @@ intercept_routine(long nr, long arg0, long arg1,
 
 	intercept_log_syscall(libpath, nr,
 	    arg0, arg1, arg2, arg3, arg4, arg5,
-	    syscall_offset, result);
+	    syscall_offset, 1, result);
 
 	xlongjmp(return_to_asm_wrapper, rsp_in_asm_wrapper, result);
 }
