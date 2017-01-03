@@ -1,5 +1,5 @@
 #
-# Copyright 2014-2016, Intel Corporation
+# Copyright 2014-2017, Intel Corporation
 # Copyright (c) 2016, Microsoft Corporation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -636,6 +636,8 @@ function expect_normal_exit() {
 	if [ "$ret" -ne "0" ]; then
 		if [ "$ret" -gt "128" ]; then
 			msg="crashed (signal $(($ret - 128)))"
+		elif [ "$ret" -eq "95" -a "${PMEMFILE_EXIT_ON_NOT_SUPPORTED}" = "1" ]; then
+			msg="crashed because of unsupported feature of pmemfile"
 		else
 			msg="failed with exit code $ret"
 		fi
@@ -683,7 +685,11 @@ function expect_normal_exit() {
 
 		[ $NODES_MAX -ge 0 ] && clean_all_remote_nodes
 
-		false
+		if [ "${PMEMFILE_EXIT_ON_NOT_SUPPORTED}" = "1" ]; then
+			export EXIT_BECAUSE_OF_UNSUPPORTED_FEATURE=1
+		else
+			false
+		fi
 	fi
 	if [ "$CHECK_TYPE" != "none" ]; then
 		if [ $REMOTE_VALGRIND_LOG -eq 1 ]; then
