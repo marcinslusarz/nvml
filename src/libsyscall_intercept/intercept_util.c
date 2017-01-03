@@ -100,7 +100,7 @@ xread(long fd, void *buffer, size_t size)
 
 
 void
-intercept_setup_log(const char *path_base)
+intercept_setup_log(const char *path_base, const char *trunc)
 {
 	char full_path[0x400];
 	const char *path = path_base;
@@ -116,8 +116,11 @@ intercept_setup_log(const char *path_base)
 		path = full_path;
 	}
 
-	log_fd = syscall_no_intercept(SYS_open, path,
-			O_CREAT | O_RDWR | O_APPEND, 0700);
+	int flags = O_CREAT | O_RDWR | O_APPEND | O_TRUNC;
+	if (trunc && trunc[0] == '0')
+		flags &= ~O_TRUNC;
+
+	log_fd = syscall_no_intercept(SYS_open, path, flags, 0700);
 
 	if (log_fd < 0)
 		xabort();

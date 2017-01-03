@@ -163,7 +163,7 @@ static __thread bool reenter = false;
 
 static bool use_stricter_symlink_resolver = PMEMFILE_DEFAULT_USE_SYMLINK_STRICT;
 
-static void log_init(const char *path);
+static void log_init(const char *path, const char *trunc);
 static void log_write(const char *fmt, ...)
 	__attribute__((format(printf, 1, 2)));
 
@@ -177,7 +177,8 @@ pmemfile_preload_constructor(void)
 	if (!libc_hook_in_process_allowed())
 		return;
 
-	log_init(getenv("PMEMFILE_PRELOAD_LOG"));
+	log_init(getenv("PMEMFILE_PRELOAD_LOG"),
+			getenv("PMEMFILE_PRELOAD_LOG_TRUNC"));
 
 	const char *env_str = getenv("PMEMFILE_EXIT_ON_NOT_SUPPORTED");
 	exit_on_ENOTSUP = env_str ? env_str[0] == '1' : 0;
@@ -1023,11 +1024,15 @@ hook_getcwd(char *buf, size_t size)
 static long log_fd = -1;
 
 static void
-log_init(const char *path)
+log_init(const char *path, const char *trunc)
 {
-	if (path != NULL)
-		log_fd = syscall_no_intercept(SYS_open, path,
-				O_CREAT | O_RDWR | O_APPEND, 0600);
+	if (path != NULL) {
+		int flags = O_CREAT | O_RDWR | O_APPEND | O_TRUNC;
+		if (trunc && trunc[0] == '0')
+			flags &= ~O_TRUNC;
+
+		log_fd = syscall_no_intercept(SYS_open, path, flags, 0600);
+	}
 }
 
 static void
