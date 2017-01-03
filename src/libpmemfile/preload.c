@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -107,6 +107,19 @@ static struct fd_association fd_table[PMEMFILE_MAX_FD + 1];
 static pthread_rwlock_t pmem_cwd_lock = PTHREAD_RWLOCK_INITIALIZER;
 static struct pool_description *volatile cwd_pool;
 
+static int exit_on_ENOTSUP;
+static long check_errno(long e)
+{
+	if (e == -ENOTSUP && exit_on_ENOTSUP) {
+		const char *str = "ENOTSUP";
+
+		syscall_no_intercept(SYS_write, 2, str, strlen(str));
+		syscall_no_intercept(SYS_exit_group, 95);
+	}
+
+	return e;
+}
+
 static struct fd_desc
 cwd_desc()
 {
@@ -165,6 +178,9 @@ pmemfile_preload_constructor(void)
 		return;
 
 	log_init(getenv("PMEMFILE_PRELOAD_LOG"));
+
+	const char *env_str = getenv("PMEMFILE_EXIT_ON_NOT_SUPPORTED");
+	exit_on_ENOTSUP = env_str ? env_str[0] == '1' : 0;
 
 	// establish_mount_points already needs to have the flag set up
 	setup_strict_symlink_flag(getenv("PMEMFILE_USE_SYMLINK_STRICT"));
@@ -652,7 +668,7 @@ dispatch_syscall(long syscall_number,
 		return 0;
 
 	if (syscall_number == SYS_fsetxattr)
-		return -ENOTSUP;
+		return check_errno(-ENOTSUP);
 
 	if (syscall_number == SYS_fcntl)
 		return hook_fcntl(arg0, (int)arg1, arg2);
@@ -816,7 +832,7 @@ hook_write(long fd, const char *buffer, size_t count)
 	    (void *)file->pool->pool, (void *)file->file,
 	    (void *)buffer, count, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -832,7 +848,7 @@ hook_read(long fd, char *buffer, size_t count)
 	    (void *)file->pool, (void *)file->file,
 	    (void *)buffer, count, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -847,7 +863,7 @@ hook_lseek(long fd, long offset, int whence)
 	if (r != 0)
 		r = -errno;
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -885,7 +901,7 @@ hook_linkat(struct fd_desc at0, long arg0,
 	    (void *)where_old.at.pmem_fda.pool->pool,
 	    where_old.path, where_new.path, flags, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -913,7 +929,7 @@ hook_unlinkat(struct fd_desc at, long path_arg, long flags)
 	log_write("pmemfile_unlink(%p, \"%s\") = %d",
 	    (void *)where.at.pmem_fda.pool->pool, where.path, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -946,6 +962,7 @@ hook_chdir(const char *path)
 			result = -errno;
 		log_write("pmemfile_chdir(%p, \"%s\") = %ld",
 		    cwd_pool->pool, where.path, result);
+		check_errno(result);
 	}
 
 	util_rwlock_unlock(&pmem_cwd_lock);
@@ -975,6 +992,7 @@ hook_fchdir(long fd)
 		}
 		log_write("pmemfile_fchdir(%p, %p) = %ld",
 		    where->pool->pool, where->file, result);
+		check_errno(result);
 	} else {
 		result = syscall_no_intercept(SYS_fchdir, fd);
 		if (result == 0)
@@ -999,7 +1017,7 @@ hook_getcwd(char *buf, size_t size)
 	if (pmemfile_getcwd(cwd_pool->pool, buf + mlen, size - mlen) != NULL)
 		return 0;
 	else
-		return -errno;
+		return check_errno(-errno);
 }
 
 static long log_fd = -1;
@@ -1110,7 +1128,7 @@ hook_newfstatat(struct fd_desc at, long arg0, long arg1, long arg2)
 	if (r != 0)
 		r = -errno;
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1127,7 +1145,7 @@ hook_fstat(long fd, long buf_addr)
 	    (void *)file->pool, (void *)file->file,
 	    (void *)buf_addr, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1143,7 +1161,7 @@ hook_pread64(long fd, char *buf, size_t count, off_t pos)
 	    (void *)file->pool, (void *)file->file,
 	    (void *)buf, count, pos, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1159,7 +1177,7 @@ hook_pwrite64(long fd, const char *buf, size_t count, off_t pos)
 	    (void *)file->pool, (void *)file->file,
 	    (const void *)buf, count, pos, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1181,7 +1199,7 @@ hook_faccessat(struct fd_desc at, long path_arg, long mode, long flags)
 	/* XXX implement for real! */
 	if (pmemfile_fstatat(where.at.pmem_fda.pool->pool,
 			where.at.pmem_fda.file, where.path, &stat, 0))
-		return -errno;
+		return check_errno(-errno);
 	return 0;
 
 	/*
@@ -1216,7 +1234,7 @@ hook_getdents(long fd, long dirp, unsigned count)
 	    (void *)dir->pool->pool, (void *)dir->file,
 	    (const void *)dirp, count, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1233,7 +1251,7 @@ hook_getdents64(long fd, long dirp, unsigned count)
 	    (void *)dir->pool->pool, (void *)dir->file,
 	    (const void *)dirp, count, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1249,7 +1267,7 @@ hook_getxattr(long arg0, long arg1, long arg2, long arg3,
 
 	if (is_fda_null(&where.at.pmem_fda)) {
 		if (where.at.kernel_fd == AT_FDCWD)
-			return -ENOTSUP; // todo...
+			return check_errno(-ENOTSUP); // todo...
 
 		return syscall_no_intercept(SYS_getxattr,
 		    where.path, arg1, arg2, arg3);
@@ -1271,12 +1289,12 @@ hook_setxattr(long arg0, long arg1, long arg2, long arg3, long arg4,
 
 	if (is_fda_null(&where.at.pmem_fda)) {
 		if (where.at.kernel_fd == AT_FDCWD)
-			return -ENOTSUP; // todo...
+			return check_errno(-ENOTSUP); // todo...
 
 		return syscall_no_intercept(SYS_setxattr,
 		    where.path, arg1, arg2, arg3, arg4);
 	} else {
-		return -ENOTSUP;
+		return check_errno(-ENOTSUP);
 	}
 }
 
@@ -1303,7 +1321,7 @@ hook_mkdirat(struct fd_desc at, long path_arg, long mode)
 	if (r == 0)
 		return 0;
 	else
-		return -errno;
+		return check_errno(-errno);
 }
 
 static long
@@ -1359,7 +1377,7 @@ hook_openat(struct fd_desc at, long arg0, long flags, long mode)
 			return fd;
 		} else {
 			fd_pool_release_fd(fd);
-			return -errno;
+			return check_errno(-errno);
 		}
 	}
 }
@@ -1376,7 +1394,7 @@ hook_fcntl(long fd, int cmd, long arg)
 	log_write("pmemfile_fcntl(%p, %p, 0x%x, 0x%lx) = %d",
 	    (void *)file->pool, (void *)file->file, cmd, arg, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1391,7 +1409,7 @@ hook_flock(long fd, int operation)
 	log_write("pmemfile_flock(%p, %p, %d) = %d",
 	    (void *)file->pool->pool, (void *)file->file, operation, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1428,7 +1446,7 @@ hook_renameat2(struct fd_desc at_old, const char *path_old,
 	    (void *)where_old.at.pmem_fda.pool->pool,
 	    where_old.path, where_new.path, flags, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1454,7 +1472,7 @@ hook_truncate(const char *path, off_t length)
 	    (void *)where.at.pmem_fda.pool->pool,
 	    where.path, length, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1469,7 +1487,7 @@ hook_ftruncate(long fd, off_t length)
 	log_write("pmemfile_ftruncate(%p, %p, %lu) = %d",
 	    (void *)file->pool->pool, (void *)file->file, length, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1495,7 +1513,7 @@ hook_symlinkat(const char *target, struct fd_desc at, const char *linkpath)
 	    (void *)where.at.pmem_fda.pool->pool, target,
 	    (void *)where.at.pmem_fda.file, where.path, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1510,7 +1528,7 @@ hook_fchmod(long fd, mode_t mode)
 	log_write("pmemfile_fchmod(%p, %p, 0%o) = %d",
 	    (void *)file->pool->pool, (void *)file->file, mode, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1538,7 +1556,7 @@ hook_fchmodat(struct fd_desc at, const char *path,
 	    (void *)where.at.pmem_fda.file,
 	    where.path, mode, flags, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1553,7 +1571,7 @@ hook_fchown(long fd, uid_t owner, gid_t group)
 	log_write("pmemfile_fchown(%p, %p, %d, %d) = %d",
 	    (void *)file->pool->pool, (void *)file->file, owner, group, r);
 
-	return r;
+	return check_errno(r);
 }
 
 static long
@@ -1585,5 +1603,5 @@ hook_fchownat(struct fd_desc at, const char *path,
 	    (void *)where.at.pmem_fda.file,
 	    where.path, owner, group, flags, r);
 
-	return r;
+	return check_errno(r);
 }
