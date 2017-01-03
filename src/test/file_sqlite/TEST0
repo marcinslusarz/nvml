@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright 2016, Intel Corporation
+# Copyright 2016-2017, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,13 +53,23 @@ mkdir -p $DIR/mount_point
 export TEST_LD_PRELOAD=libpmemfile.so
 export PMEMFILE_POOLS=$DIR/mount_point:$DIR/fs
 export PMEMFILE_PRELOAD_LOG=pmemfile_preload.log
+export LIBC_HOOK_CMDLINE_FILTER=sqlite3
 export INTERCEPT_LOG=intercept.log
 export LIST_DIR_ON_ERROR=1
 export DUMP_FILES_ON_ERROR="${INTERCEPT_LOG} ${PMEMFILE_PRELOAD_LOG}"
-export UT_DUMP_LINES=1000
+export PMEMFILE_EXIT_ON_NOT_SUPPORTED=1
 
 expect_normal_exit sqlite3 $DIR/mount_point/sqlitedb < ins0.sql
+if [ "${EXIT_BECAUSE_OF_UNSUPPORTED_FEATURE}" = "1" ]; then
+	pass
+	exit 0
+fi
+
 expect_normal_exit sqlite3 $DIR/mount_point/sqlitedb < sel0.sql > out0.log
+if [ "${EXIT_BECAUSE_OF_UNSUPPORTED_FEATURE}" = "1" ]; then
+	pass
+	exit 0
+fi
 
 check
 
