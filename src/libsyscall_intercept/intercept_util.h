@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -83,7 +83,7 @@ void intercept_logs(const char *str);
 void intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 			long arg2, long arg3,
 			long arg4, long arg5, uint64_t syscall_offset,
-			long result);
+			int result_known, long result);
 void intercept_log_close(void);
 
 #endif
