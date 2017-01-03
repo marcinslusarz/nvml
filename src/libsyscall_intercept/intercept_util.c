@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -116,7 +116,8 @@ intercept_setup_log(const char *path_base)
 		path = full_path;
 	}
 
-	log_fd = syscall_no_intercept(SYS_open, path, O_CREAT | O_RDWR, 0700);
+	log_fd = syscall_no_intercept(SYS_open, path,
+			O_CREAT | O_RDWR | O_APPEND, 0700);
 
 	if (log_fd < 0)
 		xabort();
