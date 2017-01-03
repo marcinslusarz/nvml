@@ -77,7 +77,7 @@ void xread(long fd, void *buffer, size_t size);
 char *xprint_escape(char *restrict dst, const char *restrict src,
 			size_t dst_size, bool zero_term, size_t src_size);
 
-void intercept_setup_log(const char *path_base);
+void intercept_setup_log(const char *path_base, const char *trunc);
 void intercept_log(const char *buffer, size_t len);
 void intercept_logs(const char *str);
 void intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
