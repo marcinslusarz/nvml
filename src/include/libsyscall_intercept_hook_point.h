@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,9 +40,9 @@
  *
  * The syscall_number, and the six args describe the syscall
  * currently being intercepted.
- * For now, a non-zero return value means the interceptor executes
- * the original syscall, use its result. A zero return value
- * means the interceptor should not execute the syscall, and
+ * For now, a non-zero return value means libsyscall_intercept
+ * should execute the original syscall, use its result. A zero return value
+ * means libsyscall_intercept should not execute the syscall, and
  * use the integer stored to *result as the result of the syscall
  * to be returned in RAX to libc.
  */
@@ -67,6 +67,15 @@ int (*intercept_hook_point)(long syscall_number,
  */
 long syscall_no_intercept(long syscall_number, ...);
 
+/*
+ * The syscall intercepting library checks for the
+ * LIBC_HOOK_CMDLINE_FILTER environment variable, with which one can
+ * control in which processes interception should actually happen.
+ * If the library is loaded in this process, but syscall interception
+ * is not allowed, the libc_hook_in_process_allowed function returns zero,
+ * otherwise, it returns one. The user of the library can use it to notice
+ * such situations, where the code is loaded, but no syscall will be hooked.
+ */
 int libc_hook_in_process_allowed(void);
 
 #endif

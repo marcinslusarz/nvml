@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -55,6 +55,15 @@ struct intercept_disasm_context {
 	const unsigned char *end;
 };
 
+/*
+ * intercept_disasm_init -- should be called before disassembling a region of
+ * code. The context created contains the context capstone needs ( or generally
+ * the underlying disassembling library, if something other than capstone might
+ * be used ).
+ *
+ * One must pass this context pointer to intercept_disasm_destroy following
+ * a disassembling loop.
+ */
 struct intercept_disasm_context *
 intercept_disasm_init(const unsigned char *begin, const unsigned char *end)
 {
@@ -76,9 +85,11 @@ intercept_disasm_init(const unsigned char *begin, const unsigned char *end)
 	 * Without this, it only prints the instruction, and we would need
 	 * to parse the resulting string.
 	 */
-	cs_option(context->handle, CS_OPT_DETAIL, CS_OPT_ON);
+	if (cs_option(context->handle, CS_OPT_DETAIL, CS_OPT_ON) != 0)
+		xabort();
 
-	context->insn = cs_malloc(context->handle);
+	if ((context->insn = cs_malloc(context->handle)) == NULL)
+		xabort();
 
 	return context;
 }
@@ -89,6 +100,49 @@ intercept_disasm_destroy(struct intercept_disasm_context *context)
 	cs_free(context->insn, 1);
 	cs_close(&context->handle);
 	(void) syscall_no_intercept(SYS_munmap, context, sizeof(*context));
+}
+
+static void
+check_op(struct intercept_disasm_result *result, cs_x86_op *op,
+		const unsigned char *code)
+{
+	if (op->type == X86_OP_REG) {
+		if (op->reg == X86_REG_IP ||
+				op->reg == X86_REG_RIP) {
+			result->has_ip_relative_opr = true;
+		}
+		if (result->is_jump) {
+			/*
+			 * An indirect jump can't have arguments other
+			 * than a register - therefore the asserts.
+			 * ( I'm 99.99% sure this is true )
+			 */
+			assert(!result->is_rel_jump);
+			result->is_indirect_jump = true;
+		}
+	} else if (op->type == X86_OP_MEM) {
+		if (op->mem.base == X86_REG_IP ||
+				op->mem.base == X86_REG_RIP ||
+				op->mem.index == X86_REG_IP ||
+				op->mem.index == X86_REG_RIP) {
+			result->has_ip_relative_opr = true;
+		}
+		if (result->is_jump) {
+			assert(!result->is_indirect_jump);
+			result->is_rel_jump = true;
+			result->jump_delta = (ptrdiff_t)op->mem.disp;
+			result->jump_target =
+				(code + result->length) +
+				result->jump_delta;
+		}
+	} else if (op->type == X86_OP_IMM) {
+		if (result->is_jump) {
+			assert(!result->is_indirect_jump);
+			result->is_rel_jump = true;
+			result->jump_target = (void *)op->imm;
+			result->jump_delta = (unsigned char *)op->imm - code;
+		}
+	}
 }
 
 struct intercept_disasm_result
@@ -110,15 +164,11 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 
 	result.length = context->insn->size;
 
-	if (result.length == 0)
-		return result;
+	assert(result.length != 0);
 
 	result.is_syscall = (context->insn->id == X86_INS_SYSCALL);
-
 	result.is_call = (context->insn->id == X86_INS_CALL);
-
 	result.is_ret = (context->insn->id == X86_INS_RET);
-
 	result.is_rel_jump = false;
 	result.is_indirect_jump = false;
 
@@ -154,50 +204,9 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 
 	for (uint8_t op_i = 0;
 	    op_i < context->insn->detail->x86.op_count;
-	    ++op_i) {
-		cs_x86_op *op = context->insn->detail->x86.operands + op_i;
-
-		switch (op->type) {
-			case X86_OP_REG:
-				if (op->reg == X86_REG_IP ||
-				    op->reg == X86_REG_RIP) {
-					result.has_ip_relative_opr = true;
-				}
-				if (result.is_jump) {
-					assert(!result.is_rel_jump);
-					result.is_indirect_jump = true;
-				}
-				break;
-			case X86_OP_MEM:
-				if (op->mem.base == X86_REG_IP ||
-				    op->mem.base == X86_REG_RIP ||
-				    op->mem.index == X86_REG_IP ||
-				    op->mem.index == X86_REG_RIP) {
-					result.has_ip_relative_opr = true;
-				}
-				if (result.is_jump) {
-					assert(!result.is_indirect_jump);
-					result.is_rel_jump = true;
-					result.jump_delta =
-					    (ptrdiff_t)op->mem.disp;
-					result.jump_target =
-					    (code + result.length) +
-					    result.jump_delta;
-				}
-				break;
-			case X86_OP_IMM:
-				if (result.is_jump) {
-					assert(!result.is_indirect_jump);
-					result.is_rel_jump = true;
-					result.jump_target = (void *)op->imm;
-					result.jump_delta =
-					    (unsigned char *)op->imm - code;
-				}
-				break;
-			default:
-				break;
-		}
-	}
+	    ++op_i)
+		check_op(&result, context->insn->detail->x86.operands + op_i,
+		    code);
 
 	return result;
 }
