@@ -1,5 +1,5 @@
 #
-# Copyright 2016, Intel Corporation
+# Copyright 2016-2017, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,12 +41,14 @@ ifeq ($(HAS_CAPSTONE),y)
 LIBRARIES = icap
 endif
 
-LIBS = -lsyscall_intercept -lcapstone
+include ../Makefile.inc
 
-include ../../Makefile.inc
+libicap.o: icap.o
+
+LDFLAGS += -lsyscall_intercept -lcapstone
 
 fun:
-	LD_LIBRARY_PATH=../../debug LD_PRELOAD=./icap.so cat icap.c
+	LD_LIBRARY_PATH=../../debug LD_PRELOAD=./libicap.so cat icap.c
 
 debug_fun:
-	LD_LIBRARY_PATH=../../debug LD_PRELOAD=./icap.so LIBC_HOOK_CMDLINE_FILTER=cat gdb --args cat icap.c
+	LD_LIBRARY_PATH=../../debug LD_PRELOAD=./libicap.so LIBC_HOOK_CMDLINE_FILTER=cat gdb --args cat icap.c
