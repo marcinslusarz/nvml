@@ -410,6 +410,10 @@ test5(PMEMfilepool *pfp)
 	PMEMFILE_MKDIR(pfp, "dir3", 0755);
 	PMEMFILE_STAT(pfp, "/dir2", &stat);
 	PMEMFILE_STAT(pfp, "/dir1/dir3", &stat);
+
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir1/dir3/."), -1);
+	UT_ASSERTeq(errno, EINVAL);
+
 	PMEMFILE_RMDIR(pfp, "../dir2");
 	PMEMFILE_RMDIR(pfp, "dir3");
 
