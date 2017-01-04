@@ -936,6 +936,9 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_inode *iparent = D_RW(vparent->inode);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
+		if (vparent == vdir)
+			pmemobj_tx_abort(EINVAL);
+
 		rwlock_tx_wlock(&vparent->rwlock);
 		rwlock_tx_wlock(&vdir->rwlock);
 
