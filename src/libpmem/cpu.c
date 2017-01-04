@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016, Intel Corporation
+ * Copyright 2015-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -191,6 +191,10 @@ is_cpu_clwb_present(void)
 	return ret;
 }
 
+/*
+ * has_ymm_registers -- checks if AVX instructions are supported,
+ * thus YMM registers can be used on this CPU.
+ */
 int
 has_ymm_registers(void)
 {

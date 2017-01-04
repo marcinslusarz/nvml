@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * intercept.h - a few declarations used in libsyscall_intercept
+ */
+
 #ifndef INTERCEPT_INTERCEPT_H
 #define INTERCEPT_INTERCEPT_H
 
@@ -58,7 +62,7 @@ void intercept_patch_with_postfix(unsigned char *syscall_addr,
 __attribute__((noreturn)) void xabort(void);
 
 /*
- * The parch_list array stores some information on
+ * The patch_list array stores some information on
  * whereabouts of patches made to glibc.
  * The syscall_addr pointer points to where a syscall
  *  instruction originally resided in glibc.
