@@ -1029,7 +1029,7 @@ print_syscall(char *b, const char *name, unsigned args, ...)
 		first = false;
 	}
 
-	if (va_arg(ap, int))
+	if (va_arg(ap, enum intercept_log_result) == KNOWN)
 		b += sprintf(b, ") = %ld", va_arg(ap, long));
 	else
 		b += sprintf(b, ") = ?");
