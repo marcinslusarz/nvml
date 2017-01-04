@@ -221,7 +221,7 @@ vinode_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
 
 	if (mode & ~(mode_t)0777) {
-		/* TODO: what kernel does? */
+		/* XXX: what the kernel does in this case? */
 		ERR("invalid mode flags 0%o", mode);
 		pmemobj_tx_abort(EINVAL);
 	}
