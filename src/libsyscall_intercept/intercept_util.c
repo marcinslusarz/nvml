@@ -379,7 +379,7 @@ void
 intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 			long arg2, long arg3,
 			long arg4, long arg5, unsigned long syscall_offset,
-			int result_known, long result)
+			enum intercept_log_result result_known, long result)
 {
 	if (log_fd < 0)
 		return;

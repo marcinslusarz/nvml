@@ -235,9 +235,8 @@ intercept_routine(long nr, long arg0, long arg1,
 	long result;
 	int forward_to_kernel = true;
 
-	intercept_log_syscall(libpath, nr,
-	    arg0, arg1, arg2, arg3, arg4, arg5,
-	    syscall_offset, 0, 0);
+	intercept_log_syscall(libpath, nr, arg0, arg1, arg2, arg3, arg4, arg5,
+	    syscall_offset, UNKNOWN, 0);
 
 	if (intercept_hook_point != NULL)
 		forward_to_kernel = intercept_hook_point(nr,
@@ -254,9 +253,8 @@ intercept_routine(long nr, long arg0, long arg1,
 		result = syscall_no_intercept(nr,
 		    arg0, arg1, arg2, arg3, arg4, arg5);
 
-	intercept_log_syscall(libpath, nr,
-	    arg0, arg1, arg2, arg3, arg4, arg5,
-	    syscall_offset, 1, result);
+	intercept_log_syscall(libpath, nr, arg0, arg1, arg2, arg3, arg4, arg5,
+	    syscall_offset, KNOWN, result);
 
 	xlongjmp(return_to_asm_wrapper, rsp_in_asm_wrapper, result);
 }
