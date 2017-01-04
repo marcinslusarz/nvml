@@ -30,6 +30,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * intercept.c - The entry point of libsyscall_intercept, and some of
+ * the main logic.
+ *
+ * intercept() - the library entry point
+ * intercept_routine() - the entry point for each hooked syscall
+ * libc_hook_in_process_allowed() is defined here - see other docs
+ */
+
 #define _GNU_SOURCE
 #include <assert.h>
 #include <stdbool.h>
@@ -279,15 +288,33 @@ libc_hook_in_process_allowed(void)
 	if (r <= 1 || buf[0] == '\0')
 		return 0;
 
-	char *name = buf;
-	while (*name != '\0')
-		++name;
+	/*
+	 * Find the last component of the path in "/proc/self/cmdline"
+	 * The user might provide something like:
+	 *
+	 * LIBC_HOOK_CMDLINE_FILTER=mkdir
+	 *
+	 * in which case we should compare the string "mkdir" with the
+	 * last component of a path, e.g.:
+	 * "usr/bin/mkdir"
+	 */
+
+	char *name = buf + strlen(buf);
+
+	/* Find the last slash - search backwards from the end of the string */
 
 	while (*name != '/' && name != buf)
 		--name;
 
-	if (*name == '/')
+	if (*name == '/') {
+		/*
+		 * Found a slash, don't include the slash
+		 * itself in the comparison
+		 */
 		++name;
+	} else {
+		/* No slash found, use the whole string */
+	}
 
 	return strcmp(name, c) == 0;
 }

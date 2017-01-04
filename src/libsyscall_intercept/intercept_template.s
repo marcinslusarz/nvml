@@ -33,7 +33,7 @@
 /*
  * intercept_template.s
  *
- * The syscall instructions in glbic are
+ * The syscall instructions in glibc are
  * overwritten with a call instruction, which
  * jumps here. This assembly wrapper has to achieve multiple things
  * that can not be achieved in C:
@@ -54,7 +54,7 @@
  * functions. These don't necessarily have to set up the stack pointer,
  * leaf functions can just use e.g. the address (RSP - 16) to store
  * local variables. But they definitely can not use the memory more than
- * 128 bytes below the stack pointer ( todo: verify this information ).
+ * 128 bytes below the stack pointer ( XXX: verify this information ).
  * Signal handlers are exmaples of code that can use the stack of current
  * thread between any two instructions, like this code does. This leaves us
  * with the following steps ( new steps are marked with an asterisk ) :
