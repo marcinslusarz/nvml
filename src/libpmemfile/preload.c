@@ -518,9 +518,9 @@ static long hook_close(long fd);
 static long hook_faccessat(struct fd_desc at, long path_arg,
 				long mode, long flags);
 static long hook_getxattr(long arg0, long arg1, long arg2, long arg3,
-			enum resolve_last_or_not resolve_last);
+			int resolve_last);
 static long hook_setxattr(long arg0, long arg1, long arg2, long arg3, long arg4,
-			enum resolve_last_or_not resolve_last);
+			int resolve_last);
 static long hook_mkdirat(struct fd_desc at, long path_arg, long mode);
 
 static long hook_write(long fd, const char *buffer, size_t count);
@@ -670,19 +670,19 @@ dispatch_syscall(long syscall_number,
 	 */
 	if (syscall_number == SYS_getxattr)
 		return hook_getxattr(arg0, arg1, arg2, arg3,
-		    resolve_last_slink);
+		    RESOLVE_LAST_SLINK);
 
 	if (syscall_number == SYS_lgetxattr)
 		return hook_getxattr(arg0, arg1, arg2, arg3,
-		    no_resolve_last_slink);
+		    NO_RESOLVE_LAST_SLINK);
 
 	if (syscall_number == SYS_setxattr)
 		return hook_setxattr(arg0, arg1, arg2, arg3, arg4,
-		    resolve_last_slink);
+		    RESOLVE_LAST_SLINK);
 
 	if (syscall_number == SYS_lsetxattr)
 		return hook_setxattr(arg0, arg1, arg2, arg3, arg4,
-		    no_resolve_last_slink);
+		    NO_RESOLVE_LAST_SLINK);
 
 	if (syscall_number == SYS_fgetxattr)
 		return 0;
@@ -893,8 +893,8 @@ hook_linkat(struct fd_desc at0, long arg0,
 	struct resolved_path where_old;
 	struct resolved_path where_new;
 
-	resolve_path(at0, (const char *)arg0, &where_old, resolve_last_slink);
-	resolve_path(at1, (const char *)arg1, &where_new, resolve_last_slink);
+	resolve_path(at0, (const char *)arg0, &where_old, RESOLVE_LAST_SLINK);
+	resolve_path(at1, (const char *)arg1, &where_new, RESOLVE_LAST_SLINK);
 
 	if (where_old.error_code != 0)
 		return where_old.error_code;
@@ -930,7 +930,7 @@ hook_unlinkat(struct fd_desc at, long path_arg, long flags)
 	struct resolved_path where;
 
 	resolve_path(at, (const char *)path_arg,
-	    &where, resolve_last_slink);
+	    &where, RESOLVE_LAST_SLINK);
 
 	if (where.error_code != 0)
 		return where.error_code;
@@ -963,7 +963,7 @@ hook_chdir(const char *path)
 
 	util_rwlock_wrlock(&pmem_cwd_lock);
 
-	resolve_path(cwd_desc(), path, &where, resolve_last_slink);
+	resolve_path(cwd_desc(), path, &where, RESOLVE_LAST_SLINK);
 
 	if (where.error_code != 0) {
 		result = where.error_code;
@@ -1135,7 +1135,7 @@ hook_newfstatat(struct fd_desc at, long arg0, long arg1, long arg2)
 
 	resolve_path(at, (const char *)arg0, &where,
 	    (arg2 & AT_SYMLINK_NOFOLLOW)
-	    ? no_resolve_last_slink : resolve_last_slink);
+	    ? NO_RESOLVE_LAST_SLINK : RESOLVE_LAST_SLINK);
 
 	if (where.error_code != 0)
 		return where.error_code;
@@ -1209,7 +1209,7 @@ hook_faccessat(struct fd_desc at, long path_arg, long mode, long flags)
 {
 	struct resolved_path where;
 
-	resolve_path(at, (const char *)path_arg, &where, no_resolve_last_slink);
+	resolve_path(at, (const char *)path_arg, &where, NO_RESOLVE_LAST_SLINK);
 
 	if (where.error_code != 0)
 		return where.error_code;
@@ -1280,7 +1280,7 @@ hook_getdents64(long fd, long dirp, unsigned count)
 
 static long
 hook_getxattr(long arg0, long arg1, long arg2, long arg3,
-		enum resolve_last_or_not resolve_last)
+		int resolve_last)
 {
 	struct resolved_path where;
 
@@ -1302,7 +1302,7 @@ hook_getxattr(long arg0, long arg1, long arg2, long arg3,
 
 static long
 hook_setxattr(long arg0, long arg1, long arg2, long arg3, long arg4,
-		enum resolve_last_or_not resolve_last)
+		int resolve_last)
 {
 	struct resolved_path where;
 
@@ -1327,7 +1327,7 @@ hook_mkdirat(struct fd_desc at, long path_arg, long mode)
 {
 	struct resolved_path where;
 
-	resolve_path(at, (const char *)path_arg, &where, no_resolve_last_slink);
+	resolve_path(at, (const char *)path_arg, &where, NO_RESOLVE_LAST_SLINK);
 
 	if (where.error_code != 0)
 		return where.error_code;
@@ -1353,16 +1353,16 @@ hook_openat(struct fd_desc at, long arg0, long flags, long mode)
 {
 	struct resolved_path where;
 	const char *path_arg = (const char *)arg0;
-	enum resolve_last_or_not follow_last;
+	int follow_last;
 
 	log_write("%s(\"%s\")", __func__, path_arg);
 
 	if ((flags & O_NOFOLLOW) != 0)
-		follow_last = no_resolve_last_slink;
+		follow_last = NO_RESOLVE_LAST_SLINK;
 	else if ((flags & O_CREAT) != 0)
-		follow_last = no_resolve_last_slink;
+		follow_last = NO_RESOLVE_LAST_SLINK;
 	else
-		follow_last = resolve_last_slink;
+		follow_last = RESOLVE_LAST_SLINK;
 
 	resolve_path(at, path_arg, &where, follow_last);
 
@@ -1443,11 +1443,11 @@ hook_renameat2(struct fd_desc at_old, const char *path_old,
 	struct resolved_path where_old;
 	struct resolved_path where_new;
 
-	resolve_path(at_old, path_old, &where_old, no_resolve_last_slink);
+	resolve_path(at_old, path_old, &where_old, NO_RESOLVE_LAST_SLINK);
 	if (where_old.error_code != 0)
 		return where_old.error_code;
 
-	resolve_path(at_new, path_new, &where_new, no_resolve_last_slink);
+	resolve_path(at_new, path_new, &where_new, NO_RESOLVE_LAST_SLINK);
 	if (where_new.error_code != 0)
 		return where_new.error_code;
 
@@ -1485,7 +1485,7 @@ hook_truncate(const char *path, off_t length)
 {
 	struct resolved_path where;
 
-	resolve_path(cwd_desc(), path, &where, resolve_last_slink);
+	resolve_path(cwd_desc(), path, &where, RESOLVE_LAST_SLINK);
 	if (where.error_code != 0)
 		return where.error_code;
 
@@ -1526,7 +1526,7 @@ hook_symlinkat(const char *target, struct fd_desc at, const char *linkpath)
 {
 	struct resolved_path where;
 
-	resolve_path(at, linkpath, &where, resolve_last_slink);
+	resolve_path(at, linkpath, &where, RESOLVE_LAST_SLINK);
 	if (where.error_code != 0)
 		return where.error_code;
 
@@ -1568,7 +1568,7 @@ hook_fchmodat(struct fd_desc at, const char *path,
 {
 	struct resolved_path where;
 
-	resolve_path(at, path, &where, resolve_last_slink);
+	resolve_path(at, path, &where, RESOLVE_LAST_SLINK);
 	if (where.error_code != 0)
 		return where.error_code;
 
@@ -1613,7 +1613,7 @@ hook_fchownat(struct fd_desc at, const char *path,
 
 	resolve_path(at, path, &where,
 	    (flags & AT_SYMLINK_NOFOLLOW)
-	    ? no_resolve_last_slink : resolve_last_slink);
+	    ? NO_RESOLVE_LAST_SLINK : RESOLVE_LAST_SLINK);
 
 	if (where.error_code != 0)
 		return where.error_code;

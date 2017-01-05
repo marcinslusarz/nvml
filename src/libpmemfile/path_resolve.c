@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -240,7 +240,7 @@ void
 resolve_path(struct fd_desc at,
 			const char *path,
 			struct resolved_path *result,
-			enum resolve_last_or_not follow_last)
+			int follow_last)
 {
 	if (path == NULL || path[0] == '\0') {
 		result->error_code = -ENOTDIR;
@@ -294,7 +294,7 @@ resolve_path(struct fd_desc at,
 
 		bool is_last_component = (result->path[end] == '\0');
 
-		if (is_last_component && follow_last == no_resolve_last_slink)
+		if (is_last_component && follow_last == NO_RESOLVE_LAST_SLINK)
 			break;
 
 		result->path[end] = '\0';

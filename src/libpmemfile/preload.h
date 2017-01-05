@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,7 +71,8 @@ struct pool_description {
 	PMEMfilepool *pool;
 };
 
-enum resolve_last_or_not { resolve_last_slink, no_resolve_last_slink };
+#define RESOLVE_LAST_SLINK 1
+#define NO_RESOLVE_LAST_SLINK 2
 
 struct pool_description *lookup_pd_by_inode(__ino_t inode);
 struct pool_description *lookup_pd_by_path(const char *path);
@@ -109,6 +110,6 @@ struct resolved_path {
 void resolve_path(struct fd_desc at,
 			const char *path,
 			struct resolved_path *result,
-			enum resolve_last_or_not);
+			int resolve_last_or_not);
 
 #endif

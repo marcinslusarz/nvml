@@ -56,10 +56,13 @@ long syscall_no_intercept(long syscall_number, ...);
  */
 void *xmmap_anon(size_t size);
 
+/*
+ * xmremap - no fail mremap
+ */
 void *xmremap(void *addr, size_t old, size_t new);
 
 /*
- * xlseek - get new memory mapping
+ * xlseek - no fail lseek
  *
  * Not intercepted - does not call libc.
  * Always succeds if returns - aborts the process on failure.
@@ -67,7 +70,7 @@ void *xmremap(void *addr, size_t old, size_t new);
 long xlseek(long fd, unsigned long off, int whence);
 
 /*
- * xread - get new memory mapping
+ * xread - no fail read
  *
  * Not intercepted - does not call libc.
  * Always succeds reading size bytes returns - aborts the process on failure.
