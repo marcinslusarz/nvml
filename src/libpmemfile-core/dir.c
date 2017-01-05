@@ -685,6 +685,43 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 	return bytes_read;
 }
 
+static void
+_handle_last_component(PMEMfilepool *pfp,
+		const char *path,
+		struct pmemfile_vinode *prev_parent,
+		struct pmemfile_vinode *parent,
+		const char *lookup_path,
+		bool get_parent,
+		struct pmemfile_path_info *path_info)
+{
+	struct pmemfile_vinode *child =
+			vinode_lookup_dirent(pfp, parent, lookup_path);
+	if (child) {
+		if (get_parent) {
+			path_info->parent = parent;
+			path_info->name = path;
+		} else
+			vinode_unref_tx(pfp, parent);
+
+		while (path[0])
+			path++;
+
+		if (prev_parent)
+			vinode_unref_tx(pfp, prev_parent);
+
+		path_info->vinode = child;
+	} else {
+		if (get_parent)
+			path_info->parent = prev_parent;
+		else if (prev_parent)
+			vinode_unref_tx(pfp, prev_parent);
+
+		path_info->vinode = parent;
+	}
+
+	path_info->remaining = path;
+}
+
 /*
  * traverse_pathat - traverses directory structure
  *
@@ -727,31 +764,8 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		}
 
 		if (slash == NULL) {
-			child = vinode_lookup_dirent(pfp, parent, lookup_path);
-			if (child) {
-				if (get_parent) {
-					path_info->parent = parent;
-					path_info->name = path;
-				} else
-					vinode_unref_tx(pfp, parent);
-
-				while (path[0])
-					path++;
-
-				if (prev_parent)
-					vinode_unref_tx(pfp, prev_parent);
-
-				path_info->vinode = child;
-			} else {
-				if (get_parent)
-					path_info->parent = prev_parent;
-				else if (prev_parent)
-					vinode_unref_tx(pfp, prev_parent);
-
-				path_info->vinode = parent;
-			}
-
-			path_info->remaining = path;
+			_handle_last_component(pfp, path, prev_parent, parent,
+					lookup_path, get_parent, path_info);
 			return;
 		}
 
