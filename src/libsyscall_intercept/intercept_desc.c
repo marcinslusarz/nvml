@@ -486,9 +486,10 @@ search_padding(unsigned char *syscall_addr, unsigned char *used)
 static void
 allocate_trampoline_table(struct intercept_desc *desc)
 {
-	char *e = getenv("INTERCEPT_TRAMPOLINE");
+	char *e = getenv("INTERCEPT_NO_TRAMPOLINE");
 
-	desc->uses_trampoline_table = (e != NULL) && (e[0] != '0');
+	/* Use the extra trampoline table by default */
+	desc->uses_trampoline_table = (e == NULL) && (e[0] == '0');
 
 	if (!desc->uses_trampoline_table) {
 		desc->trampoline_table = NULL;
