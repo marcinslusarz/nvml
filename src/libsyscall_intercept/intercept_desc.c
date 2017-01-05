@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,6 +44,7 @@
 #include "intercept.h"
 #include "intercept_util.h"
 #include "disasm_wrapper.h"
+#include "util.h"
 
 static long open_orig_file(const struct intercept_desc *desc);
 static void find_sections(struct intercept_desc *desc, long fd);
@@ -81,6 +82,12 @@ find_syscalls(struct intercept_desc *desc, Dl_info *dl_info)
 	crawl_text(desc);
 }
 
+static bool
+has_pow2_count(const struct intercept_desc *desc)
+{
+	return (desc->count & (desc->count - 1)) == 0;
+}
+
 static struct patch_desc *
 add_new_patch(struct intercept_desc *desc)
 {
@@ -89,7 +96,7 @@ add_new_patch(struct intercept_desc *desc)
 		/* initial allocation */
 		desc->items = xmmap_anon(sizeof(desc->items[0]));
 
-	} else if ((desc->count & (desc->count - 1)) == 0) {
+	} else if (has_pow2_count(desc) == 0) {
 
 		/* if count is a power of two, double the allocate space */
 		size_t size = desc->count * sizeof(desc->items[0]);
@@ -109,8 +116,11 @@ add_new_patch(struct intercept_desc *desc)
 static void
 allocate_jump_table(struct intercept_desc *desc)
 {
+	/* How many bytes need to be addressed? */
 	size_t bytes = (size_t)(desc->text_end - desc->text_start + 1);
 
+	/* Allocate 1 bit for each addressable byte */
+	/* Plus one -- integer division can result a number too low */
 	desc->jump_table = xmmap_anon(bytes / 8 + 1);
 }
 
@@ -120,7 +130,7 @@ has_jump(const struct intercept_desc *desc, unsigned char *addr)
 	if (addr >= desc->text_start && addr <= desc->text_end) {
 		uint64_t offset = (uint64_t)(addr - desc->text_start);
 
-		return desc->jump_table[offset / 8] & (1 << (offset % 8));
+		return util_isset(desc->jump_table, offset);
 	} else {
 		return false;
 	}
@@ -132,8 +142,12 @@ mark_jump(const struct intercept_desc *desc, const unsigned char *addr)
 	if (addr >= desc->text_start && addr <= desc->text_end) {
 		uint64_t offset = (uint64_t)(addr - desc->text_start);
 
-		unsigned char tmp = (unsigned char)(1 << (offset % 8));
-		desc->jump_table[offset / 8] |= tmp;
+		/*
+		 * XXX This doesn't work with libraries that have
+		 * over 4 gigabytes of code -- todo more checks.
+		 */
+
+		util_setbit(desc->jump_table, (uint32_t)offset);
 	}
 }
 
