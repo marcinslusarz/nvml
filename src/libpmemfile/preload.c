@@ -41,6 +41,8 @@
  * by pmemfile ( and which pmemfile pool ).
  */
 
+#define _GNU_SOURCE
+
 #include <assert.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -53,6 +55,7 @@
 #include <setjmp.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include <asm-generic/errno.h>
 
@@ -275,6 +278,43 @@ init_hooking(void)
 	syscall_number_filter[SYS_lchown] = true;
 	syscall_number_filter[SYS_fchownat] = true;
 
+	/* Syscalls not handled yet */
+	syscall_number_filter[SYS_mmap] = true;
+	syscall_number_filter[SYS_readv] = true;
+	syscall_number_filter[SYS_writev] = true;
+	syscall_number_filter[SYS_dup] = true;
+	syscall_number_filter[SYS_dup2] = true;
+	syscall_number_filter[SYS_dup3] = true;
+	syscall_number_filter[SYS_sendfile] = true;
+	syscall_number_filter[SYS_readlink] = true;
+	syscall_number_filter[SYS_readlinkat] = true;
+	syscall_number_filter[SYS_chroot] = true;
+	syscall_number_filter[SYS_readahead] = true;
+	syscall_number_filter[SYS_listxattr] = true;
+	syscall_number_filter[SYS_llistxattr] = true;
+	syscall_number_filter[SYS_flistxattr] = true;
+	syscall_number_filter[SYS_removexattr] = true;
+	syscall_number_filter[SYS_lremovexattr] = true;
+	syscall_number_filter[SYS_fremovexattr] = true;
+	syscall_number_filter[SYS_fadvise64] = true;
+	syscall_number_filter[SYS_utime] = true;
+	syscall_number_filter[SYS_utimes] = true;
+	syscall_number_filter[SYS_futimesat] = true;
+	syscall_number_filter[SYS_splice] = true;
+	syscall_number_filter[SYS_utimensat] = true;
+	syscall_number_filter[SYS_fallocate] = true;
+	syscall_number_filter[SYS_name_to_handle_at] = true;
+
+	/* No handle can come from pmemfile, so just forward this to kernel */
+	syscall_number_filter[SYS_open_by_handle_at] = false;
+
+	syscall_number_filter[SYS_execve] = true;
+	syscall_number_filter[SYS_execveat] = true;
+	syscall_number_filter[SYS_copy_file_range] = true;
+	syscall_number_filter[SYS_preadv2] = true;
+	syscall_number_filter[SYS_pwritev2] = true;
+
+
 	syscall_needs_fd_rlock[SYS_pread64] = true;
 	syscall_needs_fd_rlock[SYS_pwrite64] = true;
 	syscall_needs_fd_rlock[SYS_write] = true;
@@ -303,6 +343,8 @@ init_hooking(void)
 	syscall_needs_fd_rlock[SYS_fchmodat] = true;
 	syscall_needs_fd_rlock[SYS_fchown] = true;
 	syscall_needs_fd_rlock[SYS_fchownat] = true;
+	syscall_needs_fd_rlock[SYS_sendfile] = true;
+	syscall_needs_fd_rlock[SYS_readlinkat] = true;
 
 	syscall_needs_fd_wlock[SYS_open] = true;
 	syscall_needs_fd_wlock[SYS_openat] = true;
@@ -355,6 +397,19 @@ init_hooking(void)
 	syscall_has_fd_first_arg[SYS_ftruncate] = true;
 	syscall_has_fd_first_arg[SYS_fchmod] = true;
 	syscall_has_fd_first_arg[SYS_fchown] = true;
+	syscall_has_fd_first_arg[SYS_mmap] = true;
+	syscall_has_fd_first_arg[SYS_readv] = true;
+	syscall_has_fd_first_arg[SYS_writev] = true;
+	syscall_has_fd_first_arg[SYS_dup] = true;
+	syscall_has_fd_first_arg[SYS_dup2] = true;
+	syscall_has_fd_first_arg[SYS_dup3] = true;
+	syscall_has_fd_first_arg[SYS_readahead] = true;
+	syscall_has_fd_first_arg[SYS_flistxattr] = true;
+	syscall_has_fd_first_arg[SYS_fremovexattr] = true;
+	syscall_has_fd_first_arg[SYS_fadvise64] = true;
+	syscall_has_fd_first_arg[SYS_fallocate] = true;
+	syscall_has_fd_first_arg[SYS_preadv2] = true;
+	syscall_has_fd_first_arg[SYS_pwritev2] = true;
 
 	// Install the callback to be calleb by the syscall intercepting library
 	intercept_hook_point = &hook;
@@ -550,6 +605,27 @@ static long hook_fchownat(struct fd_desc at, const char *path,
 				uid_t owner, gid_t group, int flags);
 static long hook_fcntl(long fd, int cmd, long arg);
 
+static long hook_sendfile(long out_fd, long in_fd, off_t *offset, size_t count);
+static long hook_splice(long in_fd, loff_t *off_in, long fd_out,
+			loff_t *off_out, size_t len, unsigned flags);
+static long hook_readlinkat(struct fd_desc at, const char *path,
+				char *buf, size_t bufsiz);
+
+static long nosup_syscall_with_path(long syscall_number,
+			long path, int resolve_last,
+			long arg0, long arg1,
+			long arg2, long arg3,
+			long arg4, long arg5);
+
+static long hook_futimesat(struct fd_desc at, const char *path,
+				const struct timeval times[2]);
+static long hook_name_to_handle_at(struct fd_desc at, const char *path,
+		struct file_handle *handle, int *mount_id, int flags);
+static long hook_execveat(struct fd_desc at, const char *path,
+		char *const argv[], char *const envp[], int flags);
+static long hook_copy_file_range(long fd_in, loff_t *off_in, long fd_out,
+		loff_t *off_out, size_t len, unsigned flags);
+
 static long
 dispatch_syscall(long syscall_number,
 			long arg0, long arg1,
@@ -742,6 +818,81 @@ dispatch_syscall(long syscall_number,
 	if (syscall_number == SYS_fchownat)
 		return hook_fchownat(fetch_fd(arg0), (const char *)arg1,
 					(uid_t)arg2, (gid_t)arg3, (int)arg4);
+
+	if (syscall_number == SYS_mmap ||
+	    syscall_number == SYS_readv ||
+	    syscall_number == SYS_writev ||
+	    syscall_number == SYS_dup ||
+	    syscall_number == SYS_dup2 ||
+	    syscall_number == SYS_dup3 ||
+	    syscall_number == SYS_flistxattr ||
+	    syscall_number == SYS_fremovexattr ||
+	    syscall_number == SYS_fadvise64 ||
+	    syscall_number == SYS_fallocate ||
+	    syscall_number == SYS_preadv2 ||
+	    syscall_number == SYS_pwritev2 ||
+	    syscall_number == SYS_readahead)
+		return check_errno(-ENOTSUP);
+
+	if (syscall_number == SYS_sendfile)
+		return hook_sendfile(arg0, arg1, (off_t *)arg2, (size_t)arg3);
+
+	/*
+	 * Some syscalls that have a path argument, but are not ( yet ) handled
+	 * by libpmemfile-core. The argument of these are not interpreted,
+	 * except for the path itself. If the path points to something pmemfile
+	 * resident, -ENOTSUP is returned, otherwise, the call is forwarded
+	 * to the kernel.
+	 */
+	if (syscall_number == SYS_chroot ||
+	    syscall_number == SYS_listxattr ||
+	    syscall_number == SYS_removexattr ||
+	    syscall_number == SYS_utime ||
+	    syscall_number == SYS_utimes ||
+	    syscall_number == SYS_execve)
+		return nosup_syscall_with_path(syscall_number,
+		    arg0, RESOLVE_LAST_SLINK,
+		    arg0, arg1, arg2, arg3, arg4, arg5);
+
+	if (syscall_number == SYS_llistxattr ||
+	    syscall_number == SYS_lremovexattr)
+		return nosup_syscall_with_path(syscall_number,
+		    arg0, NO_RESOLVE_LAST_SLINK,
+		    arg0, arg1, arg2, arg3, arg4, arg5);
+
+	if (syscall_number == SYS_readlink)
+		return hook_readlinkat(cwd_desc(), (const char *)arg0,
+		    (char *)arg1, (size_t)arg2);
+
+	if (syscall_number == SYS_readlinkat)
+		return hook_readlinkat(cwd_desc(), (const char *)arg0,
+		    (char *)arg1, (size_t)arg2);
+
+	if (syscall_number == SYS_splice)
+		return hook_splice(arg0, (loff_t *)arg1,
+				arg2, (loff_t *)arg3,
+				(size_t)arg4, (unsigned)arg5);
+
+	if (syscall_number == SYS_futimesat)
+		return hook_futimesat(fetch_fd(arg0), (const char *)arg1,
+			(const struct timeval *)arg2);
+
+	if (syscall_number == SYS_name_to_handle_at)
+		return hook_name_to_handle_at(fetch_fd(arg0),
+		    (const char *)arg1, (struct file_handle *)arg2,
+		    (int *)arg3, (int)arg4);
+
+	if (syscall_number == SYS_execve)
+		return hook_execveat(cwd_desc(), (const char *)arg0,
+		    (char *const *)arg1, (char *const *)arg2, 0);
+
+	if (syscall_number == SYS_execveat)
+		return hook_execveat(fetch_fd(arg0), (const char *)arg1,
+		    (char *const *)arg2, (char *const *)arg3, (int)arg4);
+
+	if (syscall_number == SYS_copy_file_range)
+		return hook_copy_file_range(arg0, (loff_t *)arg1,
+		    arg2, (loff_t *)arg3, (size_t)arg4, (unsigned)arg5);
 
 	// Did we miss something?
 	assert(false);
@@ -1635,4 +1786,160 @@ hook_fchownat(struct fd_desc at, const char *path,
 	    where.path, owner, group, flags, r);
 
 	return check_errno(r);
+}
+
+static long
+hook_sendfile(long out_fd, long in_fd, off_t *offset, size_t count)
+{
+	if (fd_pool_has_allocated(out_fd))
+		return check_errno(-ENOTSUP);
+
+	if (fd_pool_has_allocated(in_fd))
+		return check_errno(-ENOTSUP);
+
+	return syscall_no_intercept(SYS_sendfile, out_fd, in_fd, offset, count);
+}
+
+static long
+hook_readlinkat(struct fd_desc at, const char *path,
+				char *buf, size_t bufsiz)
+{
+	struct resolved_path where;
+
+	resolve_path(at, path, &where, NO_RESOLVE_LAST_SLINK);
+
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_readlinkat,
+		    where.at.kernel_fd, where.path, buf, bufsiz);
+
+	ssize_t r = pmemfile_readlinkat(where.at.pmem_fda.pool->pool,
+			where.at.pmem_fda.file, where.path, buf, bufsiz);
+
+	if (r != 0)
+		r = -errno;
+
+	log_write("pmemfile_readlinkat(%p, %p, \"%s\", \"%s\", %zu) = %zd",
+	    (void *)where.at.pmem_fda.pool->pool,
+	    (void *)where.at.pmem_fda.file,
+	    where.path, buf, bufsiz, r);
+
+	return check_errno(r);
+}
+
+static long
+nosup_syscall_with_path(long syscall_number,
+			long path, int resolve_last,
+			long arg0, long arg1,
+			long arg2, long arg3,
+			long arg4, long arg5)
+{
+	struct resolved_path where;
+
+	resolve_path(cwd_desc(), (const char *)path, &where, resolve_last);
+
+	if (where.error_code != 0)
+		return where.error_code;
+
+	/*
+	 * XXX only forward these to the kernel, if the path is not relative
+	 * to some fd. Normally, the _at version of the syscall would be used
+	 * here, i.e.: xxx_at(kernel_fd, path, ...), but some of these syscalls
+	 * don't have an _at version. So for now these are only handled, if the
+	 * path is relative to AT_FDCWD.
+	 */
+	if (where.at.pmem_fda.pool == NULL && where.at.kernel_fd == AT_FDCWD)
+		return syscall_no_intercept(syscall_number,
+		    arg0, arg1, arg2, arg3, arg4, arg5);
+
+	return check_errno(-ENOTSUP);
+}
+
+static long
+hook_splice(long fd_in, loff_t *off_in, long fd_out,
+			loff_t *off_out, size_t len, unsigned flags)
+{
+	if (fd_pool_has_allocated(fd_out))
+		return check_errno(-ENOTSUP);
+
+	if (fd_pool_has_allocated(fd_in))
+		return check_errno(-ENOTSUP);
+
+	return syscall_no_intercept(SYS_splice, fd_in, off_in, fd_out, off_out,
+	    len, flags);
+}
+
+static long
+hook_futimesat(struct fd_desc at, const char *path,
+				const struct timeval times[2])
+{
+	struct resolved_path where;
+
+	resolve_path(at, (const char *)path, &where, NO_RESOLVE_LAST_SLINK);
+
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_futimesat,
+		    where.at.kernel_fd, path, times);
+
+	return check_errno(-ENOTSUP);
+}
+
+static long
+hook_name_to_handle_at(struct fd_desc at, const char *path,
+		struct file_handle *handle, int *mount_id, int flags)
+{
+	struct resolved_path where;
+
+	resolve_path(at, path, &where,
+	    (flags & AT_SYMLINK_FOLLOW)
+	    ? RESOLVE_LAST_SLINK : NO_RESOLVE_LAST_SLINK);
+
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_name_to_handle_at,
+		    where.at.kernel_fd, path, mount_id, flags);
+
+	return check_errno(-ENOTSUP);
+}
+
+static long
+hook_execveat(struct fd_desc at, const char *path,
+		char *const argv[], char *const envp[], int flags)
+{
+	struct resolved_path where;
+
+	resolve_path(at, path, &where,
+	    (flags & AT_SYMLINK_NOFOLLOW)
+	    ? NO_RESOLVE_LAST_SLINK : RESOLVE_LAST_SLINK);
+
+	if (where.error_code != 0)
+		return where.error_code;
+
+	if (where.at.pmem_fda.pool == NULL)
+		return syscall_no_intercept(SYS_execveat,
+		    where.at.kernel_fd, path, argv, envp, flags);
+
+	/* The expectation is that pmemfile will never support this. */
+	return check_errno(-ENOTSUP);
+}
+
+static long
+hook_copy_file_range(long fd_in, loff_t *off_in, long fd_out,
+			loff_t *off_out, size_t len, unsigned flags)
+{
+	if (fd_pool_has_allocated(fd_out))
+		return check_errno(-ENOTSUP);
+
+	if (fd_pool_has_allocated(fd_in))
+		return check_errno(-ENOTSUP);
+
+	return syscall_no_intercept(SYS_copy_file_range,
+	    fd_in, off_in, fd_out, off_out, len, flags);
 }
