@@ -117,6 +117,7 @@ static void
 allocate_jump_table(struct intercept_desc *desc)
 {
 	/* How many bytes need to be addressed? */
+	assert(desc->text_start < desc->text_end);
 	size_t bytes = (size_t)(desc->text_end - desc->text_start + 1);
 
 	/* Allocate 1 bit for each addressable byte */
@@ -290,7 +291,7 @@ crawl_text(struct intercept_desc *desc)
 {
 	unsigned char *code = desc->text_start;
 	unsigned char *padding_used = code;
-	struct intercept_disasm_result prevs[3];
+	struct intercept_disasm_result prevs[3] = {0};
 	unsigned has_prevs = 0;
 	struct intercept_disasm_context *context =
 	    intercept_disasm_init(desc->text_start, desc->text_end);
