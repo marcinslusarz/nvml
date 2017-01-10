@@ -127,7 +127,7 @@ intercept_setup_log(const char *path_base, const char *trunc)
 }
 
 static char *
-print_open_flags(char *buffer, long flags)
+print_open_flags(char *buffer, int flags)
 {
 	char *c = buffer;
 
@@ -200,7 +200,7 @@ print_open_flags(char *buffer, long flags)
 		 * raw number.
 		 * e.g.: "O_RDONLY | O_NONBLOCK | 0x9876"
 		 */
-		c += sprintf(c, "0x%lx", flags);
+		c += sprintf(c, "0x%dx", flags);
 	} else if (c != buffer) {
 		/*
 		 * All bits in flag were parsed, and the pointer c does not
@@ -921,7 +921,7 @@ intercept_logs(const char *str)
 	size_t len = strlen(str) + 1;
 	char buffer[len];
 
-	strcpy(buffer, str);
+	strncpy(buffer, str, len);
 	buffer[len - 1] = '\n';
 
 	if (log_fd >= 0)
@@ -1032,7 +1032,7 @@ print_syscall(char *b, const char *name, unsigned args, ...)
 			const char *data = va_arg(ap, char *);
 			b = xprint_escape(b, data, 0x80, false, size);
 		} else if (format == F_OPEN_FLAGS) {
-			b = print_open_flags(b, va_arg(ap, long));
+			b = print_open_flags(b, va_arg(ap, int));
 		} else if (format == F_FCNTL_CMD) {
 			b = print_fcntl_cmd(b, va_arg(ap, long));
 		}

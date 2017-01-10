@@ -71,7 +71,9 @@
 #include "intercept.h"
 #include "intercept_util.h"
 #include "../libpmem/cpu.h"
+#include "util.h"
 
+#include <assert.h>
 #include <cpuid.h>
 #include <stdint.h>
 #include <syscall.h>
@@ -127,8 +129,7 @@ create_absolute_jump(unsigned char *from, void *to)
 	from[12] = d[6];
 	from[13] = d[7];
 
-	if (TRAMPOLINE_SIZE != 14)
-		xabort();
+	COMPILE_ERROR_ON(TRAMPOLINE_SIZE != 14);
 }
 
 /*
@@ -334,7 +335,7 @@ create_patch_wrappers(struct intercept_desc *desc)
 			if (length < JUMP_INS_SIZE) {
 				char buffer[0x1000];
 
-				int l = sprintf(buffer,
+				int l = snprintf(buffer, sizeof(buffer),
 					"unintercepted syscall at: %s 0x%lx\n",
 					desc->dlinfo.dli_fname,
 					patch->syscall_offset);
@@ -404,8 +405,27 @@ init_patcher(void)
 {
 	unsigned char *begin = &intercept_asm_wrapper_tmpl[0];
 
-	if (&intercept_asm_wrapper_end <= begin)
-		xabort();
+	assert(&intercept_asm_wrapper_end > begin);
+	assert(&intercept_asm_wrapper_prefix > begin);
+	assert(&intercept_asm_wrapper_postfix > begin);
+	assert(&intercept_asm_wrapper_call > begin);
+	assert(&intercept_asm_wrapper_return_and_no_syscall > begin);
+	assert(&intercept_asm_wrapper_return_and_syscall > begin);
+	assert(&intercept_asm_wrapper_return_jump > begin);
+	assert(&intercept_asm_wrapper_push_origin_addr > begin);
+	assert(&intercept_asm_wrapper_simd_save > begin);
+	assert(&intercept_asm_wrapper_simd_restore > begin);
+	assert(&intercept_asm_wrapper_mov_return_addr_r11_no_syscall > begin);
+	assert(&intercept_asm_wrapper_mov_return_addr_r11_syscall > begin);
+	assert(&intercept_asm_wrapper_mov_libpath_r11 > begin);
+	assert(&intercept_asm_wrapper_mov_phaddr_r11 > begin);
+	assert(&intercept_asm_wrapper_mov_ph2addr_r11 > begin);
+	assert(&intercept_asm_wrapper_mov_r11_stack_first_return_addr > begin);
+	assert(&intercept_asm_wrapper_push_stack_first_return_addr > begin);
+	assert(&intercept_asm_wrapper_simd_save_YMM_end >
+	    &intercept_asm_wrapper_simd_save_YMM);
+	assert(&intercept_asm_wrapper_simd_restore_YMM_end >
+	    &intercept_asm_wrapper_simd_restore_YMM);
 
 	tmpl_size = (size_t)(&intercept_asm_wrapper_end - begin);
 	o_prefix = &intercept_asm_wrapper_prefix - begin;
