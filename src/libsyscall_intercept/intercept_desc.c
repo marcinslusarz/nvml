@@ -356,7 +356,7 @@ crawl_text(struct intercept_desc *desc)
 			ptrdiff_t syscall_offset = patch->syscall_addr -
 			    (desc->text_start - desc->text_offset);
 
-			assert(syscall_offset < 0);
+			assert(syscall_offset >= 0);
 
 			patch->syscall_offset = (unsigned long)syscall_offset;
 			patch->padding_addr =
