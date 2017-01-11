@@ -46,112 +46,6 @@
 #include "disasm_wrapper.h"
 #include "util.h"
 
-static long open_orig_file(const struct intercept_desc *desc);
-static void find_sections(struct intercept_desc *desc, long fd);
-static void allocate_jump_table(struct intercept_desc *desc);
-static void mark_jump(const struct intercept_desc *desc,
-			const unsigned char *addr);
-static void find_jumps_in_section_syms(struct intercept_desc *desc,
-					Elf64_Shdr *section, long fd);
-static unsigned char *search_padding(unsigned char *syscall_addr,
-					unsigned char *used);
-static void crawl_text(struct intercept_desc *patches);
-static struct patch_desc *add_new_patch(struct intercept_desc *patches);
-static void allocate_trampoline_table(struct intercept_desc *desc);
-
-void
-find_syscalls(struct intercept_desc *desc, Dl_info *dl_info)
-{
-	desc->dlinfo = *dl_info;
-	desc->count = 0;
-
-	long fd = open_orig_file(desc);
-
-	find_sections(desc, fd);
-	allocate_trampoline_table(desc);
-	allocate_jump_table(desc);
-
-	if (desc->has_symtab)
-		find_jumps_in_section_syms(desc, &desc->sh_symtab_section, fd);
-
-	if (desc->has_dynsym)
-		find_jumps_in_section_syms(desc, &desc->sh_dynsym_section, fd);
-
-	syscall_no_intercept(SYS_close, fd);
-
-	crawl_text(desc);
-}
-
-static bool
-has_pow2_count(const struct intercept_desc *desc)
-{
-	return (desc->count & (desc->count - 1)) == 0;
-}
-
-static struct patch_desc *
-add_new_patch(struct intercept_desc *desc)
-{
-	if (desc->count == 0) {
-
-		/* initial allocation */
-		desc->items = xmmap_anon(sizeof(desc->items[0]));
-
-	} else if (has_pow2_count(desc) == 0) {
-
-		/* if count is a power of two, double the allocate space */
-		size_t size = desc->count * sizeof(desc->items[0]);
-
-		desc->items = xmremap(desc->items, size, 2 * size);
-	}
-
-	return &(desc->items[desc->count++]);
-}
-
-/*
- * allocate_jump_table
- *
- * Allocates a bitmap, where each bit represents a unique address in
- * the text section.
- */
-static void
-allocate_jump_table(struct intercept_desc *desc)
-{
-	/* How many bytes need to be addressed? */
-	assert(desc->text_start < desc->text_end);
-	size_t bytes = (size_t)(desc->text_end - desc->text_start + 1);
-
-	/* Allocate 1 bit for each addressable byte */
-	/* Plus one -- integer division can result a number too low */
-	desc->jump_table = xmmap_anon(bytes / 8 + 1);
-}
-
-bool
-has_jump(const struct intercept_desc *desc, unsigned char *addr)
-{
-	if (addr >= desc->text_start && addr <= desc->text_end) {
-		uint64_t offset = (uint64_t)(addr - desc->text_start);
-
-		return util_isset(desc->jump_table, offset);
-	} else {
-		return false;
-	}
-}
-
-static void
-mark_jump(const struct intercept_desc *desc, const unsigned char *addr)
-{
-	if (addr >= desc->text_start && addr <= desc->text_end) {
-		uint64_t offset = (uint64_t)(addr - desc->text_start);
-
-		/*
-		 * XXX This doesn't work with libraries that have
-		 * over 4 gigabytes of code -- todo more checks.
-		 */
-
-		util_setbit(desc->jump_table, (uint32_t)offset);
-	}
-}
-
 /*
  * open_orig_file
  *
@@ -229,6 +123,60 @@ find_sections(struct intercept_desc *desc, long fd)
 }
 
 /*
+ * allocate_jump_table
+ *
+ * Allocates a bitmap, where each bit represents a unique address in
+ * the text section.
+ */
+static void
+allocate_jump_table(struct intercept_desc *desc)
+{
+	/* How many bytes need to be addressed? */
+	assert(desc->text_start < desc->text_end);
+	size_t bytes = (size_t)(desc->text_end - desc->text_start + 1);
+
+	/* Allocate 1 bit for each addressable byte */
+	/* Plus one -- integer division can result a number too low */
+	desc->jump_table = xmmap_anon(bytes / 8 + 1);
+}
+
+/*
+ * has_jump - check if addr is known to be a destination of any
+ * jump ( or subroutine call ) in the code. The address must be
+ * the one seen by the current process, not the offset in the orignal
+ * ELF file.
+ */
+bool
+has_jump(const struct intercept_desc *desc, unsigned char *addr)
+{
+	if (addr >= desc->text_start && addr <= desc->text_end) {
+		uint64_t offset = (uint64_t)(addr - desc->text_start);
+
+		return util_isset(desc->jump_table, offset);
+	} else {
+		return false;
+	}
+}
+
+/*
+ * mark_jump - Mark an address as a jump destination, see has_jump above.
+ */
+static void
+mark_jump(const struct intercept_desc *desc, const unsigned char *addr)
+{
+	if (addr >= desc->text_start && addr <= desc->text_end) {
+		uint64_t offset = (uint64_t)(addr - desc->text_start);
+
+		/*
+		 * XXX This doesn't work with libraries that have
+		 * over 4 gigabytes of code -- todo more checks.
+		 */
+
+		util_setbit(desc->jump_table, (uint32_t)offset);
+	}
+}
+
+/*
  * find_jumps_in_section_syms
  *
  * Read the .symtab or .dynsym section, which stores an array of Elf64_Sym
@@ -261,124 +209,30 @@ find_jumps_in_section_syms(struct intercept_desc *desc, Elf64_Shdr *section,
 	}
 }
 
-/*
- * crawl_text
- * Crawl the text section, disassembling it all.
- * This routine collects information about potential addresses to patch.
- *
- * The addresses of all syscall instructions are stored, together with
- * a description of the preceding, and following instructions.
- *
- * A lookup table of all addresses which appear as jump destination is
- * generated, to help determine later, whether an instruction is suitable
- * for being overwritten -- of course, if an instruction is a jump destination,
- * it can not be merged with the preceding instruction to create a
- * new larger one.
- *
- * Every time a syscall instruction is found, the next and previous padding
- * bytes between routines are checked to find a potential space for an
- * extra jump instruction.
- *
- * Note: The actual patching can not yet be done in this disassembling phase,
- * as it is not known in advance, which addresses are jump destinations.
- */
-static void
-crawl_text(struct intercept_desc *desc)
+static bool
+has_pow2_count(const struct intercept_desc *desc)
 {
-	unsigned char *code = desc->text_start;
-	unsigned char *padding_used = code;
-
-	/*
-	 * Remember the previous three instructions, while
-	 * disassembling the code instruction by instruction in the
-	 * while loop below.
-	 */
-	struct intercept_disasm_result prevs[3] = {0};
-
-	/*
-	 * How many previous instructions were decoded before this one,
-	 * and stored in the prevs array. Usually three, except for the
-	 * beginning of the text section -- the first instruction naturally
-	 * has no previous instruction.
-	 */
-	unsigned has_prevs = 0;
-	struct intercept_disasm_context *context =
-	    intercept_disasm_init(desc->text_start, desc->text_end);
-
-	while (code <= desc->text_end) {
-		struct intercept_disasm_result result;
-
-		result = intercept_disasm_next_instruction(context, code);
-
-		if (result.length == 0) {
-			++code;
-			continue;
-		}
-
-		if (result.is_rel_jump)
-			mark_jump(desc, result.jump_target);
-
-		/*
-		 * Generate a new patch description, if:
-		 * - Information is available about a syscalls place
-		 * - one following instruction
-		 * - two preceding instructions
-		 *
-		 * So this is done only if instruction in the previous
-		 * loop iteration was a syscall. Which means the currently
-		 * decoded instruction is the 'following' instruction -- as
-		 * in following the syscall.
-		 * The two instructions from two iterations ago, and three
-		 * iterations ago are going to be the two 'preceding'
-		 * instructions stored in the patch description. Other fields
-		 * of the struct patch_desc are not filled at this point yet.
-		 *
-		 * prevs[0]      ->     patch->preceding_ins_2
-		 * prevs[1]      ->     patch->preceding_ins
-		 * prevs[2]      ->     [syscall]
-		 * current ins.  ->     patch->following_ins
-		 *
-		 *
-		 * XXX -- this ignores the cases where the text section
-		 * starts, or ends with a syscall instruction, or indeed, if
-		 * the second instruction in the text section is a syscall.
-		 * These implausible edge cases don't seem to be very important
-		 * right now.
-		 */
-		if (has_prevs >= 2 && prevs[2].is_syscall) {
-			struct patch_desc *patch = add_new_patch(desc);
-
-			patch->preceding_ins_2 = prevs[0];
-			patch->preceding_ins = prevs[1];
-			patch->following_ins = result;
-			patch->syscall_addr = code - SYSCALL_INS_SIZE;
-
-			ptrdiff_t syscall_offset = patch->syscall_addr -
-			    (desc->text_start - desc->text_offset);
-
-			assert(syscall_offset >= 0);
-
-			patch->syscall_offset = (unsigned long)syscall_offset;
-			patch->padding_addr =
-			    search_padding(patch->syscall_addr, padding_used);
-			if (patch->padding_addr != NULL)
-				padding_used =
-				    patch->padding_addr + JUMP_INS_SIZE;
-		}
-
-		prevs[0] = prevs[1];
-		prevs[1] = prevs[2];
-		prevs[2] = result;
-		if (has_prevs < 2)
-			++has_prevs;
-
-		code += result.length;
-	}
-
-	intercept_disasm_destroy(context);
+	return (desc->count & (desc->count - 1)) == 0;
 }
 
+static struct patch_desc *
+add_new_patch(struct intercept_desc *desc)
+{
+	if (desc->count == 0) {
 
+		/* initial allocation */
+		desc->items = xmmap_anon(sizeof(desc->items[0]));
+
+	} else if (has_pow2_count(desc) == 0) {
+
+		/* if count is a power of two, double the allocate space */
+		size_t size = desc->count * sizeof(desc->items[0]);
+
+		desc->items = xmremap(desc->items, size, 2 * size);
+	}
+
+	return &(desc->items[desc->count++]);
+}
 
 /*
  * padding_pinpoint
@@ -519,6 +373,123 @@ search_padding(unsigned char *syscall_addr, unsigned char *used)
 	return padding_pinpoint(dl_base, syscall_addr, symbol, used);
 }
 
+/*
+ * crawl_text
+ * Crawl the text section, disassembling it all.
+ * This routine collects information about potential addresses to patch.
+ *
+ * The addresses of all syscall instructions are stored, together with
+ * a description of the preceding, and following instructions.
+ *
+ * A lookup table of all addresses which appear as jump destination is
+ * generated, to help determine later, whether an instruction is suitable
+ * for being overwritten -- of course, if an instruction is a jump destination,
+ * it can not be merged with the preceding instruction to create a
+ * new larger one.
+ *
+ * Every time a syscall instruction is found, the next and previous padding
+ * bytes between routines are checked to find a potential space for an
+ * extra jump instruction.
+ *
+ * Note: The actual patching can not yet be done in this disassembling phase,
+ * as it is not known in advance, which addresses are jump destinations.
+ */
+static void
+crawl_text(struct intercept_desc *desc)
+{
+	unsigned char *code = desc->text_start;
+	unsigned char *padding_used = code;
+
+	/*
+	 * Remember the previous three instructions, while
+	 * disassembling the code instruction by instruction in the
+	 * while loop below.
+	 */
+	struct intercept_disasm_result prevs[3] = {0};
+
+	/*
+	 * How many previous instructions were decoded before this one,
+	 * and stored in the prevs array. Usually three, except for the
+	 * beginning of the text section -- the first instruction naturally
+	 * has no previous instruction.
+	 */
+	unsigned has_prevs = 0;
+	struct intercept_disasm_context *context =
+	    intercept_disasm_init(desc->text_start, desc->text_end);
+
+	while (code <= desc->text_end) {
+		struct intercept_disasm_result result;
+
+		result = intercept_disasm_next_instruction(context, code);
+
+		if (result.length == 0) {
+			++code;
+			continue;
+		}
+
+		if (result.is_rel_jump)
+			mark_jump(desc, result.jump_target);
+
+		/*
+		 * Generate a new patch description, if:
+		 * - Information is available about a syscalls place
+		 * - one following instruction
+		 * - two preceding instructions
+		 *
+		 * So this is done only if instruction in the previous
+		 * loop iteration was a syscall. Which means the currently
+		 * decoded instruction is the 'following' instruction -- as
+		 * in following the syscall.
+		 * The two instructions from two iterations ago, and three
+		 * iterations ago are going to be the two 'preceding'
+		 * instructions stored in the patch description. Other fields
+		 * of the struct patch_desc are not filled at this point yet.
+		 *
+		 * prevs[0]      ->     patch->preceding_ins_2
+		 * prevs[1]      ->     patch->preceding_ins
+		 * prevs[2]      ->     [syscall]
+		 * current ins.  ->     patch->following_ins
+		 *
+		 *
+		 * XXX -- this ignores the cases where the text section
+		 * starts, or ends with a syscall instruction, or indeed, if
+		 * the second instruction in the text section is a syscall.
+		 * These implausible edge cases don't seem to be very important
+		 * right now.
+		 */
+		if (has_prevs >= 2 && prevs[2].is_syscall) {
+			struct patch_desc *patch = add_new_patch(desc);
+
+			patch->preceding_ins_2 = prevs[0];
+			patch->preceding_ins = prevs[1];
+			patch->following_ins = result;
+			patch->syscall_addr = code - SYSCALL_INS_SIZE;
+
+			ptrdiff_t syscall_offset = patch->syscall_addr -
+			    (desc->text_start - desc->text_offset);
+
+			assert(syscall_offset >= 0);
+
+			patch->syscall_offset = (unsigned long)syscall_offset;
+			patch->padding_addr =
+			    search_padding(patch->syscall_addr, padding_used);
+			if (patch->padding_addr != NULL)
+				padding_used =
+				    patch->padding_addr + JUMP_INS_SIZE;
+		}
+
+		prevs[0] = prevs[1];
+		prevs[1] = prevs[2];
+		prevs[2] = result;
+		if (has_prevs < 2)
+			++has_prevs;
+
+		code += result.length;
+	}
+
+	intercept_disasm_destroy(context);
+}
+
 static void
 allocate_trampoline_table(struct intercept_desc *desc)
 {
@@ -596,4 +567,27 @@ allocate_trampoline_table(struct intercept_desc *desc)
 	desc->trampoline_table_size = size;
 
 	desc->next_trampoline = desc->trampoline_table;
+}
+
+void
+find_syscalls(struct intercept_desc *desc, Dl_info *dl_info)
+{
+	desc->dlinfo = *dl_info;
+	desc->count = 0;
+
+	long fd = open_orig_file(desc);
+
+	find_sections(desc, fd);
+	allocate_trampoline_table(desc);
+	allocate_jump_table(desc);
+
+	if (desc->has_symtab)
+		find_jumps_in_section_syms(desc, &desc->sh_symtab_section, fd);
+
+	if (desc->has_dynsym)
+		find_jumps_in_section_syms(desc, &desc->sh_dynsym_section, fd);
+
+	syscall_no_intercept(SYS_close, fd);
+
+	crawl_text(desc);
 }

@@ -363,7 +363,120 @@ print_clone_flags(char buffer[static 0x100], long flags)
 /* 2nd argument of fcntl */
 #define F_FCNTL_CMD 7
 
-static char *print_syscall(char *buffer, const char *name, unsigned args, ...);
+static char *
+xprint_escape(char *restrict dst, const char *restrict src,
+			size_t dst_size, bool zero_term, size_t src_size)
+{
+	static const char xdigit[16] = "0123456789abcdef";
+
+	char *dst_end = dst + dst_size - 5;
+
+	if (src == NULL)
+		return dst + sprintf(dst, "(null)");
+
+	*dst++ = '"';
+	while (dst < dst_end && (zero_term || src_size > 0)) {
+		if (zero_term && *src == 0)
+			break;
+
+		if (*src == '\"') {
+			*dst++ = '\\';
+			*dst++ = '"';
+		} else if (*src == '\\') {
+			*dst++ = '\\';
+			*dst++ = '\\';
+		} else if (isprint(*src)) {
+			*dst++ = *src;
+		} else {
+			*dst++ = '\\';
+			if (*src == '\n') {
+				*dst++ = 'n';
+			} else if (*src == '\t') {
+				*dst++ = 't';
+			} else if (*src == '\r') {
+				*dst++ = 'r';
+			} else if (*src == '\a') {
+				*dst++ = 'a';
+			} else if (*src == '\b') {
+				*dst++ = 'b';
+			} else if (*src == '\f') {
+				*dst++ = 'f';
+			} else if (*src == '\v') {
+				*dst++ = 'v';
+			} else if (*src == '\0') {
+				*dst++ = '0';
+			} else {
+				*dst++ = 'x';
+				*dst++ = xdigit[(unsigned char)(*src) / 16];
+				*dst++ = xdigit[(unsigned char)(*src) % 16];
+			}
+
+		}
+
+		++src;
+
+		if (!zero_term)
+			--src_size;
+	}
+
+	if ((src_size > 0 && !zero_term) || (zero_term && *src != 0))
+		dst += sprintf(dst, "...");
+
+	*dst++ = '"';
+	*dst = 0;
+
+	return dst;
+}
+
+static char *
+print_syscall(char *b, const char *name, unsigned args, ...)
+{
+	bool first = true;
+	va_list ap;
+
+	b += sprintf(b, "%s(", name);
+
+	va_start(ap, args);
+
+	while (args > 0) {
+		int format = va_arg(ap, int);
+
+		if (!first) {
+			*b++ = ',';
+			*b++ = ' ';
+		}
+
+		if (format == F_DEC) {
+			b += sprintf(b, "%ld", va_arg(ap, long));
+		} else if (format == F_OCT_MODE) {
+			b += sprintf(b, "0%lo", va_arg(ap, unsigned long));
+		} else if (format == F_HEX) {
+			b += sprintf(b, "0x%lx", va_arg(ap, unsigned long));
+		} else if (format == F_STR) {
+			b = xprint_escape(b, va_arg(ap, char *), 0x80, true, 0);
+		} else if (format == F_BUF) {
+			size_t size = va_arg(ap, size_t);
+			const char *data = va_arg(ap, char *);
+			b = xprint_escape(b, data, 0x80, false, size);
+		} else if (format == F_OPEN_FLAGS) {
+			b = print_open_flags(b, va_arg(ap, int));
+		} else if (format == F_FCNTL_CMD) {
+			b = print_fcntl_cmd(b, va_arg(ap, long));
+		}
+
+		--args;
+		first = false;
+	}
+
+	if (va_arg(ap, enum intercept_log_result) == KNOWN)
+		b += sprintf(b, ") = %ld", va_arg(ap, long));
+	else
+		b += sprintf(b, ") = ?");
+
+	va_end(ap);
+
+	return b;
+}
 
 /*
  * Log syscalls after intercepting, in a human readable ( as much as possible )
@@ -934,119 +1047,4 @@ intercept_log_close(void)
 {
 	if (log_fd >= 0)
 		syscall_no_intercept(SYS_close, log_fd);
-}
-
-static const char xdigit[16] = "0123456789abcdef";
-
-char *
-xprint_escape(char *restrict dst, const char *restrict src,
-			size_t dst_size, bool zero_term, size_t src_size)
-{
-	char *dst_end = dst + dst_size - 5;
-
-	if (src == NULL)
-		return dst + sprintf(dst, "(null)");
-
-	*dst++ = '"';
-	while (dst < dst_end && (zero_term || src_size > 0)) {
-		if (zero_term && *src == 0)
-			break;
-
-		if (*src == '\"') {
-			*dst++ = '\\';
-			*dst++ = '"';
-		} else if (*src == '\\') {
-			*dst++ = '\\';
-			*dst++ = '\\';
-		} else if (isprint(*src)) {
-			*dst++ = *src;
-		} else {
-			*dst++ = '\\';
-			if (*src == '\n') {
-				*dst++ = 'n';
-			} else if (*src == '\t') {
-				*dst++ = 't';
-			} else if (*src == '\r') {
-				*dst++ = 'r';
-			} else if (*src == '\a') {
-				*dst++ = 'a';
-			} else if (*src == '\b') {
-				*dst++ = 'b';
-			} else if (*src == '\f') {
-				*dst++ = 'f';
-			} else if (*src == '\v') {
-				*dst++ = 'v';
-			} else if (*src == '\0') {
-				*dst++ = '0';
-			} else {
-				*dst++ = 'x';
-				*dst++ = xdigit[(unsigned char)(*src) / 16];
-				*dst++ = xdigit[(unsigned char)(*src) % 16];
-			}
-
-		}
-
-		++src;
-
-		if (!zero_term)
-			--src_size;
-	}
-
-	if ((src_size > 0 && !zero_term) || (zero_term && *src != 0))
-		dst += sprintf(dst, "...");
-
-	*dst++ = '"';
-	*dst = 0;
-
-	return dst;
-}
-
-static char *
-print_syscall(char *b, const char *name, unsigned args, ...)
-{
-	bool first = true;
-	va_list ap;
-
-	b += sprintf(b, "%s(", name);
-
-	va_start(ap, args);
-
-	while (args > 0) {
-		int format = va_arg(ap, int);
-
-		if (!first) {
-			*b++ = ',';
-			*b++ = ' ';
-		}
-
-		if (format == F_DEC) {
-			b += sprintf(b, "%ld", va_arg(ap, long));
-		} else if (format == F_OCT_MODE) {
-			b += sprintf(b, "0%lo", va_arg(ap, unsigned long));
-		} else if (format == F_HEX) {
-			b += sprintf(b, "0x%lx", va_arg(ap, unsigned long));
-		} else if (format == F_STR) {
-			b = xprint_escape(b, va_arg(ap, char *), 0x80, true, 0);
-		} else if (format == F_BUF) {
-			size_t size = va_arg(ap, size_t);
-			const char *data = va_arg(ap, char *);
-			b = xprint_escape(b, data, 0x80, false, size);
-		} else if (format == F_OPEN_FLAGS) {
-			b = print_open_flags(b, va_arg(ap, int));
-		} else if (format == F_FCNTL_CMD) {
-			b = print_fcntl_cmd(b, va_arg(ap, long));
-		}
-
-		--args;
-		first = false;
-	}
-
-	if (va_arg(ap, enum intercept_log_result) == KNOWN)
-		b += sprintf(b, ") = %ld", va_arg(ap, long));
-	else
-		b += sprintf(b, ") = ?");
-
-	va_end(ap);
-
-	return b;
 }
