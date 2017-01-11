@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2016, Intel Corporation
+# Copyright 2016-2017, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -118,7 +118,7 @@ fi
 FILES=$(git $GIT_COMMAND | \
 	grep -v -E -e 'src/jemalloc/' -e 'src/windows/jemalloc_gen/' -e '/queue.h$' -e '/ListEntry.h$' \
 		   -e '/getopt.h$' -e '/getopt.c$' | \
-	grep    -E -e '*\.[ch]$' -e '*\.[ch]pp$' -e '*\.sh$' \
+	grep    -E -e '*\.[chs]$' -e '*\.[ch]pp$' -e '*\.sh$' \
 		   -e '*\.py$' -e '*\.map$' -e 'Makefile*' -e 'TEST*' \
 		   -e '/common.inc$' -e '/match$' -e '/check_whitespace$' \
 		   -e 'LICENSE$' | \
