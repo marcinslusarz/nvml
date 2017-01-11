@@ -177,11 +177,7 @@ open_orig_file(const struct intercept_desc *desc)
 /*
  * find_sections
  *
- *
- *
- *
- *
- *
+ * See: man elf
  */
 static void
 find_sections(struct intercept_desc *desc, long fd)
@@ -291,7 +287,20 @@ crawl_text(struct intercept_desc *desc)
 {
 	unsigned char *code = desc->text_start;
 	unsigned char *padding_used = code;
+
+	/*
+	 * Remember the previous three instructions, while
+	 * disassembling the code instruction by instruction in the
+	 * while loop below.
+	 */
 	struct intercept_disasm_result prevs[3] = {0};
+
+	/*
+	 * How many previous instructions were decoded before this one,
+	 * and stored in the prevs array. Usually three, except for the
+	 * beginning of the text section -- the first instruction naturally
+	 * has no previous instructions.
+	 */
 	unsigned has_prevs = 0;
 	struct intercept_disasm_context *context =
 	    intercept_disasm_init(desc->text_start, desc->text_end);
@@ -309,6 +318,33 @@ crawl_text(struct intercept_desc *desc)
 		if (result.is_rel_jump)
 			mark_jump(desc, result.jump_target);
 
+		/*
+		 * Generate a new patch description, if:
+		 * - Information is available about a syscalls place
+		 * - one following instruction
+		 * - two preceding instructions
+		 *
+		 * So this is done only if instruction in the previous
+		 * loop iteration was a syscall. Which means the currently
+		 * decoded instruction is the 'following' instruction -- as
+		 * in following the syscall.
+		 * The two instructions from two iterations ago, and three
+		 * iterations ago are going to be the two 'preceding'
+		 * instructions stored in the patch description. Other fields
+		 * of the struct patch_desc are not filled at this point yet.
+		 *
+		 * prevs[0]      ->     patch->preceding_ins_2
+		 * prevs[1]      ->     patch->preceding_ins
+		 * prevs[2]      ->     [syscall]
+		 * current ins.  ->     patch->following_ins
+		 *
+		 *
+		 * XXX -- this ignores the cases where the text section
+		 * starts, or ends with a syscall instruction, or indeed, if
+		 * the second instruction in the text section is a syscall.
+		 * These implausible edge cases don't seem to be very important
+		 * right now.
+		 */
 		if (has_prevs >= 2 && prevs[2].is_syscall) {
 			struct patch_desc *patch = add_new_patch(desc);
 
@@ -320,8 +356,7 @@ crawl_text(struct intercept_desc *desc)
 			ptrdiff_t syscall_offset = patch->syscall_addr -
 			    (desc->text_start - desc->text_offset);
 
-			if (syscall_offset < 0)
-				xabort();
+			assert(syscall_offset < 0);
 
 			patch->syscall_offset = (unsigned long)syscall_offset;
 			patch->padding_addr =

@@ -194,6 +194,7 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 		case X86_INS_JRCXZ:
 		case X86_INS_JS:
 			result.is_jump = true;
+			assert(context->insn->detail->x86.op_count == 1);
 			break;
 		default:
 			result.is_jump = false;
@@ -202,11 +203,8 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 
 	result.has_ip_relative_opr = false;
 
-	for (uint8_t op_i = 0;
-	    op_i < context->insn->detail->x86.op_count;
-	    ++op_i)
-		check_op(&result, context->insn->detail->x86.operands + op_i,
-		    code);
+	if (result.is_jump)
+		check_op(&result, context->insn->detail->x86.operands, code);
 
 	return result;
 }
