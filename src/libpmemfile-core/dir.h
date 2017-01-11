@@ -50,7 +50,7 @@ struct pmemfile_path_info {
 
 void traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, bool get_parent,
-		struct pmemfile_path_info *path_info);
+		struct pmemfile_path_info *path_info, int flags);
 
 struct pmemfile_vinode *vinode_new_dir(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name, mode_t mode,
@@ -75,7 +75,7 @@ void vinode_set_debug_path(PMEMfilepool *pfp,
 void vinode_clear_debug_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
 
 struct pmemfile_vinode *vinode_lookup_dirent(PMEMfilepool *pfp,
-		struct pmemfile_vinode *parent, const char *name);
+		struct pmemfile_vinode *parent, const char *name, int flags);
 
 void vinode_unlink_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent,

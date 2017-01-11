@@ -270,7 +270,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	struct pmemfile_vinode *volatile vparent = NULL;
 	struct pmemfile_vinode *volatile vinode;
-	traverse_path(pfp, dir, pathname, false, &info);
+	traverse_path(pfp, dir, pathname, false, &info, 0);
 	vinode = info.vinode;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -407,6 +407,69 @@ pmemfile_open(PMEMfilepool *pfp, const char *pathname, int flags, ...)
 }
 
 /*
+ * pmemfile_open_parent -- open a parent directory and return filename
+ *
+ * Together with *at interfaces it's very useful for path resolution when
+ * pmemfile is mounted in place other than "/".
+ */
+PMEMfile *
+pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
+		size_t path_size, int flags)
+{
+	struct pmemfile_vinode *at;
+	bool at_unref;
+
+	at = pool_get_dir_for_path(pfp, dir, path, &at_unref);
+
+	struct pmemfile_path_info info;
+	traverse_path(pfp, at, path, true, &info, flags);
+
+	struct pmemfile_vinode *parent;
+	const char *name;
+
+	if (info.remaining[0] != 0) {
+		parent = info.vinode;
+		name = info.remaining;
+	} else {
+		parent = info.parent;
+		name = info.name;
+	}
+	vinode_ref(pfp, parent);
+
+	PMEMfile *ret = Zalloc(sizeof(*ret));
+	if (!ret)
+		goto end;
+
+	ret->vinode = parent;
+	ret->flags = PFILE_READ | PFILE_NOATIME;
+	util_mutex_init(&ret->mutex, NULL);
+	size_t len = strlen(name);
+	memmove(path, name, len);
+	path[len] = 0;
+
+end:
+	if (info.vinode)
+		vinode_unref_tx(pfp, info.vinode);
+	if (info.parent)
+		vinode_unref_tx(pfp, info.parent);
+	if (info.name)
+		free(info.name);
+	if (at_unref) {
+		int oerrno;
+		if (ret == NULL)
+			oerrno = errno;
+
+		if (at_unref)
+			vinode_unref_tx(pfp, at);
+
+		if (ret == NULL)
+			errno = oerrno;
+	}
+
+	return ret;
+}
+
+/*
  * pmemfile_close -- close file
  */
 void
@@ -446,8 +509,8 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 	}
 
 	struct pmemfile_path_info src, dst;
-	traverse_path(pfp, olddir, oldpath, false, &src);
-	traverse_path(pfp, newdir, newpath, false, &dst);
+	traverse_path(pfp, olddir, oldpath, false, &src, 0);
+	traverse_path(pfp, newdir, newpath, false, &dst, 0);
 
 	int oerrno = 0;
 
@@ -585,7 +648,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	int oerrno, ret = 0;
 
 	struct pmemfile_path_info info;
-	traverse_path(pfp, dir, pathname, true, &info);
+	traverse_path(pfp, dir, pathname, true, &info, 0);
 	struct pmemfile_vinode *vparent = info.parent;
 	struct pmemfile_vinode *volatile vinode2 = NULL;
 	volatile bool parent_refed = false;
@@ -695,8 +758,8 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 	volatile bool src_parent_refed = false;
 
 	struct pmemfile_path_info src, dst;
-	traverse_path(pfp, olddir, oldpath, true, &src);
-	traverse_path(pfp, newdir, newpath, true, &dst);
+	traverse_path(pfp, olddir, oldpath, true, &src, 0);
+	traverse_path(pfp, newdir, newpath, true, &dst, 0);
 
 	int oerrno = 0;
 

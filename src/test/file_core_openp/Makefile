@@ -1,5 +1,5 @@
 #
-# Copyright 2016-2017, Intel Corporation
+# Copyright 2017, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,81 +31,13 @@
 #
 
 #
-# src/libpmemfile-core/libpmemfile-core.map -- linker map file for libpmemfile-core
+# src/test/file_core_openp/Makefile -- build file_core_openp unit test
 #
-{
-	global:
-		pmemfile_access;
-		pmemfile_chdir;
-		pmemfile_chmod;
-		pmemfile_chown;
-		pmemfile_close;
-		pmemfile_copy_file_range;
-		pmemfile_dup;
-		pmemfile_dup2;
-		pmemfile_errormsg;
-		pmemfile_euidaccess;
-		pmemfile_faccessat;
-		pmemfile_fchdir;
-		pmemfile_fchmod;
-		pmemfile_fchmodat;
-		pmemfile_fchown;
-		pmemfile_fchownat;
-		pmemfile_fcntl;
-		pmemfile_fdatasync;
-		pmemfile_flock;
-		pmemfile_fstat;
-		pmemfile_fstatat;
-		pmemfile_ftruncate;
-		pmemfile_futimens;
-		pmemfile_futimes;
-		pmemfile_getcwd;
-		pmemfile_getdents;
-		pmemfile_getdents64;
-		pmemfile_get_dir_path;
-		pmemfile_lchown;
-		pmemfile_link;
-		pmemfile_linkat;
-		pmemfile_lseek;
-		pmemfile_lseek64;
-		pmemfile_lstat;
-		pmemfile_lstat;
-		pmemfile_lutimes;
-		pmemfile_mkdir;
-		pmemfile_mkdirat;
-		pmemfile_mkfs;
-		pmemfile_open_parent;
-		pmemfile_open;
-		pmemfile_openat;
-		pmemfile_pool_close;
-		pmemfile_pool_open;
-		pmemfile_pread;
-		pmemfile_preadv;
-		pmemfile_pwrite;
-		pmemfile_pwritev;
-		pmemfile_read;
-		pmemfile_readlink;
-		pmemfile_readlinkat;
-		pmemfile_readv;
-		pmemfile_rename;
-		pmemfile_renameat;
-		pmemfile_renameat2;
-		pmemfile_rmdir;
-		pmemfile_stat;
-		pmemfile_symlink;
-		pmemfile_symlinkat;
-		pmemfile_sync;
-		pmemfile_truncate;
-		pmemfile_umask;
-		pmemfile_unlink;
-		pmemfile_unlinkat;
-		pmemfile_utimensat;
-		pmemfile_utime;
-		pmemfile_utimes;
-		pmemfile_write;
-		pmemfile_writev;
+TARGET = file_core_openp
+OBJS = file_core_openp.o
 
-		pmemfile_stats;
-	local:
-		*;
-};
+LIBPMEM=y
+LIBPMEMOBJ=y
+LIBPMEMFILE_CORE=y
+
+include ../Makefile.inc

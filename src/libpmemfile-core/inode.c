@@ -684,7 +684,7 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	LOG(LDBG, "path %s", path);
 
 	struct pmemfile_path_info info;
-	traverse_path(pfp, dir, path, false, &info);
+	traverse_path(pfp, dir, path, false, &info, 0);
 
 	if (info.remaining[0] != 0) {
 		bool is_dir = vinode_is_dir(info.vinode);

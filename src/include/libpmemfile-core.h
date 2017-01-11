@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -134,6 +134,9 @@ void pmemfile_stats(PMEMfilepool *pfp, struct pmemfile_stats *stats);
 char *pmemfile_get_dir_path(PMEMfilepool *pfp, PMEMfile *dir, char *buf,
 		size_t size);
 
+#define PMEMFILE_OPEN_PARENT_STOP_AT_ROOT (1<<0)
+PMEMfile *pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *at,
+		char *path, size_t path_size, int flags);
 /*
  * PMEMFILE_MAJOR_VERSION and PMEMFILE_MINOR_VERSION provide the current version
  * of the libpmemfile API as provided by this header file.  Applications can

@@ -323,12 +323,16 @@ vinode_lookup_dirent_by_vinode_locked(PMEMfilepool *pfp,
  */
 struct pmemfile_vinode *
 vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *name)
+		const char *name, int flags)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
 			pmfi_path(parent), name);
 
 	if (name[0] == 0)
+		return NULL;
+
+	if ((flags & PMEMFILE_OPEN_PARENT_STOP_AT_ROOT) &&
+			parent == pfp->root && strcmp(name, "..") == 0)
 		return NULL;
 
 	struct pmemfile_vinode *vinode = NULL;
@@ -708,10 +712,11 @@ _handle_last_component(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent,
 		const char *lookup_path,
 		bool get_parent,
-		struct pmemfile_path_info *path_info)
+		struct pmemfile_path_info *path_info,
+		int flags)
 {
 	struct pmemfile_vinode *child =
-			vinode_lookup_dirent(pfp, parent, lookup_path);
+			vinode_lookup_dirent(pfp, parent, lookup_path, flags);
 	if (child) {
 		if (get_parent) {
 			if (strcmp(lookup_path, ".") == 0) {
@@ -760,7 +765,7 @@ _handle_last_component(PMEMfilepool *pfp,
 static void
 _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, bool get_parent,
-		struct pmemfile_path_info *path_info)
+		struct pmemfile_path_info *path_info, int flags)
 {
 	char tmp[PATH_MAX];
 	vinode_ref(pfp, parent);
@@ -790,14 +795,15 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 		if (slash == NULL) {
 			_handle_last_component(pfp, path, prev_parent, parent,
-					lookup_path, get_parent, path_info);
+					lookup_path, get_parent, path_info,
+					flags);
 			return;
 		}
 
 		strncpy(tmp, path, (uintptr_t)slash - (uintptr_t)path);
 		tmp[slash - path] = 0;
 
-		child = vinode_lookup_dirent(pfp, parent, tmp);
+		child = vinode_lookup_dirent(pfp, parent, tmp, flags);
 		if (!child) {
 			if (get_parent)
 				path_info->parent = prev_parent;
@@ -824,7 +830,8 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 void
 traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, bool get_parent,
-		struct pmemfile_path_info *path_info)
+		struct pmemfile_path_info *path_info,
+		int flags)
 {
 	if (path[0] == '/') {
 		while (path[0] == '/')
@@ -832,7 +839,7 @@ traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		parent = pfp->root;
 	}
 
-	_traverse_pathat(pfp, parent, path, get_parent, path_info);
+	_traverse_pathat(pfp, parent, path, get_parent, path_info, flags);
 }
 
 static int
@@ -840,7 +847,7 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path, mode_t mode)
 {
 	struct pmemfile_path_info info;
-	traverse_path(pfp, dir, path, false, &info);
+	traverse_path(pfp, dir, path, false, &info, 0);
 
 	if (info.remaining[0] == 0) {
 		vinode_unref_tx(pfp, info.vinode);
@@ -950,7 +957,7 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path)
 {
 	struct pmemfile_path_info info;
-	traverse_path(pfp, dir, path, true, &info);
+	traverse_path(pfp, dir, path, true, &info, 0);
 	if (info.name)
 		free(info.name);
 
@@ -1139,7 +1146,7 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 
 	at = pool_get_dir_for_path(pfp, PMEMFILE_AT_CWD, path, &at_unref);
 
-	traverse_path(pfp, at, path, false, &info);
+	traverse_path(pfp, at, path, false, &info, 0);
 
 	if (info.remaining[0] != 0) {
 		vinode_unref_tx(pfp, info.vinode);
