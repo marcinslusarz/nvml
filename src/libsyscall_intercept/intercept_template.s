@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,8 +54,9 @@
  * functions. These don't necessarily have to set up the stack pointer,
  * leaf functions can just use e.g. the address (RSP - 16) to store
  * local variables. But they definitely can not use the memory more than
- * 128 bytes below the stack pointer ( XXX: verify this information ).
- * Signal handlers are exmaples of code that can use the stack of current
+ * 128 bytes below the stack pointer -- this area is usually referred to as
+ * red zone, see: https://en.wikipedia.org/wiki/Red_zone_(computing) .
+ * Signal handlers are exmaples of code that can use the stack of the current
  * thread between any two instructions, like this code does. This leaves us
  * with the following steps ( new steps are marked with an asterisk ) :
  *
