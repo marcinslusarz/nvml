@@ -43,7 +43,9 @@ struct pmemfile_path_info {
 	/* Parent of the found vinode. */
 	struct pmemfile_vinode *parent;
 	/* Name of the found file. Valid only when remaining[0] == 0. */
-	const char *name;
+	char *name;
+
+	bool last_is_dot;
 };
 
 void traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,

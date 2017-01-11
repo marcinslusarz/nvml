@@ -686,6 +686,26 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 }
 
 static void
+_get_parent(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
+		struct pmemfile_path_info *path_info)
+{
+	struct pmemfile_vinode *parent = vinode->parent;
+	if (parent == NULL)
+		parent = vinode;
+	vinode_ref(pfp, parent);
+	path_info->parent = parent;
+
+	util_rwlock_rdlock(&parent->rwlock);
+
+	struct pmemfile_dirent *dirent =
+		vinode_lookup_dirent_by_vinode_locked(pfp, parent, vinode);
+
+	path_info->name = strdup(dirent->name);
+
+	util_rwlock_unlock(&parent->rwlock);
+}
+
+static void
 _handle_last_component(PMEMfilepool *pfp,
 		const char *path,
 		struct pmemfile_vinode *prev_parent,
@@ -698,8 +718,20 @@ _handle_last_component(PMEMfilepool *pfp,
 			vinode_lookup_dirent(pfp, parent, lookup_path);
 	if (child) {
 		if (get_parent) {
-			path_info->parent = parent;
-			path_info->name = path;
+			if (strcmp(lookup_path, ".") == 0) {
+				_get_parent(pfp, parent, path_info);
+				vinode_unref_tx(pfp, parent);
+				path_info->last_is_dot = true;
+			} else if (strcmp(lookup_path, "..") == 0) {
+				struct pmemfile_vinode *p = parent->parent;
+				if (p == NULL)
+					p = parent;
+				_get_parent(pfp, p, path_info);
+				vinode_unref_tx(pfp, parent);
+			} else {
+				path_info->parent = parent;
+				path_info->name = strdup(path);
+			}
 		} else
 			vinode_unref_tx(pfp, parent);
 
@@ -711,7 +743,7 @@ _handle_last_component(PMEMfilepool *pfp,
 
 		path_info->vinode = child;
 	} else {
-		if (get_parent)
+		if (get_parent) // XXX: do we have to check for .. and .?
 			path_info->parent = prev_parent;
 		else if (prev_parent)
 			vinode_unref_tx(pfp, prev_parent);
@@ -926,6 +958,8 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 {
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, path, true, &info);
+	if (info.name)
+		free(info.name);
 
 	if (info.remaining[0] != 0) {
 		vinode_unref_tx(pfp, info.vinode);
@@ -950,7 +984,7 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_inode *iparent = D_RW(vparent->inode);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		if (vparent == vdir)
+		if (info.last_is_dot)
 			pmemobj_tx_abort(EINVAL);
 
 		rwlock_tx_wlock(&vparent->rwlock);

@@ -616,6 +616,8 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		vinode_unref_tx(pfp, vinode2);
 	if (vparent)
 		vinode_unref_tx(pfp, vparent);
+	if (info.name)
+		free(info.name);
 
 	if (ret) {
 		if (parent_refed)
@@ -798,6 +800,10 @@ end:
 		vinode_unref_tx(pfp, dst.parent);
 	if (src.parent)
 		vinode_unref_tx(pfp, src.parent);
+	if (src.name)
+		free(src.name);
+	if (dst.name)
+		free(dst.name);
 
 	if (oerrno) {
 		if (dst_parent_refed)
