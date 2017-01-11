@@ -90,6 +90,13 @@ struct patch_desc {
 
 	unsigned char *padding_addr;
 
+	/*
+	 * Describe up to three instructions surrounding the original
+	 * syscall instructions. Sometimes just overwritting the two
+	 * direct neighbors of the syscall is not enough, ( e.g. if
+	 * both the directly preceding, and the directly following are
+	 * single byte instruction, that only gives 4 bytes of space ).
+	 */
 	struct intercept_disasm_result preceding_ins_2;
 	struct intercept_disasm_result preceding_ins;
 	struct intercept_disasm_result following_ins;
@@ -116,17 +123,35 @@ struct intercept_desc {
 	 */
 	bool uses_trampoline_table;
 
+	/* Storing the Dl_info returned by dladdr(3) */
 	Dl_info dlinfo;
 
-	unsigned long text_offset;
-	unsigned char *text_start;
-	unsigned char *text_end;
+	/*
+	 * Some sections of the library from which information
+	 * needs to be extracted.
+	 * The text section is where the code to be hotpatched
+	 * resides.
+	 * The symtab, and dynsym sections provide information on
+	 * the whereabouts of symbols, whose address in the text
+	 * section.
+	 */
 	Elf64_Half text_section_index;
 	Elf64_Shdr sh_text_section;
 	bool has_symtab;
 	Elf64_Shdr sh_symtab_section;
 	bool has_dynsym;
 	Elf64_Shdr sh_dynsym_section;
+
+	/* Where the text starts inside the shared object */
+	unsigned long text_offset;
+
+	/*
+	 * Where the text starts and ends in the virtual memory seen by the
+	 * current process.
+	 */
+	unsigned char *text_start;
+	unsigned char *text_end;
+
 
 	struct patch_desc *items;
 	unsigned count;
