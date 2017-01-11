@@ -337,8 +337,6 @@ vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	if (strcmp(name, "..") == 0) {
 		vinode = parent->parent;
-		if (!vinode)
-			vinode = parent;
 		vinode_ref(pfp, vinode);
 		goto end;
 	}
@@ -690,8 +688,6 @@ _get_parent(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 		struct pmemfile_path_info *path_info)
 {
 	struct pmemfile_vinode *parent = vinode->parent;
-	if (parent == NULL)
-		parent = vinode;
 	vinode_ref(pfp, parent);
 	path_info->parent = parent;
 
@@ -723,10 +719,7 @@ _handle_last_component(PMEMfilepool *pfp,
 				vinode_unref_tx(pfp, parent);
 				path_info->last_is_dot = true;
 			} else if (strcmp(lookup_path, "..") == 0) {
-				struct pmemfile_vinode *p = parent->parent;
-				if (p == NULL)
-					p = parent;
-				_get_parent(pfp, p, path_info);
+				_get_parent(pfp, parent->parent, path_info);
 				vinode_unref_tx(pfp, parent);
 			} else {
 				path_info->parent = parent;
@@ -1214,7 +1207,7 @@ static char *
 _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 		char *buf, size_t size)
 {
-	struct pmemfile_vinode *parent = NULL, *child = vinode;
+	struct pmemfile_vinode *parent, *child = vinode;
 
 	if (buf && size == 0) {
 		vinode_unref_tx(pfp, child);
@@ -1224,6 +1217,7 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 	}
 
 	util_rwlock_rdlock(&child->rwlock);
+
 	if (child->orphaned.arr) {
 		util_rwlock_unlock(&child->rwlock);
 		vinode_unref_tx(pfp, child);
@@ -1231,9 +1225,14 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 		errno = ENOENT;
 		return NULL;
 	}
-	parent = child->parent;
-	if (parent)
+
+	if (child == pfp->root) {
+		parent = NULL;
+	} else {
+		parent = child->parent;
 		vinode_ref(pfp, parent);
+	}
+
 	util_rwlock_unlock(&child->rwlock);
 
 	if (size == 0)
@@ -1252,7 +1251,7 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 	char *curpos = buf + size;
 	*(--curpos) = 0;
 
-	if (!parent) {
+	if (parent == NULL) {
 		if (curpos - 1 < buf)
 			goto range_err;
 		*(--curpos) = '/';
@@ -1274,9 +1273,13 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 
 		*(--curpos) = '/';
 
-		struct pmemfile_vinode *grandparent = parent->parent;
-		if (grandparent)
+		struct pmemfile_vinode *grandparent;
+		if (parent == pfp->root) {
+			grandparent = NULL;
+		} else {
+			grandparent = parent->parent;
 			vinode_ref(pfp, grandparent);
+		}
 		util_rwlock_unlock(&parent->rwlock);
 
 		vinode_unref_tx(pfp, child);
