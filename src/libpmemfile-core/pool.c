@@ -70,6 +70,7 @@ initialize_super_block(PMEMfilepool *pfp)
 			super->version = PMEMFILE_SUPER_VERSION(0, 1);
 			super->root_inode = pfp->root->inode;
 		}
+		pfp->root->parent = pfp->root;
 #ifdef DEBUG
 		pfp->root->path = Strdup("/");
 #endif

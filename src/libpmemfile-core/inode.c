@@ -428,7 +428,7 @@ vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 	while (vinode) {
 		TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 			struct pmemfile_vinode *parent = vinode->parent;
-			if (vinode_unref(pfp, vinode))
+			if (vinode_unref(pfp, vinode) && vinode != pfp->root)
 				vinode = parent;
 			else
 				vinode = NULL;
