@@ -537,10 +537,15 @@ file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		memcpy(data, dirent->name, namelen + 1);
 		data += namelen + 1;
 
-		if (inode_is_regular_file(D_RO(dirent->inode)))
+		const struct pmemfile_inode *inode = D_RO(dirent->inode);
+		if (inode_is_regular_file(inode))
 			*data = DT_REG;
-		else
+		else if (inode_is_symlink(inode))
+			*data = DT_LNK;
+		else if (inode_is_dir(inode))
 			*data = DT_DIR;
+		else
+			ASSERT(0);
 		data++;
 
 		read1 += slen;
@@ -639,10 +644,15 @@ file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		memcpy(data, &slen, 2);
 		data += 2;
 
-		if (inode_is_regular_file(D_RO(dirent->inode)))
+		const struct pmemfile_inode *inode = D_RO(dirent->inode);
+		if (inode_is_regular_file(inode))
 			*data = DT_REG;
-		else
+		else if (inode_is_symlink(inode))
+			*data = DT_LNK;
+		else if (inode_is_dir(inode))
 			*data = DT_DIR;
+		else
+			ASSERT(0);
 		data++;
 
 		memcpy(data, dirent->name, namelen + 1);

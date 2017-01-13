@@ -574,6 +574,8 @@ inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode)
 			tarr = next;
 			arr = D_RW(tarr);
 		}
+	} else if (inode_is_symlink(inode)) {
+		/* nothing to be done */
 	} else {
 		FATAL("unknown inode type 0x%lx", inode->flags);
 	}
@@ -645,6 +647,8 @@ vinode_stat(struct pmemfile_vinode *vinode, struct stat *buf)
 		 * getting 4k-aligned blocks from pmemobj allocator.
 		 */
 		blks = (blkcnt_t)((sz + 511) / 512);
+	} else if (inode_is_symlink(inode)) {
+		blks = 0;
 	} else
 		ASSERT(0);
 	buf->st_blocks = blks;
