@@ -145,6 +145,12 @@ vinode_add_dirent(PMEMfilepool *pfp,
 
 	struct pmemfile_inode *parent = D_RW(parent_vinode->inode);
 
+	/* don't create files in deleted directories */
+	if (parent->nlink == 0)
+		/* but let directory creation succeed */
+		if (strcmp(name, ".") != 0)
+			pmemobj_tx_abort(ENOENT);
+
 	struct pmemfile_dir *dir = &parent->file_data.dir;
 
 	struct pmemfile_dirent *dirent = NULL;

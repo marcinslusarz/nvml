@@ -182,31 +182,6 @@ pmemfile_ftruncate(PMEMfilepool *pfp, PMEMfile *file, off_t length)
 }
 
 int
-pmemfile_symlink(PMEMfilepool *pfp, const char *path1, const char *path2)
-{
-	check_pfp(pfp);
-
-	(void) path1;
-	(void) path2;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
-pmemfile_symlinkat(PMEMfilepool *pfp, const char *path1,
-			PMEMfile *at, const char *path2)
-{
-	check_pfp_file(pfp, at);
-
-	(void) path1;
-	(void) path2;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-int
 pmemfile_chmod(PMEMfilepool *pfp, const char *path, mode_t mode)
 {
 	check_pfp(pfp);

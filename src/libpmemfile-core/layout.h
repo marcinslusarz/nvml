@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -135,7 +135,7 @@ struct pmemfile_inode {
 		/* Directory specific data. */
 		struct pmemfile_dir dir;
 
-		char padding[4096
+		char data[4096
 				- 4  /* version */
 				- 4  /* uid */
 				- 4  /* gid */

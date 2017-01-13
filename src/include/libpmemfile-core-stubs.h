@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,9 +65,6 @@ int pmemfile_fdatasync(PMEMfilepool *, PMEMfile *);
 int pmemfile_flock(PMEMfilepool *, PMEMfile *file, int operation);
 int pmemfile_truncate(PMEMfilepool *, const char *path, off_t length);
 int pmemfile_ftruncate(PMEMfilepool *, PMEMfile *file, off_t length);
-int pmemfile_symlink(PMEMfilepool *, const char *path1, const char *path2);
-int pmemfile_symlinkat(PMEMfilepool *, const char *path1,
-				PMEMfile *at, const char *path2);
 
 int pmemfile_chmod(PMEMfilepool *, const char *path, mode_t mode);
 int pmemfile_fchmod(PMEMfilepool *, PMEMfile *, mode_t mode);

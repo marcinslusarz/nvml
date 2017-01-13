@@ -59,7 +59,8 @@ FILE_TESTS = \
 	file_core_mt\
 	file_core_openp\
 	file_core_rw\
-	file_core_stat
+	file_core_stat\
+	file_core_symlinks
 
 ifeq ($(HAS_CAPSTONE),y)
 FILE_TESTS += libsyscall_intercept file_preload file_sqlite

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -69,6 +69,11 @@ void PMEMFILE_LSTAT(PMEMfilepool *pfp, const char *path, struct stat *buf);
 void PMEMFILE_FSTAT(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf);
 void PMEMFILE_FSTATAT(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 		struct stat *buf, int flags);
+
+void PMEMFILE_SYMLINK(PMEMfilepool *pfp, const char *target,
+		const char *linkpath);
+void PMEMFILE_SYMLINKAT(PMEMfilepool *pfp, const char *target, PMEMfile *newdir,
+		const char *linkpath);
 
 /* utilities */
 void PMEMFILE_STATS(PMEMfilepool *pfp);

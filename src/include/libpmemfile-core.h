@@ -122,6 +122,10 @@ int pmemfile_fchdir(PMEMfilepool *, PMEMfile *dir);
 char *pmemfile_getcwd(PMEMfilepool *, char *buf, size_t size);
 int pmemfile_fcntl(PMEMfilepool *, PMEMfile *file, int cmd, ...);
 
+int pmemfile_symlink(PMEMfilepool *, const char *path1, const char *path2);
+int pmemfile_symlinkat(PMEMfilepool *, const char *path1,
+				PMEMfile *at, const char *path2);
+
 struct pmemfile_stats {
 	unsigned inodes;
 	unsigned dirs;

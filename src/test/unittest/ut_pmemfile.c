@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -260,6 +260,21 @@ void
 PMEMFILE_RENAME(PMEMfilepool *pfp, const char *old_path, const char *new_path)
 {
 	int ret = pmemfile_rename(pfp, old_path, new_path);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
+PMEMFILE_SYMLINK(PMEMfilepool *pfp, const char *target, const char *linkpath)
+{
+	int ret = pmemfile_symlink(pfp, target, linkpath);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
+PMEMFILE_SYMLINKAT(PMEMfilepool *pfp, const char *target, PMEMfile *newdir,
+		const char *linkpath)
+{
+	int ret = pmemfile_symlinkat(pfp, target, newdir, linkpath);
 	UT_ASSERTeq(ret, 0);
 }
 

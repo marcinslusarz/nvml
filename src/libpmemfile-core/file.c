@@ -951,6 +951,100 @@ pmemfile_renameat(PMEMfilepool *pfp, PMEMfile *old_at, const char *old_path,
 	return pmemfile_renameat2(pfp, old_at, old_path, new_at, new_path, 0);
 }
 
+static int
+_pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
+		struct pmemfile_vinode *dir, const char *linkpath)
+{
+	LOG(LDBG, "target %s linkpath %s", target, linkpath);
+
+	int oerrno, ret = 0;
+
+	struct pmemfile_path_info info;
+	traverse_path(pfp, dir, linkpath, false, &info, 0);
+	struct pmemfile_vinode *volatile vinode = NULL;
+
+	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
+		struct pmemfile_vinode *vparent = info.vinode;
+
+		if (info.remaining[0] == 0)
+			pmemobj_tx_abort(EEXIST);
+
+		if (!vinode_is_dir(vparent))
+			pmemobj_tx_abort(ENOTDIR);
+
+		if (strchr(info.remaining, '/'))
+			pmemobj_tx_abort(ENOENT);
+
+		size_t len = strlen(target);
+		struct pmemfile_inode *inode;
+
+		if (len >= sizeof(inode->file_data.data))
+			pmemobj_tx_abort(ENAMETOOLONG);
+
+		struct pmemfile_time t;
+
+		rwlock_tx_wlock(&vparent->rwlock);
+
+		vinode = inode_alloc(pfp, S_IFLNK | 0777, &t, vparent, NULL,
+				info.remaining);
+		inode = D_RW(vinode->inode);
+		pmemobj_memcpy_persist(pfp->pop, inode->file_data.data, target,
+				len);
+		inode->size = len;
+
+		vinode_add_dirent(pfp, vparent, info.remaining, vinode, &t);
+
+		rwlock_tx_unlock_on_commit(&vparent->rwlock);
+	} TX_ONABORT {
+		oerrno = errno;
+		ret = -1;
+	} TX_END
+
+	if (info.vinode)
+		vinode_unref_tx(pfp, info.vinode);
+
+	if (vinode && ret == 0)
+		vinode_unref_tx(pfp, vinode);
+
+	if (ret)
+		errno = oerrno;
+
+	return ret;
+}
+
+int
+pmemfile_symlinkat(PMEMfilepool *pfp, const char *target, PMEMfile *newdir,
+		const char *linkpath)
+{
+	struct pmemfile_vinode *at;
+	bool at_unref;
+
+	if (!target || !linkpath) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	at = pool_get_dir_for_path(pfp, newdir, linkpath, &at_unref);
+
+	int ret = _pmemfile_symlinkat(pfp, target, at, linkpath);
+
+	int oerrno;
+	if (ret)
+		oerrno = errno;
+	if (at_unref)
+		vinode_unref_tx(pfp, at);
+	if (ret)
+		errno = oerrno;
+
+	return ret;
+}
+
+int
+pmemfile_symlink(PMEMfilepool *pfp, const char *target, const char *linkpath)
+{
+	return pmemfile_symlinkat(pfp, target, PMEMFILE_AT_CWD, linkpath);
+}
+
 int
 pmemfile_fcntl(PMEMfilepool *pfp, PMEMfile *file, int cmd, ...)
 {
