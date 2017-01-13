@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -90,6 +90,16 @@ static inline bool inode_is_regular_file(const struct pmemfile_inode *inode)
 static inline bool vinode_is_regular_file(struct pmemfile_vinode *vinode)
 {
 	return inode_is_regular_file(D_RO(vinode->inode));
+}
+
+static inline bool inode_is_symlink(const struct pmemfile_inode *inode)
+{
+	return S_ISLNK(inode->flags);
+}
+
+static inline bool vinode_is_symlink(struct pmemfile_vinode *vinode)
+{
+	return inode_is_symlink(D_RO(vinode->inode));
 }
 
 void file_get_time(struct pmemfile_time *t);

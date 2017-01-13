@@ -278,6 +278,48 @@ PMEMFILE_SYMLINKAT(PMEMfilepool *pfp, const char *target, PMEMfile *newdir,
 	UT_ASSERTeq(ret, 0);
 }
 
+static char ut_readlink_buf[PATH_MAX];
+char *
+PMEMFILE_READLINK(PMEMfilepool *pfp, const char *pathname, const char *expected)
+{
+	ssize_t ret = pmemfile_readlink(pfp, pathname, ut_readlink_buf,
+			sizeof(ut_readlink_buf) - 1);
+	if (ret <= 0)
+		UT_FATAL("readlink(%s)=%ld < 0, errno %d, %s", pathname, ret,
+				errno, strerror(errno));
+
+	ut_readlink_buf[sizeof(ut_readlink_buf) - 1] = 0;
+
+	if (expected && strcmp(ut_readlink_buf, expected) != 0)
+		UT_FATAL("readlink(%s)=%s != %s", pathname, ut_readlink_buf,
+				expected);
+
+	return ut_readlink_buf;
+}
+
+char *
+PMEMFILE_READLINKAT(PMEMfilepool *pfp, const char *dirpath,
+		const char *pathname, const char *expected)
+{
+	PMEMfile *dir = PMEMFILE_OPEN(pfp, dirpath, O_DIRECTORY);
+
+	ssize_t ret = pmemfile_readlinkat(pfp, dir, pathname, ut_readlink_buf,
+			sizeof(ut_readlink_buf) - 1);
+	if (ret <= 0)
+		UT_FATAL("readlinkat(%s, %s)=%ld < 0, errno %d, %s", dirpath,
+				pathname, ret, errno, strerror(errno));
+
+	ut_readlink_buf[sizeof(ut_readlink_buf) - 1] = 0;
+
+	if (expected && strcmp(ut_readlink_buf, expected) != 0)
+		UT_FATAL("readlinkat(%s, %s)=%s != %s", dirpath, pathname,
+				ut_readlink_buf, expected);
+
+	PMEMFILE_CLOSE(pfp, dir);
+
+	return ut_readlink_buf;
+}
+
 static const char *
 timespec_to_str(const struct timespec *t)
 {

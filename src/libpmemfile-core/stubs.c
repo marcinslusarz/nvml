@@ -62,34 +62,6 @@ check_pfp_file(PMEMfilepool *pfp, PMEMfile *file)
 		abort();
 }
 
-ssize_t
-pmemfile_readlink(PMEMfilepool *pfp, const char *path,
-			char *buf, size_t buf_len)
-{
-	check_pfp(pfp);
-
-	(void) path;
-	(void) buf_len;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
-ssize_t
-pmemfile_readlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
-		char *buf, size_t bufsiz)
-{
-	check_pfp(pfp);
-
-	(void) dir;
-	(void) pathname;
-	(void) buf;
-	(void) bufsiz;
-
-	errno = ENOTSUP;
-	return -1;
-}
-
 int
 pmemfile_access(PMEMfilepool *pfp, const char *path, mode_t mode)
 {

@@ -50,11 +50,6 @@
 #ifndef LIBPMEMFILE_CORE_STUBS_H
 #define LIBPMEMFILE_CORE_STUBS_H
 
-ssize_t pmemfile_readlink(PMEMfilepool *, const char *path,
-			char *buf, size_t buf_len);
-ssize_t pmemfile_readlinkat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
-			char *buf, size_t bufsiz);
-
 int pmemfile_access(PMEMfilepool *, const char *path, mode_t mode);
 int pmemfile_euidaccess(PMEMfilepool *, const char *pathname, int mode);
 int pmemfile_faccessat(PMEMfilepool *, PMEMfile *dir, const char *pathname,

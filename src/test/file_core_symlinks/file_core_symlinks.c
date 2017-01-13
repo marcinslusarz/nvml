@@ -70,9 +70,22 @@ test0(PMEMfilepool *pfp)
 	PMEMFILE_MKDIR(pfp, "/dir", 0755);
 
 	PMEMFILE_SYMLINK(pfp, "/file1", "/dir/sym1-exists");
+	PMEMFILE_READLINK(pfp, "/dir/sym1-exists", "/file1");
+	PMEMFILE_READLINKAT(pfp, "/dir", "sym1-exists", "/file1");
+	PMEMFILE_READLINKAT(pfp, "/", "dir/sym1-exists", "/file1");
+
 	PMEMFILE_SYMLINK(pfp, "/file2", "/dir/sym2-not_exists");
+	PMEMFILE_READLINK(pfp, "/dir/sym2-not_exists", "/file2");
+	PMEMFILE_READLINKAT(pfp, "/dir", "sym2-not_exists", "/file2");
+
 	PMEMFILE_SYMLINK(pfp, "../file1", "/dir/sym3-exists-relative");
+	PMEMFILE_READLINK(pfp, "/dir/sym3-exists-relative", "../file1");
+	PMEMFILE_READLINKAT(pfp, "/dir", "sym3-exists-relative", "../file1");
+
 	PMEMFILE_SYMLINK(pfp, "../file2", "/dir/sym3-not_exists-relative");
+	PMEMFILE_READLINK(pfp, "/dir/sym3-not_exists-relative", "../file2");
+	PMEMFILE_READLINKAT(pfp, "/dir", "sym3-not_exists-relative",
+			"../file2");
 
 	int ret;
 
@@ -109,6 +122,26 @@ test0(PMEMfilepool *pfp)
 	ret = pmemfile_symlinkat(pfp, "whatever", f, "lalala");
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, ENOTDIR);
+
+
+	char buf[PATH_MAX];
+
+	ret = pmemfile_readlink(pfp, "/not-existing-dir/xxx", buf, PATH_MAX);
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOENT);
+
+	ret = pmemfile_readlink(pfp, "/file1/xxx", buf, PATH_MAX);
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	ret = pmemfile_readlink(pfp, "/file1", buf, PATH_MAX);
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, EINVAL);
+
+	ret = pmemfile_readlinkat(pfp, f, "lalala", buf, PATH_MAX);
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 	PMEMFILE_CLOSE(pfp, f);
 
 	PMEMFILE_STATS(pfp);

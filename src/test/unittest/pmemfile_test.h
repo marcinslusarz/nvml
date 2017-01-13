@@ -74,6 +74,10 @@ void PMEMFILE_SYMLINK(PMEMfilepool *pfp, const char *target,
 		const char *linkpath);
 void PMEMFILE_SYMLINKAT(PMEMfilepool *pfp, const char *target, PMEMfile *newdir,
 		const char *linkpath);
+char *PMEMFILE_READLINK(PMEMfilepool *pfp, const char *pathname,
+		const char *expected);
+char *PMEMFILE_READLINKAT(PMEMfilepool *pfp, const char *dirpath,
+		const char *pathname, const char *expected);
 
 /* utilities */
 void PMEMFILE_STATS(PMEMfilepool *pfp);

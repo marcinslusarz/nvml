@@ -126,6 +126,11 @@ int pmemfile_symlink(PMEMfilepool *, const char *path1, const char *path2);
 int pmemfile_symlinkat(PMEMfilepool *, const char *path1,
 				PMEMfile *at, const char *path2);
 
+ssize_t pmemfile_readlink(PMEMfilepool *, const char *path,
+			char *buf, size_t buf_len);
+ssize_t pmemfile_readlinkat(PMEMfilepool *, PMEMfile *dir, const char *pathname,
+			char *buf, size_t bufsiz);
+
 struct pmemfile_stats {
 	unsigned inodes;
 	unsigned dirs;

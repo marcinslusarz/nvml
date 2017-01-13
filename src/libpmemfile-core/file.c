@@ -1045,6 +1045,85 @@ pmemfile_symlink(PMEMfilepool *pfp, const char *target, const char *linkpath)
 	return pmemfile_symlinkat(pfp, target, PMEMFILE_AT_CWD, linkpath);
 }
 
+static ssize_t
+_pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
+		const char *pathname, char *buf, size_t bufsiz)
+{
+	ssize_t ret;
+	struct pmemfile_path_info info;
+	traverse_path(pfp, dir, pathname, false, &info, 0);
+
+	if (info.remaining[0] != 0) {
+		if (vinode_is_dir(info.vinode))
+			errno = ENOENT;
+		else
+			errno = ENOTDIR;
+
+		ret = -1;
+		goto end;
+	}
+
+	if (!vinode_is_symlink(info.vinode)) {
+		errno = EINVAL;
+		ret = -1;
+		goto end;
+	}
+
+	util_rwlock_rdlock(&info.vinode->rwlock);
+
+	const struct pmemfile_inode *inode = D_RO(info.vinode->inode);
+	size_t len = strlen(inode->file_data.data);
+	if (len > bufsiz)
+		len = bufsiz;
+	memcpy(buf, inode->file_data.data, len);
+	ret = (ssize_t)len;
+
+	util_rwlock_unlock(&info.vinode->rwlock);
+
+end:
+	if (info.vinode)
+		vinode_unref_tx(pfp, info.vinode);
+	return ret;
+}
+
+ssize_t
+pmemfile_readlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
+		char *buf, size_t bufsiz)
+{
+	struct pmemfile_vinode *at;
+	bool at_unref;
+
+	if (!pathname) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	at = pool_get_dir_for_path(pfp, dir, pathname, &at_unref);
+
+	ssize_t ret = _pmemfile_readlinkat(pfp, at, pathname, buf, bufsiz);
+
+	/*
+	 * initialized only because gcc 6.2 thinks "oerrno" might not be
+	 * initialized at the time of writing it back to "errno"
+	 */
+	int oerrno = 0;
+	if (ret < 0)
+		oerrno = errno;
+	if (at_unref)
+		vinode_unref_tx(pfp, at);
+	if (ret < 0)
+		errno = oerrno;
+
+	return ret;
+}
+
+ssize_t
+pmemfile_readlink(PMEMfilepool *pfp, const char *pathname, char *buf,
+		size_t bufsiz)
+{
+	return pmemfile_readlinkat(pfp, PMEMFILE_AT_CWD, pathname, buf, bufsiz);
+}
+
 int
 pmemfile_fcntl(PMEMfilepool *pfp, PMEMfile *file, int cmd, ...)
 {
