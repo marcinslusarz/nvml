@@ -44,6 +44,6 @@ setup
 
 expect_normal_exit ./file_core_symlinks$EXESUFFIX $DIR/testfile1
 
-#check
+check
 
 pass

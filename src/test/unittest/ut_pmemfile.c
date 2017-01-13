@@ -334,6 +334,7 @@ PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
 {
 	struct stat statbuf;
 	char *buf = (void *)dirp;
+	char symlinkbuf[PATH_MAX];
 
 	for (unsigned i = 0; i < length; ) {
 		i += 8;
@@ -346,15 +347,28 @@ PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
 		i += 1;
 
 		PMEMFILE_FSTATAT(pfp, dir, buf + i, &statbuf, 0);
-		if (type == DT_REG)
+		char typechr;
+		if (type == DT_REG) {
 			UT_ASSERTeq(S_ISREG(statbuf.st_mode), 1);
-		else if (type == DT_DIR)
+			typechr = '-';
+		} else if (type == DT_DIR) {
 			UT_ASSERTeq(S_ISDIR(statbuf.st_mode), 1);
-		else
-			UT_ASSERT(0);
+			typechr = 'd';
+		} else if (type == DT_LNK) {
+			UT_ASSERTeq(S_ISLNK(statbuf.st_mode), 1);
+			typechr = 'l';
 
-		UT_OUT("%c%c%c%c%c%c%c%c%c%c %ld %d %d %6ld %s %s",
-				type == DT_DIR ? 'd' : '-',
+			ssize_t ret = pmemfile_readlinkat(pfp, dir, buf + i,
+					symlinkbuf, PATH_MAX);
+			UT_ASSERT(ret > 0);
+			UT_ASSERT(ret < PATH_MAX);
+			symlinkbuf[ret] = 0;
+		} else {
+			UT_ASSERT(0);
+		}
+
+		UT_OUT("%c%c%c%c%c%c%c%c%c%c %ld %d %d %6ld %s %s%s%s",
+				typechr,
 				statbuf.st_mode & S_IRUSR ? 'r' : '-',
 				statbuf.st_mode & S_IWUSR ? 'w' : '-',
 				statbuf.st_mode & S_IXUSR ? 'x' : '-',
@@ -370,7 +384,9 @@ PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
 				statbuf.st_size,
 				print_attrs ? timespec_to_str(&statbuf.st_mtim)
 						: "",
-				buf + i);
+				buf + i,
+				type == DT_LNK ? " -> " : "",
+				type == DT_LNK ? symlinkbuf : "");
 		i += reclen;
 		i -= 8 + 8 + 2 + 1;
 	}

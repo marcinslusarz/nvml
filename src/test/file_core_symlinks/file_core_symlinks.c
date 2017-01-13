@@ -82,10 +82,13 @@ test0(PMEMfilepool *pfp)
 	PMEMFILE_READLINK(pfp, "/dir/sym3-exists-relative", "../file1");
 	PMEMFILE_READLINKAT(pfp, "/dir", "sym3-exists-relative", "../file1");
 
-	PMEMFILE_SYMLINK(pfp, "../file2", "/dir/sym3-not_exists-relative");
-	PMEMFILE_READLINK(pfp, "/dir/sym3-not_exists-relative", "../file2");
-	PMEMFILE_READLINKAT(pfp, "/dir", "sym3-not_exists-relative",
+	PMEMFILE_SYMLINK(pfp, "../file2", "/dir/sym4-not_exists-relative");
+	PMEMFILE_READLINK(pfp, "/dir/sym4-not_exists-relative", "../file2");
+	PMEMFILE_READLINKAT(pfp, "/dir", "sym4-not_exists-relative",
 			"../file2");
+
+	PMEMFILE_LIST_FILES(pfp, "/", "/");
+	PMEMFILE_LIST_FILES(pfp, "/dir", "/dir");
 
 	int ret;
 
@@ -143,6 +146,13 @@ test0(PMEMfilepool *pfp)
 	UT_ASSERTeq(errno, ENOTDIR);
 
 	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_UNLINK(pfp, "/dir/sym1-exists");
+	PMEMFILE_UNLINK(pfp, "/dir/sym2-not_exists");
+	PMEMFILE_UNLINK(pfp, "/dir/sym3-exists-relative");
+	PMEMFILE_UNLINK(pfp, "/dir/sym4-not_exists-relative");
+	PMEMFILE_UNLINK(pfp, "/file1");
+	PMEMFILE_RMDIR(pfp, "/dir");
 
 	PMEMFILE_STATS(pfp);
 
