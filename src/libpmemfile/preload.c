@@ -1081,7 +1081,7 @@ hook_unlinkat(struct fd_desc at, long path_arg, long flags)
 	struct resolved_path where;
 
 	resolve_path(at, (const char *)path_arg,
-	    &where, RESOLVE_LAST_SLINK);
+	    &where, NO_RESOLVE_LAST_SLINK);
 
 	if (where.error_code != 0)
 		return where.error_code;
@@ -1677,7 +1677,7 @@ hook_symlinkat(const char *target, struct fd_desc at, const char *linkpath)
 {
 	struct resolved_path where;
 
-	resolve_path(at, linkpath, &where, RESOLVE_LAST_SLINK);
+	resolve_path(at, linkpath, &where, NO_RESOLVE_LAST_SLINK);
 	if (where.error_code != 0)
 		return where.error_code;
 
