@@ -98,21 +98,16 @@ resolve_symlink(struct resolved_path *result,
 			link_buf,
 			sizeof(link_buf));
 	} else {
-		assert(false);
-		/*
-		 *
-		 * TODO -- when pmemfile-core supports symlinks
-		 *
-		 * link_len = pmemfile_readlinkat(result->at.pmem_fda.pool,
-		 *	result->at.pmem_fda.file,
-		 *	result->path,
-		 *	link_buf,
-		 *	sizeof(link_buf));
-		 * if (link_len < 0 && errno != 0) {
-		 *	result->error_code = -errno;
-		 *	return;
-		 * }
-		 */
+		link_len = pmemfile_readlinkat(result->at.pmem_fda.pool->pool,
+				result->at.pmem_fda.file,
+				result->path,
+				link_buf,
+				sizeof(link_buf));
+
+		if (link_len < 0 && errno != 0) {
+			result->error_code = -errno;
+			return;
+		}
 	}
 
 	if (! *is_last_component)
