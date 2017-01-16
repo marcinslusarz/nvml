@@ -203,8 +203,24 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 
 	result.has_ip_relative_opr = false;
 
-	if (result.is_jump)
-		check_op(&result, context->insn->detail->x86.operands, code);
+	/*
+	 * Loop over all operands of the instruction currently being decoded.
+	 * These operands are decoded by capstone, and described in the
+	 * context->insn->detail->x86.operands array.
+	 *
+	 * This operand checking serves multiple purposes:
+	 * The destination of any jumping instruction is found here,
+	 * The instructions using RIP relative addressing are found by this
+	 *  loop, e.g.: mov %rax, 0x36eb55d(%rip)
+	 *
+	 * Any instruction relying on the value of the RIP register can not
+	 * be relocated ( including relative jumps, which naturally also
+	 * rely on the RIP register ).
+	 */
+	for (uint8_t op_i = 0;
+	    op_i < context->insn->detail->x86.op_count; ++op_i)
+		check_op(&result, context->insn->detail->x86.operands + op_i,
+		    code);
 
 	return result;
 }
