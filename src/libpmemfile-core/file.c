@@ -249,11 +249,8 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	if ((flags & O_CREAT) || is_tmpfile(flags)) {
 		mode = va_arg(ap, mode_t);
 		LOG(LDBG, "mode %o", mode);
-		if (mode & ~(mode_t)(S_IRWXU | S_IRWXG | S_IRWXO)) {
-			LOG(LUSR, "invalid mode 0%o", mode);
-			errno = EINVAL;
-			return NULL;
-		}
+		mode &= S_IRWXU | S_IRWXG | S_IRWXO |
+				S_ISUID | S_ISGID | S_ISVTX;
 
 		if (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
 			LOG(LSUP, "execute bits are not supported");
