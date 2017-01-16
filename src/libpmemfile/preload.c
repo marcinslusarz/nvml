@@ -1820,11 +1820,13 @@ hook_readlinkat(struct fd_desc at, const char *path,
 
 	if (r < 0)
 		r = -errno;
+	else
+		assert(r < INT_MAX);
 
-	log_write("pmemfile_readlinkat(%p, %p, \"%s\", \"%s\", %zu) = %zd",
+	log_write("pmemfile_readlinkat(%p, %p, \"%s\", \"%.*s\", %zu) = %zd",
 	    (void *)where.at.pmem_fda.pool->pool,
 	    (void *)where.at.pmem_fda.file,
-	    where.path, buf, bufsiz, r);
+	    where.path, r >= 0 ? (int)r : 0, r >= 0 ? buf : "", bufsiz, r);
 
 	return check_errno(r);
 }
