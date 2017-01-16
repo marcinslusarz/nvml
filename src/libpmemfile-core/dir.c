@@ -865,18 +865,21 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, path, false, &info, 0);
 
+	struct pmemfile_vinode *parent = info.vinode;
+	int error = 0;
+	int txerrno = 0;
+	volatile bool parent_refed = false;
+
 	if (info.remaining[0] == 0) {
-		vinode_unref_tx(pfp, info.vinode);
-		errno = EEXIST;
-		return -1;
+		error = 1;
+		txerrno = EEXIST;
+		goto end;
 	}
 
-	struct pmemfile_vinode *parent = info.vinode;
-
 	if (!vinode_is_dir(parent)) {
-		vinode_unref_tx(pfp, parent);
-		errno = ENOTDIR;
-		return -1;
+		error = 1;
+		txerrno = ENOTDIR;
+		goto end;
 	}
 
 	char *sanitized = NULL;
@@ -888,19 +891,16 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			after_slash++;
 
 		if (*after_slash != 0) {
-			vinode_unref_tx(pfp, parent);
-			errno = ENOENT;
-			return -1;
+			error = 1;
+			txerrno = ENOENT;
+			goto end;
 		}
 
 		sanitized = strndup(info.remaining,
 			(uintptr_t)slash - (uintptr_t)info.remaining);
 	}
 
-	int error = 0;
-	int txerrno = 0;
 	struct pmemfile_vinode *child = NULL;
-	volatile bool parent_refed = false;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		rwlock_tx_wlock(&parent->rwlock);
@@ -920,6 +920,7 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	if (!error)
 		vinode_unref_tx(pfp, child);
 
+end:
 	vinode_unref_tx(pfp, parent);
 
 	if (error) {
@@ -977,26 +978,23 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	if (info.name)
 		free(info.name);
 
-	if (info.remaining[0] != 0) {
-		vinode_unref_tx(pfp, info.vinode);
-		if (info.parent)
-			vinode_unref_tx(pfp, info.parent);
-		errno = ENOENT;
-		return -1;
-	}
-
 	struct pmemfile_vinode *vdir = info.vinode;
-	if (!vinode_is_dir(vdir)) {
-		vinode_unref_tx(pfp, vdir);
-		if (info.parent)
-			vinode_unref_tx(pfp, info.parent);
-		errno = ENOTDIR;
-		return -1;
-	}
-
+	struct pmemfile_vinode *vparent = info.parent;
 	int error = 0;
 	int txerrno = 0;
-	struct pmemfile_vinode *vparent = info.parent;
+
+	if (info.remaining[0] != 0) {
+		error = 1;
+		txerrno = ENOENT;
+		goto end;
+	}
+
+	if (!vinode_is_dir(vdir)) {
+		error = 1;
+		txerrno = ENOTDIR;
+		goto end;
+	}
+
 	struct pmemfile_inode *iparent = D_RW(vparent->inode);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -1088,7 +1086,9 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		txerrno = errno;
 	} TX_END
 
-	vinode_unref_tx(pfp, vparent);
+end:
+	if (vparent)
+		vinode_unref_tx(pfp, vparent);
 
 	vinode_unref_tx(pfp, vdir);
 
