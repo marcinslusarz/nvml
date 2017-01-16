@@ -1818,7 +1818,7 @@ hook_readlinkat(struct fd_desc at, const char *path,
 	ssize_t r = pmemfile_readlinkat(where.at.pmem_fda.pool->pool,
 			where.at.pmem_fda.file, where.path, buf, bufsiz);
 
-	if (r != 0)
+	if (r < 0)
 		r = -errno;
 
 	log_write("pmemfile_readlinkat(%p, %p, \"%s\", \"%s\", %zu) = %zd",
