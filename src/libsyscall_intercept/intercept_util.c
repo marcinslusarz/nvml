@@ -771,6 +771,11 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				F_STR, arg0,
 				F_HEX, arg1,
 				result_known, result);
+	} else if (nr == SYS_fstatfs) {
+		buf = print_syscall(buf, "fstatfs", 2,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				result_known, result);
 	} else if (nr == SYS_chroot) {
 		buf = print_syscall(buf, "chroot", 1,
 				F_STR, arg0,
@@ -1002,6 +1007,143 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				F_HEX, arg1,
 				F_HEX, arg2,
 				F_HEX, arg3,
+				result_known, result);
+	} else if (nr == SYS_select) {
+		buf = print_syscall(buf, "select", 5,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				F_HEX, arg2,
+				F_HEX, arg3,
+				F_HEX, arg4,
+				result_known, result);
+	} else if (nr == SYS_pselect6) {
+		buf = print_syscall(buf, "pselect6", 6,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				F_HEX, arg2,
+				F_HEX, arg3,
+				F_HEX, arg4,
+				F_HEX, arg5,
+				result_known, result);
+	} else if (nr == SYS_rt_sigaction) {
+		buf = print_syscall(buf, "rt_sigaction", 3,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				F_HEX, arg2,
+				result_known, result);
+	} else if (nr == SYS_rt_sigprocmask) {
+		buf = print_syscall(buf, "rt_sigprocmask", 3,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				F_HEX, arg2,
+				result_known, result);
+	} else if (nr == SYS_rt_sigreturn) {
+		buf = print_syscall(buf, "rt_sigreturn", 1,
+				F_HEX, arg0,
+				result_known, result);
+	} else if (nr == SYS_getuid) {
+		buf = print_syscall(buf, "getuid", 0, result_known, result);
+	} else if (nr == SYS_geteuid) {
+		buf = print_syscall(buf, "geteuid", 0, result_known, result);
+	} else if (nr == SYS_getgid) {
+		buf = print_syscall(buf, "getgid", 0, result_known, result);
+	} else if (nr == SYS_getegid) {
+		buf = print_syscall(buf, "getegid", 0, result_known, result);
+	} else if (nr == SYS_setsid) {
+		buf = print_syscall(buf, "setsid", 0, result_known, result);
+	} else if (nr == SYS_getsid) {
+		buf = print_syscall(buf, "getsid", 1,
+				F_DEC, arg0,
+				result_known, result);
+	} else if (nr == SYS_uname) {
+		buf = print_syscall(buf, "uname", 1,
+				F_HEX, arg0,
+				result_known, result);
+	} else if (nr == SYS_futex) {
+		buf = print_syscall(buf, "futex", 6,
+				F_HEX, arg0,
+				F_DEC, arg1,
+				F_DEC, arg2,
+				F_HEX, arg3,
+				F_HEX, arg4,
+				F_DEC, arg5,
+				result_known, result);
+	} else if (nr == SYS_get_robust_list) {
+		buf = print_syscall(buf, "get_robust_list", 3,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				F_HEX, arg2,
+				result_known, result);
+	} else if (nr == SYS_set_robust_list) {
+		buf = print_syscall(buf, "set_robust_list", 2,
+				F_HEX, arg0,
+				F_DEC, arg1,
+				result_known, result);
+	} else if (nr == SYS_pipe) {
+		buf = print_syscall(buf, "pipe", 1,
+				F_HEX, arg0,
+				result_known, result);
+	} else if (nr == SYS_pipe2) {
+		buf = print_syscall(buf, "pipe2", 2,
+				F_HEX, arg0,
+				F_HEX, arg1,
+				result_known, result);
+	} else if (nr == SYS_socket) {
+		buf = print_syscall(buf, "socket", 3,
+				F_DEC, arg0,
+				F_DEC, arg1,
+				F_DEC, arg2,
+				result_known, result);
+	} else if (nr == SYS_connect) {
+		buf = print_syscall(buf, "connect", 3,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				F_DEC, arg2,
+				result_known, result);
+	} else if (nr == SYS_kill) {
+		buf = print_syscall(buf, "kill", 2,
+				F_DEC, arg0,
+				F_DEC, arg1,
+				result_known, result);
+	} else if (nr == SYS_sysinfo) {
+		buf = print_syscall(buf, "sysinfo", 1,
+				F_HEX, arg0,
+				result_known, result);
+	} else if (nr == SYS_getxattr) {
+		buf = print_syscall(buf, "getxattr", 4,
+				F_STR, arg0,
+				F_STR, arg1,
+				F_BUF, arg3, arg2,
+				F_DEC, arg3,
+				result_known, result);
+	} else if (nr == SYS_lgetxattr) {
+		buf = print_syscall(buf, "lgetxattr", 4,
+				F_STR, arg0,
+				F_STR, arg1,
+				F_BUF, arg3, arg2,
+				F_DEC, arg3,
+				result_known, result);
+	} else if (nr == SYS_fgetxattr) {
+		buf = print_syscall(buf, "fgetxattr", 4,
+				F_DEC, arg0,
+				F_STR, arg1,
+				F_BUF, arg3, arg2,
+				F_DEC, arg3,
+				result_known, result);
+	} else if (nr == SYS_setrlimit) {
+		buf = print_syscall(buf, "setrlimit", 2,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				result_known, result);
+	} else if (nr == SYS_getrlimit) {
+		buf = print_syscall(buf, "getrlimit", 2,
+				F_DEC, arg0,
+				F_HEX, arg1,
+				result_known, result);
+	} else if (nr == SYS_getrusage) {
+		buf = print_syscall(buf, "getrusage", 2,
+				F_DEC, arg0,
+				F_HEX, arg1,
 				result_known, result);
 	} else {
 		buf = print_syscall(buf, "syscall", 7,
