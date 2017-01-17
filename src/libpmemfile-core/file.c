@@ -478,6 +478,8 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 	ret->flags = PFILE_READ | PFILE_NOATIME;
 	util_mutex_init(&ret->mutex, NULL);
 	size_t len = strlen(name);
+	if (len >= path_size)
+		len = path_size - 1;
 	memmove(path, name, len);
 	path[len] = 0;
 
