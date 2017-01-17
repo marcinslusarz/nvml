@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -70,33 +70,25 @@ main(int argc, char *argv[])
 
 	const char *path = argv[1];
 	PMEMfilepool *pfp;
-	PMEMfile *f1;
-	int ret;
 
 	if (strcmp(argv[2], "prep") == 0) {
 		pfp = create_pool(path);
 
-		f1 = pmemfile_open(pfp, "/aaa", O_CREAT | O_EXCL, 0644);
-		pmemfile_close(pfp, f1);
-
-		f1 = pmemfile_open(pfp, "/bbb", O_CREAT | O_EXCL, 0644);
-		pmemfile_close(pfp, f1);
+		PMEMFILE_CREATE(pfp, "/aaa", O_CREAT | O_EXCL, 0644);
+		PMEMFILE_CREATE(pfp, "/bbb", O_CREAT | O_EXCL, 0644);
 
 		pmemfile_pool_close(pfp);
 	} else if (strcmp(argv[2], "crash1") == 0) {
 		pfp = open_pool(path);
 
-		f1 = pmemfile_open(pfp, "/aaa", 0);
-		UT_ASSERTne(f1, NULL);
+		PMEMFILE_OPEN(pfp, "/aaa", 0);
+
 		exit(0);
 	} else if (strcmp(argv[2], "crash2") == 0) {
 		pfp = open_pool(path);
 
-		f1 = pmemfile_open(pfp, "/aaa", 0);
-		UT_ASSERTne(f1, NULL);
-
-		ret = pmemfile_unlink(pfp, "/aaa");
-		UT_ASSERTeq(ret, 0);
+		PMEMFILE_OPEN(pfp, "/aaa", 0);
+		PMEMFILE_UNLINK(pfp, "/aaa");
 
 		exit(0);
 	} else if (strcmp(argv[2], "openclose") == 0) {
