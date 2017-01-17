@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -86,10 +86,65 @@ vinode_rebuild_block_tree(struct pmemfile_vinode *vinode)
 	vinode->blocks = c;
 }
 
-static struct pmemfile_block *
-find_block(struct pmemfile_vinode *vinode, uint64_t *off)
+/*
+ * is_offset_in_block -- check if the given offset is in the range
+ * specified by the block metadata
+ */
+static bool
+is_offset_in_block(const struct pmemfile_block *block, uint64_t offset)
 {
-	return (void *)(uintptr_t)ctree_find_le_unlocked(vinode->blocks, off);
+	if (block == NULL)
+		return false;
+
+	return block->offset <= offset && offset < block->offset + block->size;
+}
+
+/*
+ * find_block -- look up block metadata with the highest offset
+ * lower than or equal to the offset argument
+ */
+static struct pmemfile_block *
+find_block(struct pmemfile_file *file, uint64_t offset)
+{
+	if (is_offset_in_block(file->block_pointer_cache, offset))
+		return file->block_pointer_cache;
+
+	uint64_t off = offset;
+	struct pmemfile_block *block;
+
+	block = (void *)(uintptr_t)ctree_find_le_unlocked(file->vinode->blocks,
+	    &off);
+
+	if (block != NULL)
+		file->block_pointer_cache = block;
+
+	return block;
+}
+
+/*
+ * is_last_block -- returns true when specified block is the last one in a file
+ */
+static bool
+is_last_block(struct pmemfile_block *block)
+{
+	return TOID_IS_NULL(block->next);
+}
+
+/*
+ * find_last_block -- lookup the metadata of the block with the highest
+ * offset in the file - the metadata of the last block
+ */
+static struct pmemfile_block *
+find_last_block(struct pmemfile_file *file)
+{
+	if (file->block_pointer_cache != NULL &&
+	    is_last_block(file->block_pointer_cache))
+		return file->block_pointer_cache;
+
+	uint64_t off = SSIZE_MAX;
+
+	return (void *)(uintptr_t)ctree_find_le_unlocked(file->vinode->blocks,
+	    &off);
 }
 
 /*
@@ -107,14 +162,14 @@ vinode_destroy_data_state(struct pmemfile_vinode *vinode)
 }
 
 /*
- * file_allocate_block -- allocates new block
+ * file_allocate_block_data -- allocates new block data.
+ * The block metadata must be already allocated, and passed as the block
+ * pointer argument.
  */
 static void
-file_allocate_block(PMEMfilepool *pfp,
+file_allocate_block_data(PMEMfilepool *pfp,
 		PMEMfile *file,
 		struct pmemfile_inode *inode,
-		struct pmemfile_pos *pos,
-		struct pmemfile_block *prev,
 		struct pmemfile_block *block,
 		size_t count)
 {
@@ -166,57 +221,10 @@ file_allocate_block(PMEMfilepool *pfp,
 	block->size = (uint32_t)sz;
 
 	block->flags = 0;
-	block->offset = pos->global_offset;
-	block->next = TOID_NULL(struct pmemfile_block);
-
-	if (prev) {
-		TX_ADD_DIRECT(&prev->next);
-		prev->next = (TOID(struct pmemfile_block))pmemobj_oid(block);
-	}
-
-	TX_ADD_DIRECT(&inode->last_block_fill);
-	inode->last_block_fill = 0;
-
-	block_cache_insert_block(file->vinode->blocks, block);
-}
-
-/*
- * inode_extend_block_meta_data -- updates metadata of the current block
- */
-static void
-inode_extend_block_meta_data(struct pmemfile_inode *inode, uint32_t len)
-{
-	TX_ADD_FIELD_DIRECT(inode, last_block_fill);
-	inode->last_block_fill += len;
-
-	TX_ADD_FIELD_DIRECT(inode, size);
-	inode->size += len;
-}
-
-/*
- * inode_zero_extend_block -- extends current block with zeroes
- */
-static void
-inode_zero_extend_block(PMEMfilepool *pfp,
-		struct pmemfile_inode *inode,
-		struct pmemfile_block *block,
-		uint32_t len)
-{
-	char *addr = D_RW(block->data) + inode->last_block_fill;
-
-	/*
-	 * We can safely skip tx_add_range, because there's no user visible
-	 * data at this address.
-	 */
-	VALGRIND_ADD_TO_TX(addr, len);
-	pmemobj_memset_persist(pfp->pop, addr, 0, len);
-	VALGRIND_REMOVE_FROM_TX(addr, len);
-
-	inode_extend_block_meta_data(inode, len);
 }
 
 static struct pmemfile_block *
-get_free_block(struct pmemfile_vinode *vinode, bool extend)
+get_free_block(struct pmemfile_vinode *vinode)
 {
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 	struct block_info *binfo = &vinode->first_free_block;
@@ -233,9 +241,6 @@ get_free_block(struct pmemfile_vinode *vinode, bool extend)
 				return &binfo->arr->blocks[binfo->idx++];
 			binfo->idx++;
 		}
-
-		if (!extend && TOID_IS_NULL(binfo->arr->next))
-			return NULL;
 
 		prev = binfo->arr;
 		binfo->arr = D_RW(binfo->arr->next);
@@ -257,157 +262,230 @@ get_free_block(struct pmemfile_vinode *vinode, bool extend)
 }
 
 /*
- * is_last_block -- returns true when specified block is the last one in a file
- */
-static bool
-is_last_block(struct pmemfile_block *block)
-{
-	return TOID_IS_NULL(block->next);
-}
-
-/*
- * pos_reset -- resets position pointer to the beginning of the file
+ * expand_file - Optionally append filled blocks to the
+ * end of a file. This is going to need important changes when implementing
+ * sparse files.
  */
 static void
-pos_reset(struct pmemfile_pos *pos, struct pmemfile_vinode *vinode)
+expand_file(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
+		uint64_t new_size)
 {
-	uint64_t off = 0;
-	pos->block = find_block(vinode, &off);
-	if (!pos->block)
-		pos->block = get_free_block(vinode, false);
-	pos->block_offset = 0;
+	if (inode->size >= new_size)
+		return; /* No expansion needed */
 
-	pos->global_offset = 0;
-}
+	TX_ADD_FIELD_DIRECT(inode, size);
 
-/*
- * file_seek_within_block -- changes current position pointer within block
- *
- * returns number of bytes
- */
-static size_t
-file_seek_within_block(PMEMfilepool *pfp,
-		PMEMfile *file,
-		struct pmemfile_inode *inode,
-		struct pmemfile_pos *pos,
-		struct pmemfile_block *prev,
-		struct pmemfile_block *block,
-		size_t offset_left,
-		bool extend)
-{
-	if (block->size == 0) {
-		if (extend)
-			file_allocate_block(pfp, file, inode, pos, prev, block,
-					offset_left);
-		else
-			return 0;
-	}
+	struct pmemfile_block *last_block = find_last_block(file);
 
-	uint32_t max_off;
-	bool is_last = is_last_block(block);
-	if (is_last) {
-		ASSERT(inode->last_block_fill >= pos->block_offset);
-		max_off = inode->last_block_fill - pos->block_offset;
-	} else {
-		ASSERT(block->size >= pos->block_offset);
-		max_off = block->size - pos->block_offset;
-	}
-	uint32_t seeked = (uint32_t)min((size_t)max_off, offset_left);
-
-	pos->block_offset += seeked;
-	pos->global_offset += seeked;
-	offset_left -= seeked;
-
-	if (offset_left == 0 || pos->block_offset == block->size || !extend)
-		return seeked;
-
-	ASSERTeq(is_last, true);
-
-	uint32_t extended = (uint32_t)min(offset_left,
-			(size_t)(block->size - inode->last_block_fill));
-	inode_zero_extend_block(pfp, inode, block, extended);
-
-	pos->block_offset += extended;
-	pos->global_offset += extended;
-
-	return seeked + extended;
-}
-
-/*
- * file_write_within_block -- writes data to current block
- */
-static size_t
-file_write_within_block(PMEMfilepool *pfp,
-		PMEMfile *file,
-		struct pmemfile_inode *inode,
-		struct pmemfile_pos *pos,
-		struct pmemfile_block *prev,
-		struct pmemfile_block *block,
-		const void *buf,
-		size_t count_left)
-{
-	if (block->size == 0)
-		file_allocate_block(pfp, file, inode, pos, prev, block,
-				count_left);
-
-	/* How much data should we write to this block? */
-	uint32_t len = (uint32_t)min((size_t)block->size - pos->block_offset,
-			count_left);
-
-	void *dest = D_RW(block->data) + pos->block_offset;
-	VALGRIND_ADD_TO_TX(dest, len);
-	pmemobj_memcpy_persist(pfp->pop, dest, buf, len);
-	VALGRIND_REMOVE_FROM_TX(dest, len);
-
-	bool is_last = is_last_block(block);
-	if (is_last) {
+	if (last_block != NULL) {
 		/*
-		 * If new size is beyond the block used size, then we
-		 * have to update all metadata.
+		 * The last block might have some space allocated, but as of
+		 * yet unused. Expanding the file to this space does not
+		 * require allocating new blocks.
 		 */
-		if (pos->block_offset + len > inode->last_block_fill) {
-			uint32_t new_used = pos->block_offset + len
-					- inode->last_block_fill;
 
-			inode_extend_block_meta_data(inode, new_used);
+		uint64_t available = last_block->offset + last_block->size;
+
+		if (available >= new_size) {
+			/*
+			 * Expanding file within already allocated block,
+			 * some free space might still remain in the block.
+			 */
+			inode->size = new_size;
+			return; /* No need to allocate new blocks */
+		} else {
+			/*
+			 * Expanding file within already allocated block,
+			 * using the whole block. It is known that more
+			 * blocks are still needed.
+			 */
+			inode->size = available;
+		}
+	}
+
+	/*
+	 * Number of bytes to be allocated. This is passed down to the
+	 * file_allocate_block_data routine, to be used in a heuristic
+	 * determining block size. Some might expect this value to be
+	 * decreased during the following loop, but that might have undesirable
+	 * consequences. Take the case of a 65 kilobyte write for example:
+	 * The heuristic would allocate a 64 kilobyte block, followed by a
+	 * 1 kilobyte block. Repeated 65 kilobyte writes would result in a file
+	 * with 64 and 1 kilobyte blocks interleved. In such a case, a uniform
+	 * 64 kilobyte block size seems like a better option.
+	 * todo: vehemently argue about the allocation strategy in the office,
+	 * and hope for a consensus.
+	 *
+	 *
+	 * Marked as const -- if you try to alter count in the loop, and it
+	 * doesn't compile, read the above litany.
+	 */
+	const uint64_t count = new_size - inode->size;
+
+	/*
+	 * By this point, it is known that the file can not be extended
+	 * without allocating new block(s).
+	 */
+
+	ASSERT(count > 0);
+
+	/*
+	 * The pointer last_block always points to the metadata associated with
+	 * the last block in the file. This current last block in the loop is
+	 * added to the current transaction using the file_allocate_block_data
+	 * routine, so there is no need to add the last_block->next field to
+	 * the transaction in the two places below, where it is assigned to. An
+	 * exception is the case of the first loop iteration, when last_block
+	 * points to the previously existing last block ( if there is any ).
+	 * Thus its next field must be added to the transaction separately.
+	 */
+	if (last_block != NULL)
+		TX_ADD_DIRECT(&last_block->next);
+
+	/* At what offset in the file the next block should be inserted? */
+	uint64_t offset = inode->size;
+
+	while (inode->size < new_size) {
+		/* last_block is NULL when the file is empty */
+		ASSERT(last_block == NULL || is_last_block(last_block));
+
+		/*
+		 * XXX: coalesce get_free_block and file_allocate_block_data
+		 * into a single function?
+		 */
+		struct pmemfile_block *next_block =
+			get_free_block(file->vinode);
+		file_allocate_block_data(pfp, file, inode, next_block, count);
+		next_block->offset = offset;
+
+		/*
+		 * Link the new block into the chain of blocks, if there
+		 * already was such a chain.
+		 */
+		if (last_block != NULL)
+			last_block->next =
+			    (TOID(struct pmemfile_block))
+			    pmemobj_oid(next_block);
+
+		uint64_t available = inode->size + next_block->size;
+		if (available > new_size)
+			inode->size = new_size;
+		else
+			inode->size = available;
+
+		block_cache_insert_block(file->vinode->blocks, next_block);
+
+		/*
+		 * Set up last_block and offset to hold the loops invariant
+		 * in the next iteration.
+		 * Note: the next_block->next field is left uninitialized.
+		 * Everything else in the block metadata is initialized.
+		 */
+		last_block = next_block;
+		offset = inode->size;
+	}
+
+	ASSERT(last_block != NULL); /* at least one block was allocated */
+
+	/*
+	 * Close the linked list of blocks -- the loop did not initialize
+	 * the next field of the last block in the last iteration.
+	 */
+	last_block->next = TOID_NULL(struct pmemfile_block);
+}
+
+static void
+iterate_on_file_range(PMEMfilepool *pfp, PMEMfile *file,
+    uint64_t offset, uint64_t len,
+    int (*callback)(PMEMfilepool *, char *, char *chunk,
+	uint64_t offset, uint64_t chunk_size),
+    void *arg)
+{
+	struct pmemfile_block *block = find_block(file, offset);
+
+	/*
+	 * As long as sparse files are not implemented, a file
+	 * with non-zero size must have at least one block, that
+	 * can be found with ctree_find_le_unlocked, thus the following assert.
+	 */
+	ASSERT(block != NULL);
+
+	uint64_t range_offset = 0;
+
+	for (; len > 0; block = D_RW(block->next)) {
+		/* Remember the pointer to block used last time */
+		file->block_pointer_cache = block;
+
+		/*
+		 * Two more asserts, that should stay here as long as
+		 * sparse files are not implemented.
+		 */
+		ASSERT(is_offset_in_block(block, offset));
+
+		/*
+		 * Multiple blocks might be used, but the first and last
+		 * blocks are special, in the sense that not necesseraly
+		 * all of their content is copied.
+		 */
+
+		/*
+		 * Offset to data used from the block.
+		 * It should be zero, unless it is the first block in
+		 * the range.
+		 */
+		uint64_t in_block_start = offset - block->offset;
+
+		/*
+		 * The number of bytes used from this block.
+		 * Unless it is the last block in the range, all
+		 * data till the end of the block is used.
+		 */
+		uint64_t in_block_len = block->size - in_block_start;
+
+		if (len < in_block_len) {
+			/*
+			 * Don't need all the data till the end of this block?
+			 */
+			in_block_len = len;
 		}
 
-		ASSERT(inode->last_block_fill <= block->size);
+		ASSERT(in_block_start < block->size);
+		ASSERT(in_block_start + in_block_len <= block->size);
+
+		char *data = D_RW(block->data) + in_block_start;
+
+		if (callback(pfp, arg, data, range_offset, in_block_len) != 0)
+			return;
+
+		offset += in_block_len;
+		range_offset += in_block_len;
+		len -= in_block_len;
 	}
-
-	pos->block_offset += len;
-	pos->global_offset += len;
-
-	return len;
 }
 
-/*
- * inode_read_from_block -- reads data from current block
- */
-static size_t
-inode_read_from_block(struct pmemfile_inode *inode,
-		struct pmemfile_pos *pos,
-		struct pmemfile_block *block,
-		void *buf,
-		size_t count_left,
-		bool is_last)
+static int
+range_zero_fill(PMEMfilepool *pfp, char *arg, char *chunk,
+	uint64_t offset, uint64_t chunk_size)
 {
-	if (block->size == 0)
-		return 0;
+	(void) arg;
+	(void) offset;
 
-	/* How much data should we read from this block? */
-	uint32_t len = is_last ? inode->last_block_fill : block->size;
-	len = (uint32_t)min((size_t)len - pos->block_offset, count_left);
+	VALGRIND_ADD_TO_TX(chunk, chunk_size);
+	pmemobj_memset_persist(pfp->pop, chunk, 0, chunk_size);
+	VALGRIND_REMOVE_FROM_TX(chunk, chunk_size);
 
-	if (len == 0)
-		return 0;
+	return 0;
+}
 
-	memcpy(buf, D_RW(block->data) + pos->block_offset, len);
+static int
+range_write(PMEMfilepool *pfp, char *buf, char *chunk,
+	uint64_t offset, uint64_t chunk_size)
+{
+	VALGRIND_ADD_TO_TX(chunk, chunk_size);
+	pmemobj_memcpy_persist(pfp->pop, chunk, buf + offset, chunk_size);
+	VALGRIND_REMOVE_FROM_TX(chunk, chunk_size);
 
-	pos->block_offset += len;
-	pos->global_offset += len;
-
-	return len;
+	return 0;
 }
 
 /*
@@ -417,93 +495,30 @@ static void
 file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		const char *buf, size_t count)
 {
-	/* Position cache. */
-	struct pmemfile_pos *pos = &file->pos;
-	struct pmemfile_vinode *vinode = file->vinode;
-
-	if (pos->block == NULL)
-		pos_reset(pos, vinode);
-
-	if (file->offset != pos->global_offset) {
-		size_t block_start = pos->global_offset - pos->block_offset;
-		size_t off = file->offset;
-
-		if (off < block_start ||
-				off >= block_start + pos->block->size) {
-			struct pmemfile_block *block = find_block(vinode, &off);
-			if (block) {
-				pos->block = block;
-				pos->block_offset = 0;
-				pos->global_offset = off;
-			}
-		}
-	}
-
-	if (file->offset < pos->global_offset) {
-		if (file->offset >= pos->global_offset - pos->block_offset) {
-			pos->global_offset -= pos->block_offset;
-			pos->block_offset = 0;
-		} else {
-			pos_reset(pos, vinode);
-		}
-	}
-
-	size_t offset_left = file->offset - pos->global_offset;
+	ASSERT(count > 0);
 
 	/*
-	 * Find the position, possibly extending and/or zeroing unused space.
+	 * Three steps:
+	 * - Append new blocks to end of the file ( optionally )
+	 * - Zero Fill some new blocks, in case the file is extended by
+	 *   writing to the file after seeking past file size ( optionally )
+	 * - Copy the data from the users buffer
 	 */
 
-	struct pmemfile_block *prev = NULL;
-	while (offset_left > 0) {
-		struct pmemfile_block *block = pos->block;
+	uint64_t original_size = inode->size;
 
-		size_t seeked = file_seek_within_block(pfp, file, inode, pos,
-				prev, block, offset_left, true);
+	expand_file(pfp, file, inode, file->offset + count);
 
-		ASSERT(seeked <= offset_left);
+	if (original_size < file->offset)
+		iterate_on_file_range(pfp, file,
+		    original_size,
+		    file->offset - original_size,
+		    range_zero_fill, NULL);
 
-		offset_left -= seeked;
+	/* All blocks needed for writing are properly allocated by this point */
 
-		if (offset_left > 0) {
-			pos->block = D_RW(block->next);
-			pos->block_offset = 0;
-
-			if (pos->block == NULL)
-				pos->block = get_free_block(vinode, false);
-		}
-
-		prev = block;
-	}
-
-	/*
-	 * Now file->offset matches cached position in file->pos.
-	 *
-	 * Let's write the requested data starting from current position.
-	 */
-
-	size_t count_left = count;
-	while (count_left > 0) {
-		struct pmemfile_block *block = pos->block;
-
-		size_t written = file_write_within_block(pfp, file, inode, pos,
-				prev, block, buf, count_left);
-
-		ASSERT(written <= count_left);
-
-		buf += written;
-		count_left -= written;
-
-		if (count_left > 0) {
-			pos->block = D_RW(block->next);
-			pos->block_offset = 0;
-
-			if (pos->block == NULL)
-				pos->block = get_free_block(vinode, true);
-		}
-
-		prev = block;
-	}
+	iterate_on_file_range(pfp, file, file->offset, count,
+	    range_write, (void *)buf);
 }
 
 static ssize_t
@@ -522,16 +537,22 @@ pmemfile_write_locked(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 		return -1;
 	}
 
-	if ((ssize_t)count < 0)
-		count = SSIZE_MAX;
+	if ((ssize_t)count < 0)    /* Normally this will still   */
+		count = SSIZE_MAX; /* try to write 2^63 bytes... */
+
+	if (file->offset + count < file->offset) /* overflow check */
+		count = SIZE_MAX - file->offset;
+
+	/* XXX what is the maximum file size? Should it be SIZE_MAX? */
+
+	if (count == 0)
+		return 0;
 
 	int error = 0;
 
 	struct pmemfile_vinode *vinode = file->vinode;
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
-	struct pmemfile_pos pos;
 
-	memcpy(&pos, &file->pos, sizeof(pos));
 	int txerrno = 0;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -555,7 +576,6 @@ pmemfile_write_locked(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 	} TX_ONABORT {
 		error = 1;
 		txerrno = errno;
-		memcpy(&file->pos, &pos, sizeof(pos));
 	} TX_ONCOMMIT {
 		file->offset += count;
 	} TX_END
@@ -583,40 +603,15 @@ pmemfile_write(PMEMfilepool *pfp, PMEMfile *file, const void *buf, size_t count)
 	return ret;
 }
 
-/*
- * file_sync_off -- sanitizes file position (internal) WRT file offset (set by
- * user)
- */
-static bool
-file_sync_off(PMEMfile *file, struct pmemfile_pos *pos,
-		struct pmemfile_inode *inode)
+static int
+file_read_callback(PMEMfilepool *pfp, char *buf,
+		char *chunk, uint64_t offset, uint64_t chunk_size)
 {
-	size_t block_start = pos->global_offset - pos->block_offset;
-	size_t off = file->offset;
+	(void) pfp;
 
-	if (off < block_start || off >= block_start + pos->block->size) {
-		struct pmemfile_block *block = find_block(file->vinode, &off);
-		if (!block)
-			return false;
+	memcpy(buf + offset, chunk, chunk_size);
 
-		pos->block = block;
-		pos->block_offset = 0;
-		pos->global_offset = off;
-	}
-
-	if (file->offset < pos->global_offset) {
-		if (file->offset >= pos->global_offset - pos->block_offset) {
-			pos->global_offset -= pos->block_offset;
-			pos->block_offset = 0;
-		} else {
-			pos_reset(pos, file->vinode);
-
-			if (pos->block == NULL)
-				return false;
-		}
-	}
-
-	return true;
+	return 0;
 }
 
 /*
@@ -626,113 +621,24 @@ static size_t
 file_read(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 		char *buf, size_t count)
 {
-	struct pmemfile_pos *pos = &file->pos;
-
-	if (unlikely(pos->block == NULL)) {
-		pos_reset(pos, file->vinode);
-
-		if (pos->block == NULL)
-			return 0;
-	}
+	uint64_t size = inode->size;
 
 	/*
-	 * Find the position, without modifying file.
+	 * Start reading at file->offset, stop reading
+	 * when end of file is reached, or count bytes were read.
+	 * The following two branches compute how many bytes are
+	 * going to be read.
 	 */
+	if (file->offset >= size)
+		return 0; /* EOF already */
 
-	if (file->offset != pos->global_offset)
-		if (!file_sync_off(file, pos, inode))
-			return 0;
+	if (size - file->offset < count)
+		count = size - file->offset;
 
-	size_t offset_left = file->offset - pos->global_offset;
+	iterate_on_file_range(pfp, file, file->offset, count,
+	    file_read_callback, buf);
 
-	struct pmemfile_block *prev = NULL;
-	while (offset_left > 0) {
-		struct pmemfile_block *block = pos->block;
-
-		size_t seeked = file_seek_within_block(pfp, file, inode, pos,
-				prev, block, offset_left, false);
-		bool is_last = is_last_block(pos->block);
-
-		if (seeked == 0) {
-			uint32_t used = is_last ?
-					inode->last_block_fill : block->size;
-			bool block_boundary =
-					block->size > 0 &&
-					used == block->size &&
-					used == pos->block_offset;
-			if (!block_boundary)
-				return 0;
-		}
-
-		ASSERT(seeked <= offset_left);
-
-		offset_left -= seeked;
-
-		if (offset_left > 0) {
-			/* EOF? */
-			if (is_last && inode->last_block_fill != block->size)
-				return 0;
-
-			pos->block = D_RW(block->next);
-			pos->block_offset = 0;
-
-			if (pos->block == NULL) {
-				/* EOF */
-				return 0;
-			}
-		}
-
-		prev = block;
-	}
-
-	/*
-	 * Now file->offset matches cached position in file->pos.
-	 *
-	 * Let's read the requested data starting from current position.
-	 */
-
-	size_t bytes_read = 0;
-	size_t count_left = count;
-	while (count_left > 0) {
-		struct pmemfile_block *block = pos->block;
-		bool is_last = is_last_block(pos->block);
-
-		size_t read1 = inode_read_from_block(inode, pos, block, buf,
-				count_left, is_last);
-
-		if (read1 == 0) {
-			uint32_t used = is_last ?
-					inode->last_block_fill : block->size;
-			bool block_boundary =
-					block->size > 0 &&
-					used == block->size &&
-					used == pos->block_offset;
-			if (!block_boundary)
-				break;
-		}
-
-		ASSERT(read1 <= count_left);
-
-		buf += read1;
-		bytes_read += read1;
-		count_left -= read1;
-
-		if (count_left > 0) {
-			/* EOF? */
-			if (is_last && inode->last_block_fill != block->size)
-				break;
-
-			pos->block = D_RW(block->next);
-			pos->block_offset = 0;
-
-			if (pos->block == NULL) {
-				/* EOF */
-				return 0;
-			}
-		}
-	}
-
-	return bytes_read;
+	return count;
 }
 
 static int
@@ -1023,9 +929,6 @@ vinode_truncate(struct pmemfile_vinode *vinode)
 
 	TX_ADD_DIRECT(&inode->size);
 	inode->size = 0;
-
-	TX_ADD_DIRECT(&inode->last_block_fill);
-	inode->last_block_fill = 0;
 
 	struct pmemfile_time tm;
 	file_get_time(&tm);
