@@ -106,8 +106,7 @@ struct pmemfile_inode {
 	/* Group */
 	uint32_t gid;
 
-	/* Number of bytes written in the last block */
-	uint32_t last_block_fill;
+	uint32_t reserved;
 
 	/* Time of last access. */
 	struct pmemfile_time atime;
@@ -139,7 +138,7 @@ struct pmemfile_inode {
 				- 4  /* version */
 				- 4  /* uid */
 				- 4  /* gid */
-				- 4  /* last_block_fill */
+				- 4  /* reserved */
 				- 16 /* atime */
 				- 16 /* ctime */
 				- 16 /* mtime */
