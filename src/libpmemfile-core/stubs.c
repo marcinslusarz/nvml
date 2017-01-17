@@ -161,8 +161,7 @@ pmemfile_chmod(PMEMfilepool *pfp, const char *path, mode_t mode)
 	(void) path;
 	(void) mode;
 
-	errno = ENOTSUP;
-	return -1;
+	return 0;
 }
 
 int
@@ -172,8 +171,7 @@ pmemfile_fchmod(PMEMfilepool *pfp, PMEMfile *file, mode_t mode)
 
 	(void) mode;
 
-	errno = ENOTSUP;
-	return -1;
+	return 0;
 }
 
 PMEMfile *
@@ -334,8 +332,7 @@ pmemfile_fchmodat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	(void) mode;
 	(void) flags;
 
-	errno = ENOTSUP;
-	return -1;
+	return 0;
 }
 
 int
