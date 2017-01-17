@@ -114,7 +114,8 @@ void inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode);
 
 const char *pmfi_path(struct pmemfile_vinode *vinode);
 
-void vinode_ref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
+struct pmemfile_vinode *vinode_ref(PMEMfilepool *pfp,
+		struct pmemfile_vinode *vinode);
 
 struct pmemfile_inode_map *inode_map_alloc(void);
 

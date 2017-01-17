@@ -346,8 +346,7 @@ vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	util_rwlock_rdlock(&parent->rwlock);
 
 	if (strcmp(name, "..") == 0) {
-		vinode = parent->parent;
-		vinode_ref(pfp, vinode);
+		vinode = vinode_ref(pfp, parent->parent);
 		goto end;
 	}
 
@@ -708,8 +707,7 @@ _get_parent(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 		struct pmemfile_path_info *path_info)
 {
 	struct pmemfile_vinode *parent = vinode->parent;
-	vinode_ref(pfp, parent);
-	path_info->parent = parent;
+	path_info->parent = vinode_ref(pfp, parent);
 
 	util_rwlock_rdlock(&parent->rwlock);
 
@@ -1187,9 +1185,7 @@ end:
 int
 pmemfile_fchdir(PMEMfilepool *pfp, PMEMfile *dir)
 {
-	vinode_ref(pfp, dir->vinode);
-
-	return _pmemfile_chdir(pfp, dir->vinode);
+	return _pmemfile_chdir(pfp, vinode_ref(pfp, dir->vinode));
 }
 
 /*
@@ -1203,8 +1199,7 @@ pool_get_cwd(PMEMfilepool *pfp)
 	struct pmemfile_vinode *cwd;
 
 	util_rwlock_rdlock(&pfp->cwd_rwlock);
-	cwd = pfp->cwd;
-	vinode_ref(pfp, cwd);
+	cwd = vinode_ref(pfp, pfp->cwd);
 	util_rwlock_unlock(&pfp->cwd_rwlock);
 
 	return cwd;
@@ -1249,12 +1244,10 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 		return NULL;
 	}
 
-	if (child == pfp->root) {
+	if (child == pfp->root)
 		parent = NULL;
-	} else {
-		parent = child->parent;
-		vinode_ref(pfp, parent);
-	}
+	else
+		parent = vinode_ref(pfp, child->parent);
 
 	util_rwlock_unlock(&child->rwlock);
 
@@ -1297,12 +1290,10 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 		*(--curpos) = '/';
 
 		struct pmemfile_vinode *grandparent;
-		if (parent == pfp->root) {
+		if (parent == pfp->root)
 			grandparent = NULL;
-		} else {
-			grandparent = parent->parent;
-			vinode_ref(pfp, grandparent);
-		}
+		else
+			grandparent = vinode_ref(pfp, parent->parent);
 		util_rwlock_unlock(&parent->rwlock);
 
 		vinode_unref_tx(pfp, child);
@@ -1328,12 +1319,10 @@ pmemfile_get_dir_path(PMEMfilepool *pfp, PMEMfile *dir, char *buf, size_t size)
 {
 	struct pmemfile_vinode *vdir;
 
-	if (dir == PMEMFILE_AT_CWD) {
+	if (dir == PMEMFILE_AT_CWD)
 		vdir = pool_get_cwd(pfp);
-	} else {
-		vdir = dir->vinode;
-		vinode_ref(pfp, vdir);
-	}
+	else
+		vdir = vinode_ref(pfp, dir->vinode);
 
 	return _pmemfile_get_dir_path(pfp, vdir, buf, size);
 }

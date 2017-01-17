@@ -75,8 +75,7 @@ initialize_super_block(PMEMfilepool *pfp)
 		pfp->root->path = Strdup("/");
 #endif
 
-		vinode_ref(pfp, pfp->root);
-		pfp->cwd = pfp->root;
+		pfp->cwd = vinode_ref(pfp, pfp->root);
 	} TX_ONABORT {
 		err = -1;
 		txerrno = errno;

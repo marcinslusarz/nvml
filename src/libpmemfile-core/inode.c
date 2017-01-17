@@ -76,10 +76,11 @@ pmfi_path(struct pmemfile_vinode *vinode)
  *
  * Does not need transaction.
  */
-void
+struct pmemfile_vinode *
 vinode_ref(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 {
 	__sync_fetch_and_add(&vinode->ref, 1);
+	return vinode;
 }
 
 #define BUCKET_SIZE 2
@@ -325,8 +326,7 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode,
 	util_rwlock_init(&vinode->rwlock);
 	vinode->inode = inode;
 	if (inode_is_dir(D_RO(inode)) && parent) {
-		vinode_ref(pfp, parent);
-		vinode->parent = parent;
+		vinode->parent = vinode_ref(pfp, parent);
 
 		if (parent_refed)
 			*parent_refed = true;
