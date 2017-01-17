@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,19 +65,8 @@ struct pmemfile_file {
 	/* Requested/current position. */
 	size_t offset;
 
-	/* Current position cache. */
-	struct pmemfile_pos {
-		/* Current block. */
-		struct pmemfile_block *block;
-
-		/* Offset from the beginning of current block. */
-		uint32_t block_offset;
-
-		/* Above fields are mapped to field below. */
-
-		/* Offset from the beginning of file. */
-		size_t global_offset;
-	} pos;
+	/* Current position cache, the latest block used. */
+	struct pmemfile_block *block_pointer_cache;
 
 	struct pmemfile_dir_pos {
 		/* Current directory list */
