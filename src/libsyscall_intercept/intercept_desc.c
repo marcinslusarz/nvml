@@ -546,7 +546,7 @@ allocate_trampoline_table(struct intercept_desc *desc)
 		 * The next guess is the page following the mapping seen
 		 * just now.
 		 */
-		guess = end + 1;
+		guess = end;
 
 		if (guess + size >= desc->text_start + (1u << 31)) {
 			/* Too far away */
