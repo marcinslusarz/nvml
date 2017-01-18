@@ -271,9 +271,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	vinode = info.vinode;
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		if (strchr(info.remaining, '/'))
-			pmemobj_tx_abort(ENOENT);
-
 		if (is_tmpfile(flags)) {
 			if (!vinode_is_dir(vinode))
 				pmemobj_tx_abort(ENOTDIR);
@@ -289,15 +286,30 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 				LOG(LUSR, "file %s already exists", pathname);
 				pmemobj_tx_abort(EEXIST);
 			}
+
+			if (!vinode_is_dir(info.vinode))
+				pmemobj_tx_abort(ENOTDIR);
+			if (strchr(info.remaining, '/'))
+				pmemobj_tx_abort(ENOENT);
+
 			vparent = vinode;
 			vinode = NULL;
 		} else if (flags & O_CREAT) {
 			if (info.remaining[0] != 0) {
+				if (!vinode_is_dir(info.vinode))
+					pmemobj_tx_abort(ENOTDIR);
+				if (strchr(info.remaining, '/'))
+					pmemobj_tx_abort(ENOENT);
+
 				vparent = vinode;
 				vinode = NULL;
 			}
-		} else if (info.remaining[0] != 0)
-			pmemobj_tx_abort(ENOENT);
+		} else if (info.remaining[0] != 0) {
+			if (!vinode_is_dir(info.vinode))
+				pmemobj_tx_abort(ENOTDIR);
+			else
+				pmemobj_tx_abort(ENOENT);
+		}
 
 		if (vinode == NULL) {
 			vinode = create_file(pfp, info.remaining,

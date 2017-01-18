@@ -142,6 +142,18 @@ test0(PMEMfilepool *pfp)
 	f = PMEMFILE_OPEN(pfp, "/dir/../dir////file", 0);
 	PMEMFILE_CLOSE(pfp, f);
 
+	f = pmemfile_open(pfp, "/dir/file/file", O_RDONLY);
+	UT_ASSERTeq(f, NULL);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	f = pmemfile_open(pfp, "/dir/file/file", O_RDONLY | O_CREAT);
+	UT_ASSERTeq(f, NULL);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	f = pmemfile_open(pfp, "/dir/file/file", O_RDONLY | O_CREAT | O_EXCL);
+	UT_ASSERTeq(f, NULL);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 	PMEMFILE_UNLINK(pfp, "/dir//file");
 	PMEMFILE_RMDIR(pfp, "/dir//////");
 }
