@@ -1163,8 +1163,12 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	traverse_path(pfp, at, path, false, &info, 0);
 
 	if (info.remaining[0] != 0) {
+		if (vinode_is_dir(info.vinode))
+			err = ENOENT;
+		else
+			err = ENOTDIR;
+
 		vinode_unref_tx(pfp, info.vinode);
-		err = ENOENT;
 		ret = -1;
 		goto end;
 	}

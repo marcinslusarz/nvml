@@ -370,6 +370,10 @@ test4(PMEMfilepool *pfp)
 	UT_ASSERTeq(pmemfile_chdir(pfp, "file"), -1);
 	UT_ASSERTeq(errno, ENOTDIR);
 
+	errno = 0;
+	UT_ASSERTeq(pmemfile_chdir(pfp, "file/file"), -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 	PMEMFILE_UNLINK(pfp, "/file");
 
 
