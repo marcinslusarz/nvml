@@ -572,18 +572,18 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		goto end;
 	}
 
-	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		rwlock_tx_wlock(&dst.vinode->rwlock);
+	util_rwlock_wrlock(&dst.vinode->rwlock);
 
+	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		struct pmemfile_time t;
 		file_get_time(&t);
 		vinode_add_dirent(pfp, dst.vinode, dst.remaining, src.vinode,
 				&t);
-
-		rwlock_tx_unlock_on_commit(&dst.vinode->rwlock);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
+
+	util_rwlock_unlock(&dst.vinode->rwlock);
 
 	if (error == 0) {
 		vinode_clear_debug_path(pfp, src.vinode);
@@ -700,14 +700,16 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
+	util_rwlock_wrlock(&vparent->rwlock);
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		rwlock_tx_wlock(&vparent->rwlock);
 		vinode_unlink_dirent(pfp, vparent, info.name, &vinode2,
 				&parent_refed, true);
-		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
+
+	util_rwlock_unlock(&vparent->rwlock);
 
 end:
 	if (info.vinode)
@@ -843,19 +845,19 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 		dst_name = dst.remaining;
 	}
 
+	if (src_parent == dst_parent)
+		util_rwlock_wrlock(&dst_parent->rwlock);
+	else if (src_parent < dst_parent) {
+		util_rwlock_wrlock(&src_parent->rwlock);
+		util_rwlock_wrlock(&dst_parent->rwlock);
+	} else {
+		util_rwlock_wrlock(&dst_parent->rwlock);
+		util_rwlock_wrlock(&src_parent->rwlock);
+	}
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		// XXX, when src dir == dst dir we can just update dirent,
 		// without linking and unlinking
-
-		if (src_parent == dst_parent)
-			rwlock_tx_wlock(&dst_parent->rwlock);
-		else if (src_parent < dst_parent) {
-			rwlock_tx_wlock(&src_parent->rwlock);
-			rwlock_tx_wlock(&dst_parent->rwlock);
-		} else {
-			rwlock_tx_wlock(&dst_parent->rwlock);
-			rwlock_tx_wlock(&src_parent->rwlock);
-		}
 
 		vinode_unlink_dirent(pfp, dst_parent, dst_name,
 				&dst_unlinked, &dst_parent_refed, false);
@@ -870,15 +872,16 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 		if (src_unlinked != src.vinode) // XXX restart?
 			pmemobj_tx_abort(ENOENT);
 
-		if (src_parent == dst_parent)
-			rwlock_tx_unlock_on_commit(&dst_parent->rwlock);
-		else {
-			rwlock_tx_unlock_on_commit(&src_parent->rwlock);
-			rwlock_tx_unlock_on_commit(&dst_parent->rwlock);
-		}
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
+
+	if (src_parent == dst_parent)
+		util_rwlock_unlock(&dst_parent->rwlock);
+	else {
+		util_rwlock_unlock(&src_parent->rwlock);
+		util_rwlock_unlock(&dst_parent->rwlock);
+	}
 
 	if (dst_parent_refed)
 		vinode_unref_tx(pfp, dst_parent);
@@ -1032,10 +1035,10 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 		goto end;
 	}
 
+	util_rwlock_wrlock(&vparent->rwlock);
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		struct pmemfile_time t;
-
-		rwlock_tx_wlock(&vparent->rwlock);
 
 		vinode = inode_alloc(pfp, S_IFLNK | 0777, &t, vparent, NULL,
 				info.remaining);
@@ -1045,11 +1048,11 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 		inode->size = len;
 
 		vinode_add_dirent(pfp, vparent, info.remaining, vinode, &t);
-
-		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
+
+	util_rwlock_unlock(&vparent->rwlock);
 
 end:
 	if (info.vinode)

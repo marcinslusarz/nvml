@@ -705,15 +705,15 @@ pmemfile_read_locked(PMEMfilepool *pfp, PMEMfile *file, void *buf, size_t count)
 	util_rwlock_unlock(&vinode->rwlock);
 
 	if (update_atime) {
+		util_rwlock_wrlock(&vinode->rwlock);
+
 		TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-			rwlock_tx_wlock(&vinode->rwlock);
-
 			TX_SET(vinode->inode, atime, tm);
-
-			rwlock_tx_unlock_on_commit(&vinode->rwlock);
 		} TX_ONABORT {
 			LOG(LINF, "can not update inode atime");
 		} TX_END
+
+		util_rwlock_unlock(&vinode->rwlock);
 	}
 
 

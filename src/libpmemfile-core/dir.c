@@ -896,16 +896,16 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	struct pmemfile_vinode *child = NULL;
 
-	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		rwlock_tx_wlock(&parent->rwlock);
+	util_rwlock_wrlock(&parent->rwlock);
 
+	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		child = vinode_new_dir(pfp, parent, sanitized ? sanitized :
 				info.remaining, mode, true, &parent_refed);
-
-		rwlock_tx_unlock_on_commit(&parent->rwlock);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
+
+	util_rwlock_unlock(&parent->rwlock);
 
 	if (sanitized)
 		free(sanitized);
@@ -991,15 +991,17 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
+	if (info.last_is_dot) {
+		error = EINVAL;
+		goto end;
+	}
+
 	struct pmemfile_inode *iparent = D_RW(vparent->inode);
 
+	util_rwlock_wrlock(&vparent->rwlock);
+	util_rwlock_wrlock(&vdir->rwlock);
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		if (info.last_is_dot)
-			pmemobj_tx_abort(EINVAL);
-
-		rwlock_tx_wlock(&vparent->rwlock);
-		rwlock_tx_wlock(&vdir->rwlock);
-
 		struct pmemfile_dirent *dirent =
 			vinode_lookup_dirent_by_vinode_locked(pfp, vparent,
 					vdir);
@@ -1074,12 +1076,12 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		 * or deletion of files in that directory."
 		 */
 		TX_SET_DIRECT(iparent, mtime, tm);
-
-		rwlock_tx_unlock_on_commit(&vdir->rwlock);
-		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
+
+	util_rwlock_unlock(&vdir->rwlock);
+	util_rwlock_unlock(&vparent->rwlock);
 
 end:
 	if (vparent)
