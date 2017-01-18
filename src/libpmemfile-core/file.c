@@ -384,15 +384,17 @@ pmemfile_openat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 	at = pool_get_dir_for_path(pfp, dir, pathname, &at_unref);
 
 	PMEMfile *ret = _pmemfile_openat(pfp, at, pathname, flags, mode);
-	int oerrno;
-	if (!ret)
-		oerrno = errno;
 
-	if (at_unref)
+	if (at_unref) {
+		int error;
+		if (ret == NULL)
+			error = errno;
+
 		vinode_unref_tx(pfp, at);
 
-	if (!ret)
-		errno = oerrno;
+		if (ret == NULL)
+			errno = error;
+	}
 
 	return ret;
 }
@@ -462,15 +464,14 @@ end:
 	if (info.name)
 		free(info.name);
 	if (at_unref) {
-		int oerrno;
+		int error;
 		if (ret == NULL)
-			oerrno = errno;
+			error = errno;
 
-		if (at_unref)
-			vinode_unref_tx(pfp, at);
+		vinode_unref_tx(pfp, at);
 
 		if (ret == NULL)
-			errno = oerrno;
+			errno = error;
 	}
 
 	return ret;
@@ -519,30 +520,30 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 	traverse_path(pfp, olddir, oldpath, false, &src, 0);
 	traverse_path(pfp, newdir, newpath, false, &dst, 0);
 
-	int oerrno = 0;
+	int error = 0;
 
 	if (src.remaining[0] != 0 && !vinode_is_dir(src.vinode)) {
-		oerrno = ENOTDIR;
+		error = ENOTDIR;
 		goto end;
 	}
 
 	if (dst.remaining[0] != 0 && !vinode_is_dir(dst.vinode)) {
-		oerrno = ENOTDIR;
+		error = ENOTDIR;
 		goto end;
 	}
 
 	if (src.remaining[0] != 0 || strchr(dst.remaining, '/')) {
-		oerrno = ENOENT;
+		error = ENOENT;
 		goto end;
 	}
 
 	if (dst.remaining[0] == 0) {
-		oerrno = EEXIST;
+		error = EEXIST;
 		goto end;
 	}
 
 	if (vinode_is_dir(src.vinode)) {
-		oerrno = EPERM;
+		error = EPERM;
 		goto end;
 	}
 
@@ -556,10 +557,10 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 
 		rwlock_tx_unlock_on_commit(&dst.vinode->rwlock);
 	} TX_ONABORT {
-		oerrno = errno;
+		error = errno;
 	} TX_END
 
-	if (oerrno == 0) {
+	if (error == 0) {
 		vinode_clear_debug_path(pfp, src.vinode);
 		vinode_set_debug_path(pfp, dst.vinode, src.vinode, newpath);
 	}
@@ -568,8 +569,8 @@ end:
 	vinode_unref_tx(pfp, dst.vinode);
 	vinode_unref_tx(pfp, src.vinode);
 
-	if (oerrno) {
-		errno = oerrno;
+	if (error) {
+		errno = error;
 		return -1;
 	}
 
@@ -596,9 +597,9 @@ pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
 
 	int ret = _pmemfile_linkat(pfp, olddir_at, oldpath, newdir_at, newpath,
 			flags);
-	int oerrno;
+	int error;
 	if (ret)
-		oerrno = errno;
+		error = errno;
 
 	if (olddir_at_unref)
 		vinode_unref_tx(pfp, olddir_at);
@@ -607,7 +608,7 @@ pmemfile_linkat(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
 		vinode_unref_tx(pfp, newdir_at);
 
 	if (ret)
-		errno = oerrno;
+		errno = error;
 
 	return ret;
 }
@@ -633,15 +634,16 @@ pmemfile_link(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 
 	int ret = _pmemfile_linkat(pfp, at, oldpath, at, newpath, 0);
 
-	int oerrno;
-	if (ret)
-		oerrno = errno;
+	if (at) {
+		int error;
+		if (ret)
+			error = errno;
 
-	if (at)
 		vinode_unref_tx(pfp, at);
 
-	if (ret)
-		errno = oerrno;
+		if (ret)
+			errno = error;
+	}
 
 	return ret;
 }
@@ -652,7 +654,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 {
 	LOG(LDBG, "pathname %s", pathname);
 
-	int oerrno, ret = 0;
+	int error = 0;
 
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, pathname, true, &info, 0);
@@ -676,8 +678,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 				&parent_refed, true);
 		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
-		oerrno = errno;
-		ret = -1;
+		error = errno;
 	} TX_END
 
 	if (info.vinode)
@@ -689,13 +690,14 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	if (info.name)
 		free(info.name);
 
-	if (ret) {
+	if (error) {
 		if (parent_refed)
 			vinode_unref_tx(pfp, vparent);
-		errno = oerrno;
+		errno = error;
+		return -1;
 	}
 
-	return ret;
+	return 0;
 }
 
 int
@@ -725,13 +727,16 @@ pmemfile_unlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 		}
 	}
 
-	int oerrno;
-	if (ret)
-		oerrno = errno;
-	if (at_unref)
+	if (at_unref) {
+		int error;
+		if (ret)
+			error = errno;
+
 		vinode_unref_tx(pfp, at);
-	if (ret)
-		errno = oerrno;
+
+		if (ret)
+			errno = error;
+	}
 
 	return ret;
 }
@@ -768,20 +773,20 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 	traverse_path(pfp, olddir, oldpath, true, &src, 0);
 	traverse_path(pfp, newdir, newpath, true, &dst, 0);
 
-	int oerrno = 0;
+	int error = 0;
 
 	if (src.remaining[0] != 0 && !vinode_is_dir(src.vinode)) {
-		oerrno = ENOTDIR;
+		error = ENOTDIR;
 		goto end;
 	}
 
 	if (dst.remaining[0] != 0 && !vinode_is_dir(dst.vinode)) {
-		oerrno = ENOTDIR;
+		error = ENOTDIR;
 		goto end;
 	}
 
 	if (src.remaining[0] != 0 || strchr(dst.remaining, '/')) {
-		oerrno = ENOENT;
+		error = ENOENT;
 		goto end;
 	}
 
@@ -797,7 +802,7 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 
 	if (src_is_dir) {
 		LOG(LSUP, "renaming directories is not supported yet");
-		oerrno = ENOTSUP;
+		error = ENOTSUP;
 		goto end;
 	}
 
@@ -843,7 +848,7 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 			rwlock_tx_unlock_on_commit(&dst_parent->rwlock);
 		}
 	} TX_ONABORT {
-		oerrno = errno;
+		error = errno;
 	} TX_END
 
 	if (dst_parent_refed)
@@ -858,7 +863,7 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 	if (src_unlinked)
 		vinode_unref_tx(pfp, src_unlinked);
 
-	if (oerrno == 0) {
+	if (error == 0) {
 		vinode_clear_debug_path(pfp, src.vinode);
 		vinode_set_debug_path(pfp, dst.vinode, src.vinode, newpath);
 	}
@@ -875,11 +880,11 @@ end:
 	if (dst.name)
 		free(dst.name);
 
-	if (oerrno) {
+	if (error) {
 		if (dst_parent_refed)
 			vinode_unref_tx(pfp, dst.vinode);
 
-		errno = oerrno;
+		errno = error;
 		return -1;
 	}
 
@@ -904,13 +909,16 @@ pmemfile_rename(PMEMfilepool *pfp, const char *old_path, const char *new_path)
 
 	int ret = _pmemfile_renameat2(pfp, at, old_path, at, new_path, 0);
 
-	int oerrno;
-	if (ret)
-		oerrno = errno;
-	if (at)
+	if (at) {
+		int error;
+		if (ret)
+			error = errno;
+
 		vinode_unref_tx(pfp, at);
-	if (ret)
-		errno = oerrno;
+
+		if (ret)
+			errno = error;
+	}
 
 	return ret;
 }
@@ -935,9 +943,9 @@ pmemfile_renameat2(PMEMfilepool *pfp, PMEMfile *old_at, const char *old_path,
 
 	int ret = _pmemfile_renameat2(pfp, olddir_at, old_path, newdir_at,
 			new_path, flags);
-	int oerrno;
+	int error;
 	if (ret)
-		oerrno = errno;
+		error = errno;
 
 	if (olddir_at_unref)
 		vinode_unref_tx(pfp, olddir_at);
@@ -946,7 +954,7 @@ pmemfile_renameat2(PMEMfilepool *pfp, PMEMfile *old_at, const char *old_path,
 		vinode_unref_tx(pfp, newdir_at);
 
 	if (ret)
-		errno = oerrno;
+		errno = error;
 
 	return ret;
 }
@@ -964,7 +972,7 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 {
 	LOG(LDBG, "target %s linkpath %s", target, linkpath);
 
-	int oerrno, ret = 0;
+	int error, ret = 0;
 
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, linkpath, false, &info, 0);
@@ -1003,7 +1011,7 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 
 		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
-		oerrno = errno;
+		error = errno;
 		ret = -1;
 	} TX_END
 
@@ -1014,7 +1022,7 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 		vinode_unref_tx(pfp, vinode);
 
 	if (ret)
-		errno = oerrno;
+		errno = error;
 
 	return ret;
 }
@@ -1035,13 +1043,16 @@ pmemfile_symlinkat(PMEMfilepool *pfp, const char *target, PMEMfile *newdir,
 
 	int ret = _pmemfile_symlinkat(pfp, target, at, linkpath);
 
-	int oerrno;
-	if (ret)
-		oerrno = errno;
-	if (at_unref)
+	if (at_unref) {
+		int error;
+		if (ret)
+			error = errno;
+
 		vinode_unref_tx(pfp, at);
-	if (ret)
-		errno = oerrno;
+
+		if (ret)
+			errno = error;
+	}
 
 	return ret;
 }
@@ -1109,17 +1120,20 @@ pmemfile_readlinkat(PMEMfilepool *pfp, PMEMfile *dir, const char *pathname,
 
 	ssize_t ret = _pmemfile_readlinkat(pfp, at, pathname, buf, bufsiz);
 
-	/*
-	 * initialized only because gcc 6.2 thinks "oerrno" might not be
-	 * initialized at the time of writing it back to "errno"
-	 */
-	int oerrno = 0;
-	if (ret < 0)
-		oerrno = errno;
-	if (at_unref)
+	if (at_unref) {
+		/*
+		 * initialized only because gcc 6.2 thinks "error" might not be
+		 * initialized at the time of writing it back to "errno"
+		 */
+		int error = 0;
+		if (ret < 0)
+			error = errno;
+
 		vinode_unref_tx(pfp, at);
-	if (ret < 0)
-		errno = oerrno;
+
+		if (ret < 0)
+			errno = error;
+	}
 
 	return ret;
 }

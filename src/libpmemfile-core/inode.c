@@ -723,15 +723,15 @@ pmemfile_fstatat(PMEMfilepool *pfp, PMEMfile *dir, const char *path,
 
 	int ret = _pmemfile_fstatat(pfp, at, path, buf, flags);
 
-	int oerrno;
-	if (ret)
-		oerrno = errno;
-
-	if (at_unref)
+	if (at_unref) {
+		int error;
+		if (ret)
+			error = errno;
 		vinode_unref_tx(pfp, at);
 
-	if (ret)
-		errno = oerrno;
+		if (ret)
+			errno = error;
+	}
 
 	return ret;
 }
@@ -774,14 +774,14 @@ pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
 	int ret = vinode_stat(vinode, buf);
 
 	if (unref) {
-		int oerrno;
+		int error;
 		if (ret)
-			oerrno = errno;
+			error = errno;
 
 		vinode_unref_tx(pfp, vinode);
 
 		if (ret)
-			errno = oerrno;
+			errno = error;
 	}
 
 	return ret;

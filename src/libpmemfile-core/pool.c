@@ -176,18 +176,18 @@ pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode)
 	if (!pfp)
 		return NULL;
 
-	int oerrno;
+	int error;
 	pfp->pop = pmemobj_create(pathname, POBJ_LAYOUT_NAME(pmemfile),
 			poolsize, mode);
 	if (!pfp->pop) {
-		oerrno = errno;
+		error = errno;
 		ERR("pmemobj_create failed: %s", pmemobj_errormsg());
 		goto pool_create;
 	}
 
 	pfp->super = POBJ_ROOT(pfp->pop, struct pmemfile_super);
 	if (TOID_IS_NULL(pfp->super)) {
-		oerrno = ENODEV;
+		error = ENODEV;
 		ERR("cannot initialize super block");
 		goto no_super;
 	}
@@ -195,12 +195,12 @@ pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode)
 	util_rwlock_init(&pfp->cwd_rwlock);
 	pfp->inode_map = inode_map_alloc();
 	if (!pfp->inode_map) {
-		oerrno = errno;
+		error = errno;
 		goto inode_map_fail;
 	}
 
 	if (initialize_super_block(pfp)) {
-		oerrno = errno;
+		error = errno;
 		goto init_failed;
 	}
 
@@ -219,7 +219,7 @@ no_super:
 	pmemobj_close(pfp->pop);
 pool_create:
 	Free(pfp);
-	errno = oerrno;
+	errno = error;
 	return NULL;
 }
 
@@ -235,17 +235,17 @@ pmemfile_pool_open(const char *pathname)
 	if (!pfp)
 		return NULL;
 
-	int oerrno;
+	int error;
 	pfp->pop = pmemobj_open(pathname, POBJ_LAYOUT_NAME(pmemfile));
 	if (!pfp->pop) {
-		oerrno = errno;
+		error = errno;
 		ERR("pmemobj_open failed: %s", pmemobj_errormsg());
 		goto pool_open;
 	}
 
 	pfp->super = (TOID(struct pmemfile_super))pmemobj_root(pfp->pop, 0);
 	if (pmemobj_root_size(pfp->pop) != sizeof(struct pmemfile_super)) {
-		oerrno = ENODEV;
+		error = ENODEV;
 		ERR("pool in file %s is not initialized", pathname);
 		goto no_super;
 	}
@@ -253,12 +253,12 @@ pmemfile_pool_open(const char *pathname)
 	util_rwlock_init(&pfp->cwd_rwlock);
 	pfp->inode_map = inode_map_alloc();
 	if (!pfp->inode_map) {
-		oerrno = errno;
+		error = errno;
 		goto inode_map_fail;
 	}
 
 	if (initialize_super_block(pfp)) {
-		oerrno = errno;
+		error = errno;
 		goto init_failed;
 	}
 
@@ -279,7 +279,7 @@ no_super:
 	pmemobj_close(pfp->pop);
 pool_open:
 	Free(pfp);
-	errno = oerrno;
+	errno = error;
 	return NULL;
 }
 
