@@ -865,18 +865,15 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	struct pmemfile_vinode *parent = info.vinode;
 	int error = 0;
-	int txerrno = 0;
 	volatile bool parent_refed = false;
 
 	if (info.remaining[0] == 0) {
-		error = 1;
-		txerrno = EEXIST;
+		error = EEXIST;
 		goto end;
 	}
 
 	if (!vinode_is_dir(parent)) {
-		error = 1;
-		txerrno = ENOTDIR;
+		error = ENOTDIR;
 		goto end;
 	}
 
@@ -889,8 +886,7 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			after_slash++;
 
 		if (*after_slash != 0) {
-			error = 1;
-			txerrno = ENOENT;
+			error = ENOENT;
 			goto end;
 		}
 
@@ -908,8 +904,7 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 		rwlock_tx_unlock_on_commit(&parent->rwlock);
 	} TX_ONABORT {
-		error = 1;
-		txerrno = errno;
+		error = errno;
 	} TX_END
 
 	if (sanitized)
@@ -925,7 +920,7 @@ end:
 		if (parent_refed)
 			vinode_unref_tx(pfp, parent);
 
-		errno = txerrno;
+		errno = error;
 		return -1;
 	}
 
@@ -979,23 +974,19 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_vinode *vdir = info.vinode;
 	struct pmemfile_vinode *vparent = info.parent;
 	int error = 0;
-	int txerrno = 0;
 
 	if (info.remaining[0] != 0) {
-		error = 1;
-		txerrno = ENOENT;
+		error = ENOENT;
 		goto end;
 	}
 
 	if (!vinode_is_dir(vdir)) {
-		error = 1;
-		txerrno = ENOTDIR;
+		error = ENOTDIR;
 		goto end;
 	}
 
 	if (vdir == pfp->root) {
-		error = 1;
-		txerrno = EBUSY;
+		error = EBUSY;
 		goto end;
 	}
 
@@ -1086,8 +1077,7 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		rwlock_tx_unlock_on_commit(&vdir->rwlock);
 		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
-		error = 1;
-		txerrno = errno;
+		error = errno;
 	} TX_END
 
 end:
@@ -1097,7 +1087,7 @@ end:
 	vinode_unref_tx(pfp, vdir);
 
 	if (error) {
-		errno = txerrno;
+		errno = error;
 		return -1;
 	}
 

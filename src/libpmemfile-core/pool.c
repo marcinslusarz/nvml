@@ -54,8 +54,7 @@ initialize_super_block(PMEMfilepool *pfp)
 {
 	LOG(LDBG, "pfp %p", pfp);
 
-	int err = 0;
-	int txerrno = 0;
+	int error = 0;
 	struct pmemfile_super *super = D_RW(pfp->super);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -77,14 +76,13 @@ initialize_super_block(PMEMfilepool *pfp)
 
 		pfp->cwd = vinode_ref(pfp, pfp->root);
 	} TX_ONABORT {
-		err = -1;
-		txerrno = errno;
+		error = errno;
 	} TX_END
 
-	if (err) {
-		errno = txerrno;
+	if (error) {
+		errno = error;
 		ERR("!cannot initialize super block");
-		return err;
+		return -1;
 	}
 
 	if (super->version != PMEMFILE_SUPER_VERSION(0, 1)) {

@@ -260,7 +260,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	va_end(ap);
 
 	int error = 0;
-	int txerrno = 0;
 	PMEMfile *file = NULL;
 
 	struct pmemfile_path_info info;
@@ -336,8 +335,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		if (flags & O_APPEND)
 			file->flags |= PFILE_APPEND;
 	} TX_ONABORT {
-		error = 1;
-		txerrno = errno;
+		error = errno;
 	} TX_END
 
 	if (vparent)
@@ -347,7 +345,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		if (vinode != NULL)
 			vinode_unref_tx(pfp, vinode);
 
-		errno = txerrno;
+		errno = error;
 		LOG(LDBG, "!");
 
 		return NULL;
