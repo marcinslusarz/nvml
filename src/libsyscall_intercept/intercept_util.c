@@ -515,9 +515,20 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 	buf += sprintf(buf, "%s 0x%lx -- ", libpath, syscall_offset);
 
 	if (nr == SYS_read) {
+		ssize_t print_size = (ssize_t)result;
+
+		if (result_known == UNKNOWN || result < 0) {
+			/*
+			 * Avoid printing the buffer before the syscall.
+			 * It is useless, and can trigger a message from
+			 * valgrind.
+			 */
+			print_size = 0;
+		}
+
 		buf = print_syscall(buf, "read", 3,
 				F_DEC, arg0,
-				F_BUF, arg2, arg1,
+				F_BUF, print_size, arg1,
 				F_DEC, arg2,
 				result_known, result);
 	} else if (nr == SYS_write) {
@@ -723,9 +734,14 @@ intercept_log_syscall(const char *libpath, long nr, long arg0, long arg1,
 				F_STR, arg1,
 				result_known, result);
 	} else if (nr == SYS_readlink) {
+		ssize_t print_size = (ssize_t)result;
+
+		if (result_known == UNKNOWN || result < 0)
+			print_size = 0;
+
 		buf = print_syscall(buf, "readlink", 3,
 				F_STR, arg0,
-				F_BUF, arg2, arg1,
+				F_BUF, print_size, arg1,
 				F_DEC, arg2,
 				result_known, result);
 	} else if (nr == SYS_chmod) {
