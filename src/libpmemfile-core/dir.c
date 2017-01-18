@@ -703,7 +703,7 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 }
 
 static void
-_get_parent(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
+get_parent_info(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 		struct pmemfile_path_info *path_info)
 {
 	struct pmemfile_vinode *parent = vinode->parent;
@@ -722,7 +722,6 @@ _get_parent(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 static void
 _handle_last_component(PMEMfilepool *pfp,
 		const char *path,
-		struct pmemfile_vinode *prev_parent,
 		struct pmemfile_vinode *parent,
 		const char *lookup_path,
 		bool get_parent,
@@ -734,11 +733,11 @@ _handle_last_component(PMEMfilepool *pfp,
 	if (child) {
 		if (get_parent) {
 			if (strcmp(lookup_path, ".") == 0) {
-				_get_parent(pfp, parent, path_info);
+				get_parent_info(pfp, parent, path_info);
 				vinode_unref_tx(pfp, parent);
 				path_info->last_is_dot = true;
 			} else if (strcmp(lookup_path, "..") == 0) {
-				_get_parent(pfp, parent->parent, path_info);
+				get_parent_info(pfp, parent->parent, path_info);
 				vinode_unref_tx(pfp, parent);
 			} else {
 				path_info->parent = parent;
@@ -750,15 +749,10 @@ _handle_last_component(PMEMfilepool *pfp,
 		while (path[0])
 			path++;
 
-		if (prev_parent)
-			vinode_unref_tx(pfp, prev_parent);
-
 		path_info->vinode = child;
 	} else {
-		if (get_parent) // XXX: do we have to check for .. and .?
-			path_info->parent = prev_parent;
-		else if (prev_parent)
-			vinode_unref_tx(pfp, prev_parent);
+		if (get_parent)
+			get_parent_info(pfp, parent, path_info);
 
 		path_info->vinode = parent;
 	}
@@ -787,7 +781,6 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path;
 	} lookup_stack[MAX_SYMLINKS];
 	char tmp[PATH_MAX];
-	struct pmemfile_vinode *prev_parent = NULL;
 	int lookup_idx = 0;
 
 	vinode_ref(pfp, parent);
@@ -818,9 +811,8 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		}
 
 		if (slash == NULL) {
-			_handle_last_component(pfp, path, prev_parent, parent,
-					lookup_path, get_parent, path_info,
-					flags);
+			_handle_last_component(pfp, path, parent, lookup_path,
+					get_parent, path_info, flags);
 			break;
 		}
 
@@ -830,18 +822,14 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		child = vinode_lookup_dirent(pfp, parent, tmp, flags);
 		if (!child) {
 			if (get_parent)
-				path_info->parent = prev_parent;
-			else if (prev_parent)
-				vinode_unref_tx(pfp, prev_parent);
+				get_parent_info(pfp, parent, path_info);
 
 			path_info->remaining = path;
 			path_info->vinode = parent;
 			break;
 		}
 
-		if (prev_parent)
-			vinode_unref_tx(pfp, prev_parent);
-		prev_parent = parent;
+		vinode_unref_tx(pfp, parent);
 
 		parent = child;
 		path = slash + 1;
