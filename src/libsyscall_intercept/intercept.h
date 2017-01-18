@@ -185,6 +185,7 @@ void activate_patches(struct intercept_desc *desc);
 #define SHORT_JMP_OPCODE 0xeb
 #define PUSH_IMM_OPCODE 0x68
 #define NOP_OPCODE 0x90
+#define INT3_OPCODE 0xCC
 
 void create_jump(unsigned char opcode, unsigned char *from, void *to);
 

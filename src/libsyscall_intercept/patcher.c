@@ -640,7 +640,7 @@ activate_patches(struct intercept_desc *desc)
 			for (byte = patch->dst_jmp_patch + JUMP_INS_SIZE;
 				byte < patch->return_address;
 				++byte) {
-				*byte = NOP_OPCODE;
+				*byte = INT3_OPCODE;
 			}
 		}
 	}
