@@ -993,6 +993,12 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
+	if (vdir == pfp->root) {
+		error = 1;
+		txerrno = EBUSY;
+		goto end;
+	}
+
 	struct pmemfile_inode *iparent = D_RW(vparent->inode);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {

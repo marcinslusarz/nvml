@@ -475,6 +475,10 @@ test6(PMEMfilepool *pfp)
 
 	PMEMFILE_RMDIR(pfp, "/dir2");
 	PMEMFILE_RMDIR(pfp, "/dir1");
+
+	int ret = pmemfile_rmdir(pfp, "/");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, EBUSY);
 }
 
 int
