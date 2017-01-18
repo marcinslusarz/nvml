@@ -269,45 +269,69 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	traverse_path(pfp, dir, pathname, false, &info, 0);
 	vinode = info.vinode;
 
+	if (is_tmpfile(flags)) {
+		if (!vinode_is_dir(vinode)) {
+			error = ENOTDIR;
+			goto end;
+		}
+
+		if (info.remaining[0]) {
+			error = ENOENT;
+			goto end;
+		}
+
+		if ((flags & O_ACCMODE) == O_RDONLY) {
+			error = EINVAL;
+			goto end;
+		}
+	} else if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+		if (info.remaining[0] == 0) {
+			LOG(LUSR, "file %s already exists", pathname);
+			error = EEXIST;
+			goto end;
+		}
+
+		if (!vinode_is_dir(info.vinode)) {
+			error = ENOTDIR;
+			goto end;
+		}
+
+		if (strchr(info.remaining, '/')) {
+			error = ENOENT;
+			goto end;
+		}
+	} else if (flags & O_CREAT) {
+		if (info.remaining[0] != 0) {
+			if (!vinode_is_dir(info.vinode)) {
+				error = ENOTDIR;
+				goto end;
+			}
+
+			if (strchr(info.remaining, '/')) {
+				error = ENOENT;
+				goto end;
+			}
+		}
+	} else if (info.remaining[0] != 0) {
+		if (!vinode_is_dir(info.vinode))
+			error = ENOTDIR;
+		else
+			error = ENOENT;
+		goto end;
+	}
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (is_tmpfile(flags)) {
-			if (!vinode_is_dir(vinode))
-				pmemobj_tx_abort(ENOTDIR);
-			if (info.remaining[0])
-				pmemobj_tx_abort(ENOENT);
-			if ((flags & O_ACCMODE) == O_RDONLY)
-				pmemobj_tx_abort(EINVAL);
-
 			vparent = vinode;
 			vinode = NULL;
 		} else if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
-			if (info.remaining[0] == 0) {
-				LOG(LUSR, "file %s already exists", pathname);
-				pmemobj_tx_abort(EEXIST);
-			}
-
-			if (!vinode_is_dir(info.vinode))
-				pmemobj_tx_abort(ENOTDIR);
-			if (strchr(info.remaining, '/'))
-				pmemobj_tx_abort(ENOENT);
-
 			vparent = vinode;
 			vinode = NULL;
 		} else if (flags & O_CREAT) {
 			if (info.remaining[0] != 0) {
-				if (!vinode_is_dir(info.vinode))
-					pmemobj_tx_abort(ENOTDIR);
-				if (strchr(info.remaining, '/'))
-					pmemobj_tx_abort(ENOENT);
-
 				vparent = vinode;
 				vinode = NULL;
 			}
-		} else if (info.remaining[0] != 0) {
-			if (!vinode_is_dir(info.vinode))
-				pmemobj_tx_abort(ENOTDIR);
-			else
-				pmemobj_tx_abort(ENOENT);
 		}
 
 		if (vinode == NULL) {
@@ -338,6 +362,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		error = errno;
 	} TX_END
 
+end:
 	if (vparent)
 		vinode_unref_tx(pfp, vparent);
 
@@ -662,17 +687,20 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_vinode *volatile vinode2 = NULL;
 	volatile bool parent_refed = false;
 
+	if (info.remaining[0]) {
+		if (!vinode_is_dir(info.vinode))
+			error = ENOTDIR;
+		else
+			error = ENOENT;
+		goto end;
+	}
+
+	if (vinode_is_dir(info.vinode)) {
+		error = EISDIR;
+		goto end;
+	}
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		if (info.remaining[0]) {
-			if (!vinode_is_dir(info.vinode))
-				pmemobj_tx_abort(ENOTDIR);
-			else
-				pmemobj_tx_abort(ENOENT);
-		}
-
-		if (vinode_is_dir(info.vinode))
-			pmemobj_tx_abort(EISDIR);
-
 		rwlock_tx_wlock(&vparent->rwlock);
 		vinode_unlink_dirent(pfp, vparent, info.name, &vinode2,
 				&parent_refed, true);
@@ -681,6 +709,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		error = errno;
 	} TX_END
 
+end:
 	if (info.vinode)
 		vinode_unref_tx(pfp, info.vinode);
 	if (vinode2)
@@ -972,30 +1001,38 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 {
 	LOG(LDBG, "target %s linkpath %s", target, linkpath);
 
-	int error, ret = 0;
+	int error = 0;
 
 	struct pmemfile_path_info info;
 	traverse_path(pfp, dir, linkpath, false, &info, 0);
 	struct pmemfile_vinode *volatile vinode = NULL;
 
+	struct pmemfile_vinode *vparent = info.vinode;
+
+	if (info.remaining[0] == 0) {
+		error = EEXIST;
+		goto end;
+	}
+
+	if (!vinode_is_dir(vparent)) {
+		error = ENOTDIR;
+		goto end;
+	}
+
+	if (strchr(info.remaining, '/')) {
+		error = ENOENT;
+		goto end;
+	}
+
+	size_t len = strlen(target);
+	struct pmemfile_inode *inode;
+
+	if (len >= sizeof(inode->file_data.data)) {
+		error = ENAMETOOLONG;
+		goto end;
+	}
+
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		struct pmemfile_vinode *vparent = info.vinode;
-
-		if (info.remaining[0] == 0)
-			pmemobj_tx_abort(EEXIST);
-
-		if (!vinode_is_dir(vparent))
-			pmemobj_tx_abort(ENOTDIR);
-
-		if (strchr(info.remaining, '/'))
-			pmemobj_tx_abort(ENOENT);
-
-		size_t len = strlen(target);
-		struct pmemfile_inode *inode;
-
-		if (len >= sizeof(inode->file_data.data))
-			pmemobj_tx_abort(ENAMETOOLONG);
-
 		struct pmemfile_time t;
 
 		rwlock_tx_wlock(&vparent->rwlock);
@@ -1012,19 +1049,21 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 		rwlock_tx_unlock_on_commit(&vparent->rwlock);
 	} TX_ONABORT {
 		error = errno;
-		ret = -1;
 	} TX_END
 
+end:
 	if (info.vinode)
 		vinode_unref_tx(pfp, info.vinode);
 
-	if (vinode && ret == 0)
+	if (vinode && error == 0)
 		vinode_unref_tx(pfp, vinode);
 
-	if (ret)
+	if (error) {
 		errno = error;
+		return -1;
+	}
 
-	return ret;
+	return 0;
 }
 
 int
