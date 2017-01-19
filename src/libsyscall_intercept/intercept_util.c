@@ -50,6 +50,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <sched.h>
+#include <linux/limits.h>
 
 static long log_fd = -1;
 
@@ -102,7 +103,7 @@ xread(long fd, void *buffer, size_t size)
 void
 intercept_setup_log(const char *path_base, const char *trunc)
 {
-	char full_path[0x400];
+	char full_path[PATH_MAX];
 	const char *path = path_base;
 
 	if (path_base == NULL)
