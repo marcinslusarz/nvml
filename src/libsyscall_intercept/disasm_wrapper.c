@@ -106,12 +106,26 @@ static void
 check_op(struct intercept_disasm_result *result, cs_x86_op *op,
 		const unsigned char *code)
 {
+	/*
+	 * the addres the RIP register is going to contain during the
+	 * execution if this instruction
+	 */
+	const unsigned char *rip = code + result->length;
+
 	if (op->type == X86_OP_REG) {
 		if (op->reg == X86_REG_IP ||
 				op->reg == X86_REG_RIP) {
+			/*
+			 * Example: mov %rip, %rax
+			 */
 			result->has_ip_relative_opr = true;
+			result->rip_disp = 0;
+			result->rip_ref_addr = rip;
 		}
 		if (result->is_jump) {
+			/*
+			 * Example: jmp *(%rax)
+			 */
 			/*
 			 * An indirect jump can't have arguments other
 			 * than a register - therefore the asserts.
@@ -124,23 +138,29 @@ check_op(struct intercept_disasm_result *result, cs_x86_op *op,
 		if (op->mem.base == X86_REG_IP ||
 				op->mem.base == X86_REG_RIP ||
 				op->mem.index == X86_REG_IP ||
-				op->mem.index == X86_REG_RIP) {
+				op->mem.index == X86_REG_RIP ||
+				result->is_jump) {
 			result->has_ip_relative_opr = true;
-		}
-		if (result->is_jump) {
 			assert(!result->is_indirect_jump);
-			result->is_rel_jump = true;
-			result->jump_delta = (ptrdiff_t)op->mem.disp;
-			result->jump_target =
-				(code + result->length) +
-				result->jump_delta;
+
+			if (result->is_jump)
+				result->is_rel_jump = true;
+
+			assert(op->mem.disp <= INT32_MAX);
+			assert(op->mem.disp >= INT32_MIN);
+
+			result->rip_disp = (int32_t)op->mem.disp;
+			result->rip_ref_addr = rip + result->rip_disp;
 		}
 	} else if (op->type == X86_OP_IMM) {
 		if (result->is_jump) {
 			assert(!result->is_indirect_jump);
+			result->has_ip_relative_opr = true;
 			result->is_rel_jump = true;
-			result->jump_target = (void *)op->imm;
-			result->jump_delta = (unsigned char *)op->imm - code;
+			result->rip_ref_addr = (void *)op->imm;
+
+			result->rip_disp =
+			    (int32_t)((unsigned char *)op->imm - rip);
 		}
 	}
 }

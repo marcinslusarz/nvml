@@ -427,8 +427,8 @@ crawl_text(struct intercept_desc *desc)
 			continue;
 		}
 
-		if (result.is_rel_jump)
-			mark_jump(desc, result.jump_target);
+		if (result.has_ip_relative_opr)
+			mark_jump(desc, result.rip_ref_addr);
 
 		/*
 		 * Generate a new patch description, if:

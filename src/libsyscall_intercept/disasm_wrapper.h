@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -79,13 +79,14 @@ struct intercept_disasm_result {
 
 	/*
 	 * Optional fields:
-	 * The jump_delta is the relative jump target of
-	 * jump instruction, jump_target is the absolute
-	 * address of the jump target.
-	 * These are only valid, when is_rel_jump is true.
+	 * The rip_disp field contains the displacement used in
+	 * instructions refering to RIP relative addresses.
+	 * The rip_ref_addr field contains the absolute address of
+	 * such references, computed based on the rip_disp.
+	 * These are only valid, when has_ip_relative_opr is true.
 	 */
-	ptrdiff_t jump_delta;
-	const unsigned char *jump_target;
+	int32_t rip_disp;
+	const unsigned char *rip_ref_addr;
 };
 
 struct intercept_disasm_context;
