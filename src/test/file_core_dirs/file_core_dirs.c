@@ -436,6 +436,9 @@ test5(PMEMfilepool *pfp)
 	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir1/dir3/."), -1);
 	UT_ASSERTeq(errno, EINVAL);
 
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/dir1/file2/file"), -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 	PMEMFILE_RMDIR(pfp, "../dir2");
 	PMEMFILE_RMDIR(pfp, "dir3");
 
