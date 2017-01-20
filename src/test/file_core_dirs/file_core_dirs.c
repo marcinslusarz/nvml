@@ -390,6 +390,9 @@ test4(PMEMfilepool *pfp)
 	t = PMEMFILE_GETCWD(pfp, NULL, 10, "/dir1");
 	free(t);
 
+	t = pmemfile_getcwd(pfp, NULL, 2);
+	UT_ASSERTeq(t, NULL);
+	UT_ASSERTeq(errno, ERANGE);
 
 	for (int i = 1; i < strlen("/dir1") + 1; ++i) {
 		errno = 0;

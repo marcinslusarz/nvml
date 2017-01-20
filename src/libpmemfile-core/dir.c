@@ -1254,6 +1254,7 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 	if (size == 0)
 		size = PATH_MAX;
 
+	bool allocated = false;
 	if (!buf) {
 		buf = malloc(size);
 		if (!buf) {
@@ -1262,6 +1263,7 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 			errno = oerrno;
 			return NULL;
 		}
+		allocated = true;
 	}
 
 	char *curpos = buf + size;
@@ -1310,6 +1312,8 @@ _pmemfile_get_dir_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode,
 
 range_err:
 	vinode_unref_tx(pfp, child);
+	if (allocated)
+		free(buf);
 	errno = ERANGE;
 	return NULL;
 }
