@@ -392,7 +392,7 @@ expand_file(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	last_block->next = TOID_NULL(struct pmemfile_block);
 }
 
-static void
+static inline void
 iterate_on_file_range(PMEMfilepool *pfp, PMEMfile *file,
     uint64_t offset, uint64_t len,
     int (*callback)(PMEMfilepool *, char *, char *chunk,
