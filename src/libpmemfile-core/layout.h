@@ -57,6 +57,10 @@ struct pmemfile_block {
 	TOID(struct pmemfile_block) next;
 };
 
+enum block_flags {
+	block_initialized = 1
+};
+
 /* File */
 struct pmemfile_block_array {
 	TOID(struct pmemfile_block_array) next;
@@ -182,5 +186,16 @@ struct pmemfile_super {
 			- 16 /* toid */
 			- 16 /* toid */];
 };
+
+/*
+ * The size of data allocated for each block is a positive integer multiple
+ * of FILE_PAGE_SIZE.
+ *
+ * XXX: The current code can read from / write to blocks with any positive size,
+ * any offset alignment, so this information doessn't necessarily have to be
+ * part of the on-media layout.
+ * But later the code might ( probably will ) depend on this.
+ */
+#define FILE_PAGE_SIZE ((size_t)0x1000)
 
 #endif

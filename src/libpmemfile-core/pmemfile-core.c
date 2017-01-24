@@ -45,7 +45,10 @@
 #define PMEMFILE_LOG_LEVEL_VAR "PMEMFILECORE_LOG_LEVEL"
 #define PMEMFILE_LOG_FILE_VAR "PMEMFILECORE_LOG_FILE"
 
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
 size_t pmemfile_core_block_size = 0;
+bool pmemfile_overallocate_on_append = true;
 
 /*
  * libpmemfile_core_init -- load-time initialization for libpmemfile-core
@@ -68,9 +71,24 @@ libpmemfile_core_init(void)
 	cb_init();
 
 	char *tmp = getenv("PMEMFILECORE_BLOCK_SIZE");
-	if (tmp)
-		pmemfile_core_block_size = (size_t)atoll(tmp);
-	LOG(LINF, "block size %lu", pmemfile_core_block_size);
+	if (tmp) {
+		pmemfile_core_block_size = min((size_t)atoll(tmp), UINT32_MAX);
+		pmemfile_core_block_size =
+			(pmemfile_core_block_size - 1) / FILE_PAGE_SIZE;
+		pmemfile_core_block_size =
+			(pmemfile_core_block_size + 1) * FILE_PAGE_SIZE;
+	}
+	LOG(LINF, "block size %zu", pmemfile_core_block_size);
+
+	if (pmemfile_core_block_size == 0) {
+		tmp = getenv("PMEMFILECORE_OVERALLOCATE_ON_APPEND");
+		if (tmp && tmp[0] == '0')
+			pmemfile_overallocate_on_append = false;
+	} else {
+		pmemfile_overallocate_on_append = false;
+	}
+	LOG(LINF, "overallocate_on_append flag is %s",
+	    (pmemfile_overallocate_on_append ? "set" : "not set"));
 }
 
 /*
