@@ -342,8 +342,10 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		}
 
 		file = Zalloc(sizeof(*file));
-		if (!file)
+		if (!file) {
 			pmemobj_tx_abort(errno);
+			ASSERT(0);
+		}
 
 		file->vinode = vinode;
 
@@ -376,6 +378,7 @@ end:
 		return NULL;
 	}
 
+	ASSERT(file != NULL);
 	util_mutex_init(&file->mutex, NULL);
 
 	LOG(LDBG, "pathname %s opened inode 0x%lx", orig_pathname,

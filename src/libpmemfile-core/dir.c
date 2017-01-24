@@ -184,6 +184,7 @@ vinode_add_dirent(PMEMfilepool *pfp,
 		dir = D_RW(dir->next);
 	} while (dir);
 
+	ASSERT(dirent != NULL);
 	pmemobj_tx_add_range_direct(dirent,
 			sizeof(dirent->inode) + namelen + 1);
 
@@ -387,6 +388,7 @@ vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		if (errno == ENOENT && !abort_on_ENOENT)
 			return;
 		pmemobj_tx_abort(errno);
+		ASSERT(0);
 	}
 
 	TOID(struct pmemfile_inode) tinode = dirent->inode;
@@ -506,6 +508,7 @@ file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			dirent_id = 0;
 			file->offset = ((size_t)file->dir_pos.dir_id) << 32 | 0;
 		}
+		ASSERT(dir != NULL);
 
 		struct pmemfile_dirent *dirent = &dir->dirents[dirent_id];
 		if (TOID_IS_NULL(dirent->inode)) {
@@ -562,6 +565,7 @@ pmemfile_getdents(PMEMfilepool *pfp, PMEMfile *file,
 {
 	struct pmemfile_vinode *vinode = file->vinode;
 
+	ASSERT(vinode != NULL);
 	if (!vinode_is_dir(vinode)) {
 		errno = ENOTDIR;
 		return -1;
@@ -616,6 +620,7 @@ file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 			dirent_id = 0;
 			file->offset = ((size_t)file->dir_pos.dir_id) << 32 | 0;
 		}
+		ASSERT(dir != NULL);
 
 		struct pmemfile_dirent *dirent = &dir->dirents[dirent_id];
 		if (TOID_IS_NULL(dirent->inode)) {

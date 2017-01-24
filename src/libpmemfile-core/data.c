@@ -252,6 +252,7 @@ get_free_block(struct pmemfile_vinode *vinode)
 			((pmemobj_alloc_usable_size(next.oid) -
 			sizeof(struct pmemfile_block_array)) /
 			sizeof(struct pmemfile_block));
+	ASSERT(prev != NULL);
 	TX_SET_DIRECT(prev, next, next);
 
 	binfo->arr = D_RW(next);
