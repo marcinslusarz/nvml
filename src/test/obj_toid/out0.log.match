@@ -1,3 +1,7 @@
 obj_toid$(nW)TEST0: START: obj_toid
  $(nW)obj_toid$(nW) $(nW)testfile1
+ptr !NULL
+ptr !NULL
+ptr NULL
+ptr NULL
 obj_toid$(nW)TEST0: Done
