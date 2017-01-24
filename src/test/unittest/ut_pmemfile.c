@@ -52,7 +52,7 @@ PMEMfilepool *
 PMEMFILE_MKFS(const char *path)
 {
 	PMEMfilepool *pfp = pmemfile_mkfs(path,
-			1024 * 1024 * 1024 /* PMEMOBJ_MIN_POOL */,
+			256 * 1024 * 1024 /* PMEMOBJ_MIN_POOL */,
 			S_IWUSR | S_IRUSR);
 	if (!pfp)
 		UT_FATAL("!pmemfile_mkfs: %s", path);

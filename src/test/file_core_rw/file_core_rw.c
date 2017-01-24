@@ -249,12 +249,12 @@ test2(PMEMfilepool *pfp)
 			0644);
 
 #define LEN (sizeof(bufd) - 1000)
-#define LOOPS ((800 * 1024 * 1024) / LEN)
+#define LOOPS ((200 * 1024 * 1024) / LEN)
 	for (int i = 0; i < LOOPS; ++i)
 		PMEMFILE_WRITE(pfp, f, bufd, LEN, LEN);
 
 	PMEMFILE_CLOSE(pfp, f);
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 ~800MB");
+	PMEMFILE_LIST_FILES(pfp, "/", "/file1 ~200MB");
 	PMEMFILE_STATS(pfp);
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
