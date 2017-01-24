@@ -550,9 +550,9 @@ pmemfile_write_locked(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 	struct pmemfile_vinode *vinode = file->vinode;
 	struct pmemfile_inode *inode = D_RW(vinode->inode);
 
-	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		rwlock_tx_wlock(&vinode->rwlock);
+	util_rwlock_wrlock(&vinode->rwlock);
 
+	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (!vinode->blocks)
 			vinode_rebuild_block_tree(vinode);
 
@@ -566,13 +566,13 @@ pmemfile_write_locked(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 			file_get_time(&tm);
 			TX_SET(vinode->inode, mtime, tm);
 		}
-
-		rwlock_tx_unlock_on_commit(&vinode->rwlock);
 	} TX_ONABORT {
 		error = errno;
 	} TX_ONCOMMIT {
 		file->offset += count;
 	} TX_END
+
+	util_rwlock_unlock(&vinode->rwlock);
 
 	if (error) {
 		errno = error;
