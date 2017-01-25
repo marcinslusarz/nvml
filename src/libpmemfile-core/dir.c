@@ -785,28 +785,18 @@ _handle_last_component(PMEMfilepool *pfp,
  */
 static void
 _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *full_path, bool get_parent,
+		const char *path, bool get_parent,
 		struct pmemfile_path_info *path_info, int flags)
 {
-#define MAX_SYMLINKS 40
-	struct {
-		const char *full_path;
-		const char *path;
-	} lookup_stack[MAX_SYMLINKS];
 	char tmp[PATH_MAX];
-	int lookup_idx = 0;
 
-	memset(lookup_stack, 0, sizeof(lookup_stack));
 	memset(path_info, 0, sizeof(*path_info));
-	lookup_stack[0].full_path = full_path;
-	lookup_stack[0].path = full_path;
 	struct pmemfile_vinode *parent_tree[2];
 	parent_tree[0] = vinode_ref(pfp, parent);
 	parent_tree[1] = vinode_ref(pfp, parent);
 
 	while (1) {
 		struct pmemfile_vinode *child;
-		const char *path = lookup_stack[lookup_idx].path;
 		const char *lookup_path = path;
 		const char *slash = strchr(lookup_path, '/');
 
@@ -854,18 +844,7 @@ _traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 		while (path[0] == '/')
 			path++;
-
-		lookup_stack[lookup_idx].path = path;
 	}
-
-	for (int i = 1; i < lookup_idx; ++i) {
-		/*
-		 * All full_paths except the first one were allocated in this
-		 * function, so it's safe to cast.
-		 */
-		free((char *)lookup_stack[i].full_path);
-	}
-#undef MAX_SYMLINKS
 }
 
 void
