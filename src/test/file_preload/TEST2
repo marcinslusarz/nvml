@@ -58,6 +58,11 @@ expect_normal_exit mkdir $DIR/dummy_mount_point/test_dir &> /dev/null
 expect_normal_exit mkdir $DIR/dummy_mount_point/test_dir_other &> /dev/null
 expect_normal_exit mkdir $DIR/dummy_mount_point/test_dir/test_subdir &> /dev/null
 
+cp repo_dummy_file_a dummy_file_a
+chmod 644 dummy_file_a
+cp repo_dummy_file_b dummy_file_b
+chmod 644 dummy_file_b
+
 expect_normal_exit cp dummy_file_a $DIR/dummy_mount_point/test_dir/file_a
 expect_normal_exit cp dummy_file_b $DIR/dummy_mount_point/test_dir/test_subdir/file_b
 expect_normal_exit cp $DIR/dummy_mount_point/test_dir/file_a file_a.log
