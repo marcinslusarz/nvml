@@ -34,9 +34,14 @@
  * file_core_rw.c -- unit test for pmemfile_read & pmemfile_write
  */
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "unittest.h"
 #include "pmemfile_test.h"
 #include "util.h"
+
+static unsigned env_block_size;
 
 static void
 test1(PMEMfilepool *pfp)
@@ -44,7 +49,11 @@ test1(PMEMfilepool *pfp)
 	PMEMfile *f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_WRONLY,
 			0644);
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 0");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 0, "file1"},
+	    {}});
 
 	const char *data = "Marcin S";
 	char data2[4096];
@@ -55,7 +64,11 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_WRITE(pfp, f, data, len, len);
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 9, "file1"},
+	    {}});
 
 	/* try to read write-only file */
 	PMEMFILE_READ(pfp, f, data2, len, -1, EBADF);
@@ -119,8 +132,11 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9");
-
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 9, "file1"},
+	    {}});
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
 
@@ -200,14 +216,27 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f);
 
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 9+100+4+4096+11=4220");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 4220, "file1"},
+	    {}});
 
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = (env_block_size == 4096) ? 2 : 1});
 
 	PMEMFILE_UNLINK(pfp, "/file1");
 
-	PMEMFILE_STATS(pfp);
-
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_EXCL | O_RDWR, 0644);
 
@@ -227,8 +256,18 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_CLOSE(pfp, f);
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 8192");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 8192, "file1"},
+	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = (env_block_size == 4096) ? 2 : 1});
 
 	PMEMFILE_UNLINK(pfp, "/file1");
 }
@@ -254,8 +293,27 @@ test2(PMEMfilepool *pfp)
 		PMEMFILE_WRITE(pfp, f, bufd, LEN, LEN);
 
 	PMEMFILE_CLOSE(pfp, f);
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 ~200MB");
-	PMEMFILE_STATS(pfp);
+
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 209714688, "file1"},
+	    {}});
+
+	if (env_block_size == 4096)
+		PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+			.inodes = 2,
+			.dirs = 0,
+			.block_arrays = 609,
+			.inode_arrays = 1,
+			.blocks = 51200});
+	else
+		PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+			.inodes = 2,
+			.dirs = 0,
+			.block_arrays = 5,
+			.inode_arrays = 1,
+			.blocks = 502});
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 
@@ -297,8 +355,20 @@ test_trunc(PMEMfilepool *pfp)
 
 	PMEMFILE_CLOSE(pfp, f1);
 	PMEMFILE_CLOSE(pfp, f2);
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1,file2 25600");
-	PMEMFILE_STATS(pfp);
+
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 25600, "file1"},
+	    {0100644, 1, 25600, "file2"},
+	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 3,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = (env_block_size == 4096) ? 14 : 4});
 
 	f1 = PMEMFILE_OPEN(pfp, "/file1", O_RDWR | O_TRUNC, 0);
 
@@ -311,8 +381,19 @@ test_trunc(PMEMfilepool *pfp)
 	PMEMFILE_CLOSE(pfp, f1);
 	PMEMFILE_CLOSE(pfp, f2);
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/file1 0, /file2 128");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100644, 1, 0, "file1"},
+	    {0100644, 1, 128, "file2"},
+	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 3,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 1});
 
 	PMEMFILE_UNLINK(pfp, "/file1");
 
@@ -384,31 +465,69 @@ main(int argc, char *argv[])
 		UT_FATAL("usage: %s file-name", argv[0]);
 
 	const char *path = argv[1];
+	const char *e = getenv("PMEMFILECORE_BLOCK_SIZE");
+
+	if (e == NULL)
+		env_block_size = 0;
+	else if (strcmp(e, "4096") == 0)
+		env_block_size = 4096;
+	else
+		UT_FATAL("unexpected PMEMFILECORE_BLOCK_SIZE");
 
 	PMEMfilepool *pfp = PMEMFILE_MKFS(path);
 
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 0});
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 
 	test1(pfp);
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	test2(pfp);
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	test_trunc(pfp);
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	test_o_append(pfp);
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	test_sparse_files(pfp);
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	pmemfile_pool_close(pfp);
 

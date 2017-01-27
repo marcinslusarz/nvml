@@ -61,7 +61,12 @@ open_pool(const char *path)
 static void
 test0(PMEMfilepool *pfp)
 {
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 0});
 
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 
@@ -87,8 +92,21 @@ test0(PMEMfilepool *pfp)
 	PMEMFILE_READLINKAT(pfp, "/dir", "sym4-not_exists-relative",
 			"../file2");
 
-	PMEMFILE_LIST_FILES(pfp, "/", "/");
-	PMEMFILE_LIST_FILES(pfp, "/dir", "/dir");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 3, 4008, "."},
+	    {040777, 3, 4008, ".."},
+	    {0100644, 1, 0, "file1"},
+	    {040755, 2, 4008, "dir"},
+	    {}});
+
+	PMEMFILE_LIST_FILES(pfp, "/dir", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 3, 4008, ".."},
+	    {0120777, 1, 6, "sym1-exists", "/file1"},
+	    {0120777, 1, 6, "sym2-not_exists", "/file2"},
+	    {0120777, 1, 8, "sym3-exists-relative", "../file1"},
+	    {0120777, 1, 8, "sym4-not_exists-relative", "../file2"},
+	    {}});
 
 	int ret;
 
@@ -158,7 +176,12 @@ test0(PMEMfilepool *pfp)
 	PMEMFILE_UNLINK(pfp, "/file1");
 	PMEMFILE_RMDIR(pfp, "/dir");
 
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	pmemfile_pool_close(pfp);
 }

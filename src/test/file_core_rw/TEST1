@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright 2016, Intel Corporation
+# Copyright 2016-2017, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,5 @@ export PMEM_IS_PMEM_FORCE=1
 
 PMEMFILECORE_BLOCK_SIZE=4096 expect_normal_exit\
     ./file_core_rw$EXESUFFIX $DIR/testfile1
-
-check
 
 pass

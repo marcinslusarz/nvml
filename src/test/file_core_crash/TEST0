@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright 2016, Intel Corporation
+# Copyright 2016-2017, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,24 +42,11 @@ require_fs_type any
 
 setup
 
-function run() {
-	num=$1
-	name=$2
-
-	expect_normal_exit ./file_core_crash$EXESUFFIX $DIR/testfile1 $name
-
-	cp out${UNITTEST_NUM}.log out_${num}_${name}_${UNITTEST_NUM}.log
-}
-
-rm -f ${PMEMFILECORE_LOG_FILE}
-
-run a prep
-run b openclose
-run c crash1
-run d openclose
-run e crash2
-run f openclose
-
-check
+expect_normal_exit ./file_core_crash$EXESUFFIX $DIR/testfile1 prep
+expect_normal_exit ./file_core_crash$EXESUFFIX $DIR/testfile1 openclose1
+expect_normal_exit ./file_core_crash$EXESUFFIX $DIR/testfile1 crash1
+expect_normal_exit ./file_core_crash$EXESUFFIX $DIR/testfile1 openclose2
+expect_normal_exit ./file_core_crash$EXESUFFIX $DIR/testfile1 crash2
+expect_normal_exit ./file_core_crash$EXESUFFIX $DIR/testfile1 openclose3
 
 pass

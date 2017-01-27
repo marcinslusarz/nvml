@@ -38,14 +38,16 @@
 #include "unittest.h"
 
 void
-PMEMFILE_STATS(PMEMfilepool *pfp)
+PMEMFILE_STATS(PMEMfilepool *pfp, const struct pmemfile_stats expected)
 {
 	struct pmemfile_stats stats;
 	pmemfile_stats(pfp, &stats);
 
-	UT_OUT("inodes %u dirs %u block_arrays %u inode_arrays %u blocks %u",
-			stats.inodes, stats.dirs, stats.block_arrays,
-			stats.inode_arrays, stats.blocks);
+	UT_ASSERTeq(stats.inodes, expected.inodes);
+	UT_ASSERTeq(stats.dirs, expected.dirs);
+	UT_ASSERTeq(stats.block_arrays, expected.block_arrays);
+	UT_ASSERTeq(stats.inode_arrays, expected.inode_arrays);
+	UT_ASSERTeq(stats.blocks, expected.blocks);
 }
 
 PMEMfilepool *
@@ -320,45 +322,33 @@ PMEMFILE_READLINKAT(PMEMfilepool *pfp, const char *dirpath,
 	return ut_readlink_buf;
 }
 
-static const char *
-timespec_to_str(const struct timespec *t)
-{
-	char *s = asctime(localtime(&t->tv_sec));
-	s[strlen(s) - 1] = 0;
-	return s;
-}
-
-void
-PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
-		unsigned length, int print_attrs)
+const struct pmemfile_ls *
+PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, const char *dirp,
+		unsigned length, const struct pmemfile_ls expected[],
+		int check_attr)
 {
 	struct stat statbuf;
-	char *buf = (void *)dirp;
 	char symlinkbuf[PATH_MAX];
 
 	for (unsigned i = 0; i < length; ) {
 		i += 8;
 		i += 8;
 
-		unsigned short int reclen = *(unsigned short *)&buf[i];
+		unsigned short int reclen = *(unsigned short *)&dirp[i];
 		i += 2;
 
-		char type = *(char *)&buf[i];
+		char type = *(char *)&dirp[i];
 		i += 1;
 
-		PMEMFILE_FSTATAT(pfp, dir, buf + i, &statbuf, 0);
-		char typechr;
+		PMEMFILE_FSTATAT(pfp, dir, dirp + i, &statbuf, 0);
 		if (type == DT_REG) {
 			UT_ASSERTeq(S_ISREG(statbuf.st_mode), 1);
-			typechr = '-';
 		} else if (type == DT_DIR) {
 			UT_ASSERTeq(S_ISDIR(statbuf.st_mode), 1);
-			typechr = 'd';
 		} else if (type == DT_LNK) {
 			UT_ASSERTeq(S_ISLNK(statbuf.st_mode), 1);
-			typechr = 'l';
 
-			ssize_t ret = pmemfile_readlinkat(pfp, dir, buf + i,
+			ssize_t ret = pmemfile_readlinkat(pfp, dir, dirp + i,
 					symlinkbuf, PATH_MAX);
 			UT_ASSERT(ret > 0);
 			UT_ASSERT(ret < PATH_MAX);
@@ -367,63 +357,65 @@ PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
 			UT_ASSERT(0);
 		}
 
-		UT_OUT("%c%c%c%c%c%c%c%c%c%c %ld %d %d %6ld %s %s%s%s",
-				typechr,
-				statbuf.st_mode & S_IRUSR ? 'r' : '-',
-				statbuf.st_mode & S_IWUSR ? 'w' : '-',
-				statbuf.st_mode & S_IXUSR ? 'x' : '-',
-				statbuf.st_mode & S_IRGRP ? 'r' : '-',
-				statbuf.st_mode & S_IWGRP ? 'w' : '-',
-				statbuf.st_mode & S_IXGRP ? 'x' : '-',
-				statbuf.st_mode & S_IROTH ? 'r' : '-',
-				statbuf.st_mode & S_IWOTH ? 'w' : '-',
-				statbuf.st_mode & S_IXOTH ? 'x' : '-',
-				statbuf.st_nlink,
-				print_attrs ? statbuf.st_uid : 0,
-				print_attrs ? statbuf.st_gid : 0,
-				statbuf.st_size,
-				print_attrs ? timespec_to_str(&statbuf.st_mtim)
-						: "",
-				buf + i,
-				type == DT_LNK ? " -> " : "",
-				type == DT_LNK ? symlinkbuf : "");
+		UT_ASSERTeq(expected->mode, statbuf.st_mode);
+		UT_ASSERTeq(expected->nlink, statbuf.st_nlink);
+		UT_ASSERTeq(expected->size, statbuf.st_size);
+		UT_ASSERT(strcmp(expected->name, dirp + i) == 0);
+		if (expected->link == NULL) {
+			UT_ASSERT(type != DT_LNK);
+		} else {
+			UT_ASSERT(type == DT_LNK);
+			UT_ASSERT(strcmp(expected->link, symlinkbuf) == 0);
+		}
+
+		if (check_attr) {
+			UT_ASSERTeq(expected->uid, statbuf.st_uid);
+			UT_ASSERTeq(expected->gid, statbuf.st_gid);
+		}
+
+		++expected;
 		i += reclen;
 		i -= 8 + 8 + 2 + 1;
 	}
+
+	return expected;
 }
 
 static void
-_PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path, const char *txt,
-		int print_attr)
+_PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path,
+		const struct pmemfile_ls expected[], int check_attr)
 {
-	UT_OUT("LIST_FILES start, %s", txt);
 	PMEMfile *f = PMEMFILE_OPEN(pfp, path, O_DIRECTORY | O_RDONLY);
 
-	char buf[32758];
+	char dir_buf[32758];
 	while (1) {
-		int r = pmemfile_getdents64(pfp, f, (void *)buf, sizeof(buf));
+		int r = pmemfile_getdents64(pfp, f,
+		    (void *)dir_buf, sizeof(dir_buf));
 		UT_ASSERT(r >= 0);
 		if (r == 0)
 			break;
 
-		PMEMFILE_PRINT_FILES64(pfp, f, buf, (unsigned)r, print_attr);
+		expected = PMEMFILE_PRINT_FILES64(pfp, f, dir_buf, (unsigned)r,
+		    expected, check_attr);
 	}
 
+	UT_ASSERT(expected->name == NULL);
+
 	PMEMFILE_CLOSE(pfp, f);
-	UT_OUT("LIST_FILES end,   %s", txt);
 }
 
 void
-PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path, const char *txt)
+PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path,
+		const struct pmemfile_ls expected[])
 {
-	_PMEMFILE_LIST_FILES(pfp, path, txt, 0);
+	_PMEMFILE_LIST_FILES(pfp, path, expected, 0);
 }
 
 void
 PMEMFILE_LIST_FILES_WITH_ATTRS(PMEMfilepool *pfp, const char *path,
-		const char *txt)
+		const struct pmemfile_ls expected[])
 {
-	_PMEMFILE_LIST_FILES(pfp, path, txt, 1);
+	_PMEMFILE_LIST_FILES(pfp, path, expected, 1);
 }
 
 void
