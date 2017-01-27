@@ -169,7 +169,10 @@ test1(PMEMfilepool *pfp)
 {
 	PMEMfile *f;
 	char buf[1001];
-	PMEMFILE_LIST_FILES(pfp, "/", "before");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {}});
 	memset(buf, 0xff, sizeof(buf));
 	UT_OUT("test1");
 
@@ -196,7 +199,10 @@ static void
 test2(PMEMfilepool *pfp)
 {
 	char buf[1001];
-	PMEMFILE_LIST_FILES(pfp, "/", "before");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 32680, "."},
+	    {040777, 2, 32680, ".."},
+	    {}});
 	UT_OUT("test2");
 
 	for (int i = 0; i < 100; ++i) {
@@ -479,25 +485,77 @@ test6(PMEMfilepool *pfp)
 	PMEMFILE_CREATE(pfp, "/dir2/file2", 0, 0755);
 	PMEMFILE_CREATE(pfp, "/file3", 0, 0755);
 
-	PMEMFILE_LIST_FILES(pfp, "/", "dir1 dir2 file3");
-	PMEMFILE_LIST_FILES(pfp, "/dir1", "file1");
-	PMEMFILE_LIST_FILES(pfp, "/dir2", "file2");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 4, 32680, "."},
+	    {040777, 4, 32680, ".."},
+	    {040755, 2, 4008, "dir1"},
+	    {040755, 2, 4008, "dir2"},
+	    {0100644, 1, 0, "file3"},
+	    {}});
+	PMEMFILE_LIST_FILES(pfp, "/dir1", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {0100644, 1, 0, "file1"},
+	    {}});
+	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {0100644, 1, 0, "file2"},
+	    {}});
 
 	PMEMFILE_RENAME(pfp, "/file3", "/file4");
-	PMEMFILE_LIST_FILES(pfp, "/", "dir1 dir2 file4");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 4, 32680, "."},
+	    {040777, 4, 32680, ".."},
+	    {040755, 2, 4008, "dir1"},
+	    {040755, 2, 4008, "dir2"},
+	    {0100644, 1, 0, "file4"},
+	    {}});
 	PMEMFILE_RENAME(pfp, "/dir1/file1", "/dir1/file11");
-	PMEMFILE_LIST_FILES(pfp, "/dir1", "file11");
+	PMEMFILE_LIST_FILES(pfp, "/dir1", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {0100644, 1, 0, "file11"},
+	    {}});
 	PMEMFILE_RENAME(pfp, "/dir2/file2", "/dir2/file22");
-	PMEMFILE_LIST_FILES(pfp, "/dir2", "file22");
+	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {0100644, 1, 0, "file22"},
+	    {}});
 
 	PMEMFILE_RENAME(pfp, "/file4", "/dir2/file4");
-	PMEMFILE_LIST_FILES(pfp, "/", "dir1 dir2");
-	PMEMFILE_LIST_FILES(pfp, "/dir2", "file22 file4");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 4, 32680, "."},
+	    {040777, 4, 32680, ".."},
+	    {040755, 2, 4008, "dir1"},
+	    {040755, 2, 4008, "dir2"},
+	    {}});
+	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {0100644, 1, 0, "file4"},
+	    {0100644, 1, 0, "file22"},
+	    {}});
 	PMEMFILE_RENAME(pfp, "/dir1/file11", "/dir2/file11");
-	PMEMFILE_LIST_FILES(pfp, "/dir1", "empty");
-	PMEMFILE_LIST_FILES(pfp, "/dir2", "file11 file22 file4");
+	PMEMFILE_LIST_FILES(pfp, "/dir1", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {}});
+	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {0100644, 1, 0, "file4"},
+	    {0100644, 1, 0, "file22"},
+	    {0100644, 1, 0, "file11"},
+	    {}});
 	PMEMFILE_RENAME(pfp, "/dir2/file11", "/dir2/file22");
-	PMEMFILE_LIST_FILES(pfp, "/dir2", "file22 file4");
+	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
+	    {040755, 2, 4008, "."},
+	    {040777, 4, 32680, ".."},
+	    {0100644, 1, 0, "file4"},
+	    {0100644, 1, 0, "file22"},
+	    {}});
 
 	PMEMFILE_UNLINK(pfp, "/dir2/file22");
 	PMEMFILE_UNLINK(pfp, "/dir2/file4");

@@ -54,9 +54,6 @@ open_pool(const char *path)
 	if (!pfp)
 		UT_FATAL("!pmemfile_pool_open %s", path);
 
-	PMEMFILE_LIST_FILES(pfp, "/", "");
-	PMEMFILE_STATS(pfp);
-
 	return pfp;
 }
 
@@ -91,8 +88,41 @@ main(int argc, char *argv[])
 		PMEMFILE_UNLINK(pfp, "/aaa");
 
 		exit(0);
-	} else if (strcmp(argv[2], "openclose") == 0) {
+	} else if (strcmp(argv[2], "openclose1") == 0 ||
+	    strcmp(argv[2], "openclose2") == 0) {
 		pfp = open_pool(path);
+
+		PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+		    {040777, 2, 4008, "."},
+		    {040777, 2, 4008, ".."},
+		    {0100644, 1, 0, "aaa"},
+		    {0100644, 1, 0, "bbb"},
+		    {}});
+
+		PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+			.inodes = 3,
+			.dirs = 0,
+			.block_arrays = 0,
+			.inode_arrays = 0,
+			.blocks = 0});
+
+		pmemfile_pool_close(pfp);
+	} else if (strcmp(argv[2], "openclose3") == 0) {
+		pfp = open_pool(path);
+
+		PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+		    {040777, 2, 4008, "."},
+		    {040777, 2, 4008, ".."},
+		    {0100644, 1, 0, "bbb"},
+		    {}});
+
+		PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+			.inodes = 2,
+			.dirs = 0,
+			.block_arrays = 0,
+			.inode_arrays = 1,
+			.blocks = 0});
+
 		pmemfile_pool_close(pfp);
 	} else
 		UT_ASSERT(0);

@@ -80,16 +80,30 @@ char *PMEMFILE_READLINKAT(PMEMfilepool *pfp, const char *dirpath,
 		const char *pathname, const char *expected);
 
 /* utilities */
-void PMEMFILE_STATS(PMEMfilepool *pfp);
+
+struct pmemfile_ls {
+	mode_t mode;
+	nlink_t nlink;
+	off_t size;
+	const char *name;
+	const char *link;
+
+	uid_t uid;
+	gid_t gid;
+};
+
+void PMEMFILE_STATS(PMEMfilepool *pfp, const struct pmemfile_stats expected);
 ssize_t PMEMFILE_FILE_SIZE(PMEMfilepool *pfp, PMEMfile *file,
 		ssize_t expected_size);
 ssize_t PMEMFILE_PATH_SIZE(PMEMfilepool *pfp, const char *path,
 		ssize_t expected_size);
-void PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, void *dirp,
-		unsigned length, int print_dates);
-void PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path, const char *txt);
+const struct pmemfile_ls *PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp,
+		PMEMfile *dir, const char *dirp, unsigned length,
+		const struct pmemfile_ls expected[], int print_attrs);
+void PMEMFILE_LIST_FILES(PMEMfilepool *pfp, const char *path,
+		const struct pmemfile_ls expected[]);
 void PMEMFILE_LIST_FILES_WITH_ATTRS(PMEMfilepool *pfp, const char *path,
-		const char *txt);
+		const struct pmemfile_ls expected[]);
 void PMEMFILE_ASSERT_EMPTY_DIR(PMEMfilepool *pfp, const char *path);
 
 #ifdef __cplusplus

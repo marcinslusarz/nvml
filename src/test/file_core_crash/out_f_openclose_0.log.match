@@ -1,9 +1,0 @@
-file_core_crash/TEST0: START: file_core_crash openclose
- ./file_core_crash$(nW) $(nW) openclose
-LIST_FILES start, 
-drwxrwxrwx 2 0 0   4008  .
-drwxrwxrwx 2 0 0   4008  ..
--rw-r--r-- 1 0 0      0  bbb
-LIST_FILES end,   
-inodes 2 dirs 0 block_arrays 0 inode_arrays 1 blocks 0
-file_core_crash/TEST0: Done

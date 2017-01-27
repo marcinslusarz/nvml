@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -185,8 +185,19 @@ test2(PMEMfilepool *pfp)
 	r = pmemfile_getdents64(pfp, f, (void *)buf, sizeof(buf));
 	UT_ASSERT(r > 0);
 	dump_linux_dirents64(buf, r);
-	PMEMFILE_PRINT_FILES64(pfp, f, buf, r, 0);
-	UT_OUT("---");
+
+	static const struct pmemfile_ls expected[] = {
+	    {040755, 2, 4008, "."},
+	    {040777, 3, 4008, ".."},
+	    {0100644, 1, 0, "file1"},
+	    {0100644, 1, 0, "file2"},
+	    {0100644, 1, 0, "file3"},
+	    {}};
+
+	const struct pmemfile_ls *end;
+
+	end = PMEMFILE_PRINT_FILES64(pfp, f, buf, r, expected, 0);
+	UT_ASSERT(end->name == NULL);
 
 	PMEMFILE_CLOSE(pfp, f);
 

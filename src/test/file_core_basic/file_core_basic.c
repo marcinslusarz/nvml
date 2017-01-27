@@ -61,9 +61,17 @@ test_open_create_close(PMEMfilepool *pfp)
 {
 	PMEMfile *f1, *f2;
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_open_create_close start, files: . ..");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 0});
 
 	/* NULL file name */
 	errno = 0;
@@ -121,9 +129,19 @@ test_open_create_close(PMEMfilepool *pfp)
 
 	pmemfile_close(pfp, f1);
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_open_create_close end, files: . .. aaa bbb");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 1, 0, "aaa"},
+	    {0100666, 1, 0, "bbb"},
+	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 3,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 0});
 
 	pmemfile_pool_close(pfp);
 }
@@ -141,9 +159,21 @@ static void
 test_open_close(const char *path)
 {
 	PMEMfilepool *pfp = open_pool(path);
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_open_close, files: . .. aaa bbb");
-	PMEMFILE_STATS(pfp);
+
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 1, 0, "aaa"},
+	    {0100666, 1, 0, "bbb"},
+	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 3,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 0});
+
 	pmemfile_pool_close(pfp);
 }
 
@@ -154,14 +184,23 @@ test_link(const char *path)
 
 	int ret;
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_link, files: . .. aaa bbb");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 1, 0, "aaa"},
+	    {0100666, 1, 0, "bbb"},
+	    {}});
 
 	/* successful link */
 	PMEMFILE_LINK(pfp, "/aaa", "/aaa.link");
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_link, files: . .. aaa bbb aaa.link");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 2, 0, "aaa"},
+	    {0100666, 1, 0, "bbb"},
+	    {0100666, 2, 0, "aaa.link"},
+	    {}});
 
 	/* destination already exists */
 	errno = 0;
@@ -169,8 +208,13 @@ test_link(const char *path)
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, EEXIST);
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_link, files: . .. aaa bbb aaa.link");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 2, 0, "aaa"},
+	    {0100666, 1, 0, "bbb"},
+	    {0100666, 2, 0, "aaa.link"},
+	    {}});
 
 	/* source does not exist */
 	errno = 0;
@@ -178,20 +222,38 @@ test_link(const char *path)
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, ENOENT);
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_link, files: . .. aaa bbb aaa.link");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 2, 0, "aaa"},
+	    {0100666, 1, 0, "bbb"},
+	    {0100666, 2, 0, "aaa.link"},
+	    {}});
 
 	/* successful link from link */
 	PMEMFILE_LINK(pfp, "/aaa.link", "/aaa2.link");
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_link, files: . .. aaa bbb aaa.link aaa2.link");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 3, 0, "aaa"},
+	    {0100666, 1, 0, "bbb"},
+	    {0100666, 3, 0, "aaa.link"},
+	    {0100666, 3, 0, "aaa2.link"},
+	    {}});
 
 	/* another successful link */
 	PMEMFILE_LINK(pfp, "/bbb", "/bbb2.link");
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-		"test_link, files: . .. aaa bbb aaa.link aaa2.link bbb2.link");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 3, 0, "aaa"},
+	    {0100666, 2, 0, "bbb"},
+	    {0100666, 3, 0, "aaa.link"},
+	    {0100666, 3, 0, "aaa2.link"},
+	    {0100666, 2, 0, "bbb2.link"},
+	    {}});
 
 	PMEMFILE_MKDIR(pfp, "/dir", 0777);
 	/* destination already exists as directory */
@@ -238,10 +300,22 @@ test_link(const char *path)
 
 	PMEMFILE_RMDIR(pfp, "/dir");
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-		"test_link, files: . .. aaa bbb aaa.link aaa2.link bbb2.link");
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 3, 0, "aaa"},
+	    {0100666, 2, 0, "bbb"},
+	    {0100666, 3, 0, "aaa.link"},
+	    {0100666, 3, 0, "aaa2.link"},
+	    {0100666, 2, 0, "bbb2.link"},
+	    {}});
 
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 3,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	pmemfile_pool_close(pfp);
 }
@@ -310,9 +384,20 @@ test_unlink(const char *path)
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, EISDIR);
 
-	PMEMFILE_LIST_FILES(pfp, "/",
-			"test_unlink end, files: . .. aaa aaa.link aaa2.link");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+	    {040777, 2, 4008, "."},
+	    {040777, 2, 4008, ".."},
+	    {0100666, 3, 0, "aaa"},
+	    {0100666, 3, 0, "aaa.link"},
+	    {0100666, 3, 0, "aaa2.link"},
+	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	PMEMFILE_UNLINK(pfp, "/aaa");
 	PMEMFILE_UNLINK(pfp, "/aaa.link");
@@ -326,7 +411,12 @@ test_tmpfile(const char *path)
 {
 	PMEMfilepool *pfp = open_pool(path);
 
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
 
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 
@@ -335,13 +425,24 @@ test_tmpfile(const char *path)
 	PMEMFILE_WRITE(pfp, f, "qwerty", 6, 6);
 
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 1});
 
 	PMEMFILE_CLOSE(pfp, f);
 
 	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
 #endif
-	PMEMFILE_STATS(pfp);
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
 
 	pmemfile_pool_close(pfp);
 }
