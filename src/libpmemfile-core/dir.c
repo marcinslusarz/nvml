@@ -1294,17 +1294,17 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 		goto end;
 	}
 
+	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+		error = ENOENT;
+		goto end;
+	}
+
 	struct pmemfile_vinode *dir;
-	if (info.remaining[0] == 0) {
+	if (sanitized[0] == 0) {
+		ASSERT(info.vinode == pfp->root);
 		dir = vinode_ref(pfp, info.vinode);
 	} else {
-		if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
-			error = ENOENT;
-			goto end;
-		}
-
-		dir = vinode_lookup_dirent(pfp, info.vinode,
-				sanitized, 0);
+		dir = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
 		if (!dir) {
 			error = ENOENT;
 			goto end;
