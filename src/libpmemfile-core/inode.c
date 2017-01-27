@@ -713,6 +713,11 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		}
 	}
 
+	if (!vinode_is_dir(vinode) && strchr(info.remaining, '/')) {
+		error = ENOTDIR;
+		goto end;
+	}
+
 	error = vinode_stat(vinode, buf);
 
 end:

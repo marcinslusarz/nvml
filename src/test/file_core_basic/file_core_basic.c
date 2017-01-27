@@ -221,6 +221,11 @@ test_link(const char *path)
 	UT_ASSERTeq(errno, ENOENT);
 
 	errno = 0;
+	ret = pmemfile_link(pfp, "/aaa/", "/bbbb");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
+	errno = 0;
 	ret = pmemfile_link(pfp, "/aaa", "/"
 		"12345678901234567890123456789012345678901234567890"
 		"12345678901234567890123456789012345678901234567890"
@@ -262,6 +267,11 @@ test_unlink(const char *path)
 
 	f1 = PMEMFILE_OPEN(pfp, "/bbb2.link", 0);
 	PMEMFILE_CLOSE(pfp, f1);
+
+	errno = 0;
+	ret = pmemfile_unlink(pfp, "/bbb2.link/");
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOTDIR);
 
 	PMEMFILE_UNLINK(pfp, "/bbb2.link");
 

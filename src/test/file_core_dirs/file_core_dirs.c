@@ -154,6 +154,12 @@ test0(PMEMfilepool *pfp)
 	UT_ASSERTeq(f, NULL);
 	UT_ASSERTeq(errno, ENOTDIR);
 
+	/* file is not a directory */
+	errno = 0;
+	f = pmemfile_open(pfp, "/dir/file/", O_RDONLY);
+	UT_ASSERTeq(f, NULL);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 	PMEMFILE_UNLINK(pfp, "/dir//file");
 	PMEMFILE_RMDIR(pfp, "/dir//////");
 }
@@ -243,6 +249,15 @@ test2(PMEMfilepool *pfp)
 	errno = 0;
 	UT_ASSERTeq(pmemfile_rmdir(pfp, "/file"), -1);
 	UT_ASSERTeq(errno, ENOTDIR);
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_mkdir(pfp, "/file/", 0755), -1);
+	UT_ASSERTeq(errno, EEXIST);
+
+	errno = 0;
+	UT_ASSERTeq(pmemfile_rmdir(pfp, "/file/"), -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 
 	PMEMFILE_UNLINK(pfp, "/file");
 

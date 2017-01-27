@@ -109,6 +109,10 @@ test1(PMEMfilepool *pfp)
 
 	UT_ASSERTeq(stat_and_dump(pfp, "/file1"), 0);
 
+	errno = 0;
+	UT_ASSERTeq(stat_and_dump(pfp, "/file1/"), -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 	PMEMFILE_UNLINK(pfp, "/file1");
 
 	errno = 0;

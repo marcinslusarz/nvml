@@ -288,6 +288,11 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
 	}
 
+	if (vinode && !vinode_is_dir(vinode) && strchr(info.remaining, '/')) {
+		error = ENOTDIR;
+		goto end;
+	}
+
 	if (is_tmpfile(flags)) {
 		if (!vinode) {
 			error = ENOENT;
@@ -571,6 +576,11 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		goto end;
 	}
 
+	if (strchr(src.remaining, '/')) {
+		error = ENOTDIR;
+		goto end;
+	}
+
 	util_rwlock_wrlock(&dst.vinode->rwlock);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
@@ -703,6 +713,11 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
 		error = ENOENT;
+		goto end;
+	}
+
+	if (strchr(info.remaining, '/')) {
+		error = ENOTDIR;
 		goto end;
 	}
 
@@ -1151,6 +1166,11 @@ _pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	if (!vinode_is_symlink(vinode)) {
 		error = EINVAL;
+		goto end;
+	}
+
+	if (strchr(info.remaining, '/')) {
+		error = ENOTDIR;
 		goto end;
 	}
 

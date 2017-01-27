@@ -145,6 +145,10 @@ test0(PMEMfilepool *pfp)
 	UT_ASSERTeq(ret, -1);
 	UT_ASSERTeq(errno, ENOTDIR);
 
+	ret = pmemfile_readlink(pfp, "/dir/sym1-exists/", buf, PATH_MAX);
+	UT_ASSERTeq(ret, -1);
+	UT_ASSERTeq(errno, ENOTDIR);
+
 	PMEMFILE_CLOSE(pfp, f);
 
 	PMEMFILE_UNLINK(pfp, "/dir/sym1-exists");
