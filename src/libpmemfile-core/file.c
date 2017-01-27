@@ -320,20 +320,20 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
-	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		if (is_tmpfile(flags)) {
+	if (is_tmpfile(flags)) {
+		vparent = vinode;
+		vinode = NULL;
+	} else if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+		vparent = vinode;
+		vinode = NULL;
+	} else if (flags & O_CREAT) {
+		if (info.remaining[0] != 0) {
 			vparent = vinode;
 			vinode = NULL;
-		} else if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
-			vparent = vinode;
-			vinode = NULL;
-		} else if (flags & O_CREAT) {
-			if (info.remaining[0] != 0) {
-				vparent = vinode;
-				vinode = NULL;
-			}
 		}
+	}
 
+	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (vinode == NULL) {
 			vinode = create_file(pfp, info.remaining,
 					orig_pathname, vparent, flags, mode);
