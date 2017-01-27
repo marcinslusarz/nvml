@@ -971,6 +971,13 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
+	/* mkdir("/") */
+	if (sanitized[0] == 0) {
+		ASSERT(parent == pfp->root);
+		error = EEXIST;
+		goto end;
+	}
+
 	/* optimization - vinode_add_dirent handles it in safe way */
 	struct pmemfile_vinode *child = vinode_lookup_dirent(pfp, parent,
 			sanitized, 0);

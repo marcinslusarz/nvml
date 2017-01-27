@@ -205,6 +205,10 @@ test2(PMEMfilepool *pfp)
 	PMEMFILE_MKDIR(pfp, "/dir0007/another_directory", 0755);
 
 	errno = 0;
+	UT_ASSERTeq(pmemfile_mkdir(pfp, "/", 0755), -1);
+	UT_ASSERTeq(errno, EEXIST);
+
+	errno = 0;
 	UT_ASSERTeq(pmemfile_mkdir(pfp, "/dir0007", 0755), -1);
 	UT_ASSERTeq(errno, EEXIST);
 
