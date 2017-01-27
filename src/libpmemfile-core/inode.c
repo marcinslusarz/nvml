@@ -609,16 +609,12 @@ vinode_stat(struct pmemfile_vinode *vinode, struct stat *buf)
 	buf->st_uid = inode->uid;
 	buf->st_gid = inode->gid;
 	buf->st_rdev = 0;
-	if ((off_t)inode->size < 0) {
-		errno = EOVERFLOW;
-		return -1;
-	}
+	if ((off_t)inode->size < 0)
+		return EOVERFLOW;
 	buf->st_size = (off_t)inode->size;
 	buf->st_blksize = 1;
-	if ((blkcnt_t)inode->size < 0) {
-		errno = EOVERFLOW;
-		return -1;
-	}
+	if ((blkcnt_t)inode->size < 0)
+		return EOVERFLOW;
 
 	blkcnt_t blks = 0;
 	if (inode_is_regular_file(inode)) {
@@ -689,24 +685,47 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	LOG(LDBG, "path %s", path);
 
-	struct pmemfile_path_info info;
-	traverse_path(pfp, dir, path, false, &info, 0);
+	int error = 0;
+	struct pmemfile_path_info2 info;
+	resolve_pathat(pfp, dir, path, &info, 0);
 
-	if (info.remaining[0] != 0) {
-		bool is_dir = vinode_is_dir(info.vinode);
-		vinode_unref_tx(pfp, info.vinode);
-		if (is_dir)
-			errno = ENOENT;
-		else
-			errno = ENOTDIR;
+	const char *sanitized;
+	bool allocated = false;
+	struct pmemfile_vinode *vinode = NULL;
+	if (!vinode_is_dir(info.vinode)) {
+		error = ENOTDIR;
+		goto end;
+	}
+
+	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+		error = ENOENT;
+		goto end;
+	}
+
+	if (sanitized[0] == 0) {
+		ASSERT(info.vinode == pfp->root);
+		vinode = vinode_ref(pfp, info.vinode);
+	} else {
+		vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+		if (!vinode) {
+			error = ENOENT;
+			goto end;
+		}
+	}
+
+	error = vinode_stat(vinode, buf);
+
+end:
+	vinode_unref_tx(pfp, info.vinode);
+	vinode_unref_tx(pfp, vinode);
+	if (allocated)
+		free((char *)sanitized);
+	if (error) {
+		errno = error;
 		return -1;
 	}
 
-	int ret = vinode_stat(info.vinode, buf);
-
-	vinode_unref_tx(pfp, info.vinode);
-
-	return ret;
+	return 0;
 }
 
 int
@@ -775,18 +794,15 @@ pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
 
 	int ret = vinode_stat(vinode, buf);
 
-	if (unref) {
-		int error;
-		if (ret)
-			error = errno;
-
+	if (unref)
 		vinode_unref_tx(pfp, vinode);
 
-		if (ret)
-			errno = error;
+	if (ret) {
+		errno = ret;
+		return -1;
 	}
 
-	return ret;
+	return 0;
 }
 
 /*
