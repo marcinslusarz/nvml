@@ -803,13 +803,13 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_vinode *parent = info.vinode;
 	int error = 0;
 	volatile bool parent_refed = false;
+	bool allocated = false;
 
 	if (!vinode_is_dir(parent)) {
 		error = ENOTDIR;
 		goto end;
 	}
 
-	bool allocated;
 	const char *sanitized;
 	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
 		error = ENOENT;
@@ -845,14 +845,14 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	util_rwlock_unlock(&parent->rwlock);
 
-	if (allocated)
-		free((char *)sanitized);
-
 	if (!error)
 		vinode_unref_tx(pfp, child);
 
 end:
 	vinode_unref_tx(pfp, parent);
+
+	if (allocated)
+		free((char *)sanitized);
 
 	if (error) {
 		if (parent_refed)
