@@ -256,8 +256,10 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode,
 				D_RO(inode)->version, inode.oid.off);
 		if (pmemobj_tx_stage() == TX_STAGE_WORK)
 			pmemobj_tx_abort(EINVAL);
-		else
+		else {
+			errno = EINVAL;
 			return NULL;
+		}
 	}
 
 	util_rwlock_rdlock(&c->rwlock);
