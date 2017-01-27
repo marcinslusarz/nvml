@@ -1029,24 +1029,27 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 
 	int error = 0;
 
-	struct pmemfile_path_info info;
-	traverse_path(pfp, dir, linkpath, false, &info, 0);
-	struct pmemfile_vinode *volatile vinode = NULL;
+	struct pmemfile_path_info2 info;
+	resolve_pathat(pfp, dir, linkpath, &info, 0);
+	struct pmemfile_vinode *vinode = NULL;
 
 	struct pmemfile_vinode *vparent = info.vinode;
 
-	if (info.remaining[0] == 0) {
-		error = EEXIST;
-		goto end;
-	}
-
+	const char *sanitized;
+	bool allocated = false;
 	if (!vinode_is_dir(vparent)) {
 		error = ENOTDIR;
 		goto end;
 	}
 
-	if (strchr(info.remaining, '/')) {
+	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
 		error = ENOENT;
+		goto end;
+	}
+
+	vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+	if (vinode) {
+		error = EEXIST;
 		goto end;
 	}
 
@@ -1070,9 +1073,10 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 				len);
 		inode->size = len;
 
-		vinode_add_dirent(pfp, vparent, info.remaining, vinode, &t);
+		vinode_add_dirent(pfp, vparent, sanitized, vinode, &t);
 	} TX_ONABORT {
 		error = errno;
+		vinode = NULL;
 	} TX_END
 
 	util_rwlock_unlock(&vparent->rwlock);
@@ -1081,8 +1085,11 @@ end:
 	if (info.vinode)
 		vinode_unref_tx(pfp, info.vinode);
 
-	if (vinode && error == 0)
+	if (vinode)
 		vinode_unref_tx(pfp, vinode);
+
+	if (allocated)
+		free((char *)sanitized);
 
 	if (error) {
 		errno = error;
