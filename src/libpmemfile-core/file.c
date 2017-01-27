@@ -252,6 +252,8 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		mode &= S_IRWXU | S_IRWXG | S_IRWXO |
 				S_ISUID | S_ISGID | S_ISVTX;
 
+		// XXX: remove this, there's no reason files can't have
+		// executable flags
 		if (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
 			LOG(LSUP, "execute bits are not supported");
 			mode = mode & ~(mode_t)(S_IXUSR | S_IXGRP | S_IXOTH);
@@ -262,21 +264,38 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	int error = 0;
 	PMEMfile *file = NULL;
 
-	struct pmemfile_path_info info;
+	struct pmemfile_path_info2 info;
+	bool allocated = false;
+	const char *sanitized;
+	struct pmemfile_vinode *volatile vinode = NULL;
+	resolve_pathat(pfp, dir, pathname, &info, 0);
+	struct pmemfile_vinode *vparent = info.vinode;
 
-	struct pmemfile_vinode *volatile vparent = NULL;
-	struct pmemfile_vinode *volatile vinode;
-	traverse_path(pfp, dir, pathname, false, &info, 0);
-	vinode = info.vinode;
+	if (!vinode_is_dir(vparent)) {
+		error = ENOTDIR;
+		goto end;
+	}
+
+	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+		error = ENOENT;
+		goto end;
+	}
+
+	if (sanitized[0] == 0) {
+		ASSERT(vparent == pfp->root);
+		vinode = vinode_ref(pfp, vparent);
+	} else {
+		vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+	}
 
 	if (is_tmpfile(flags)) {
-		if (!vinode_is_dir(vinode)) {
-			error = ENOTDIR;
+		if (!vinode) {
+			error = ENOENT;
 			goto end;
 		}
 
-		if (info.remaining[0]) {
-			error = ENOENT;
+		if (!vinode_is_dir(vinode)) {
+			error = ENOTDIR;
 			goto end;
 		}
 
@@ -285,57 +304,34 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			goto end;
 		}
 	} else if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
-		if (info.remaining[0] == 0) {
+		if (vinode) {
 			LOG(LUSR, "file %s already exists", pathname);
 			error = EEXIST;
 			goto end;
 		}
 
-		if (!vinode_is_dir(info.vinode)) {
+		if (!vinode_is_dir(vparent)) {
 			error = ENOTDIR;
 			goto end;
 		}
-
-		if (strchr(info.remaining, '/')) {
+	} else if ((flags & O_CREAT) == O_CREAT) {
+		/* nothing to be done here */
+	} else {
+		if (!vinode) {
 			error = ENOENT;
 			goto end;
 		}
-	} else if (flags & O_CREAT) {
-		if (info.remaining[0] != 0) {
-			if (!vinode_is_dir(info.vinode)) {
-				error = ENOTDIR;
-				goto end;
-			}
-
-			if (strchr(info.remaining, '/')) {
-				error = ENOENT;
-				goto end;
-			}
-		}
-	} else if (info.remaining[0] != 0) {
-		if (!vinode_is_dir(info.vinode))
-			error = ENOTDIR;
-		else
-			error = ENOENT;
-		goto end;
 	}
 
 	if (is_tmpfile(flags)) {
+		vinode_unref_tx(pfp, vparent);
 		vparent = vinode;
 		vinode = NULL;
-	} else if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
-		vparent = vinode;
-		vinode = NULL;
-	} else if (flags & O_CREAT) {
-		if (info.remaining[0] != 0) {
-			vparent = vinode;
-			vinode = NULL;
-		}
 	}
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (vinode == NULL) {
-			vinode = create_file(pfp, info.remaining,
+			vinode = create_file(pfp, sanitized,
 					orig_pathname, vparent, flags, mode);
 		} else {
 			open_file(orig_pathname, vinode, flags);
@@ -365,8 +361,10 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	} TX_END
 
 end:
-	if (vparent)
-		vinode_unref_tx(pfp, vparent);
+	if (info.vinode)
+		vinode_unref_tx(pfp, info.vinode);
+	if (allocated)
+		free((char *)sanitized);
 
 	if (error) {
 		if (vinode != NULL)
