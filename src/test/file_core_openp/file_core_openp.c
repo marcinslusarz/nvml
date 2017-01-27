@@ -99,7 +99,7 @@ test0(PMEMfilepool *pfp)
 	check_path(pfp, 0, "dir1/dir3/dir4", "/dir1/dir3", "dir4");
 	check_path(pfp, 0, "dir1/not_exists/dir4", "/dir1", "not_exists/dir4");
 
-	check_path(pfp, 0, "dir1/dir3/../", "/", "dir1");
+	check_path(pfp, 0, "dir1/dir3/../", "/dir1/dir3", "../");
 
 	check_path(pfp, 0, "/dir1/../../dir2", "/", "dir2");
 	check_path(pfp, 0, "dir1/../../dir2", "/", "dir2");

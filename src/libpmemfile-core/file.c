@@ -456,41 +456,27 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 
 	at = pool_get_dir_for_path(pfp, dir, path, &at_unref);
 
-	struct pmemfile_path_info info;
-	traverse_path(pfp, at, path, true, &info, flags);
+	struct pmemfile_path_info2 info;
+	resolve_pathat(pfp, at, path, &info, flags);
 
-	struct pmemfile_vinode *parent;
-	const char *name;
-
-	if (info.remaining[0] != 0) {
-		parent = info.vinode;
-		name = info.remaining;
-	} else {
-		parent = info.parent;
-		name = info.name;
-	}
-	vinode_ref(pfp, parent);
+	vinode_ref(pfp, info.vinode);
 
 	PMEMfile *ret = Zalloc(sizeof(*ret));
 	if (!ret)
 		goto end;
 
-	ret->vinode = parent;
+	ret->vinode = info.vinode;
 	ret->flags = PFILE_READ | PFILE_NOATIME;
 	util_mutex_init(&ret->mutex, NULL);
-	size_t len = strlen(name);
+	size_t len = strlen(info.remaining);
 	if (len >= path_size)
 		len = path_size - 1;
-	memmove(path, name, len);
+	memmove(path, info.remaining, len);
 	path[len] = 0;
 
 end:
 	if (info.vinode)
 		vinode_unref_tx(pfp, info.vinode);
-	if (info.parent)
-		vinode_unref_tx(pfp, info.parent);
-	if (info.name)
-		free(info.name);
 	if (at_unref) {
 		int error;
 		if (ret == NULL)
