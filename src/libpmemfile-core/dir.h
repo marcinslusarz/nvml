@@ -52,6 +52,21 @@ void traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, bool get_parent,
 		struct pmemfile_path_info *path_info, int flags);
 
+struct pmemfile_path_info2 {
+	/*
+	 * Vinode of the last reachable component in the path, except for
+	 * the last part.
+	 */
+	struct pmemfile_vinode *vinode;
+	/* Remaining part of the path. */
+	const char *remaining;
+};
+
+void resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+		const char *path, struct pmemfile_path_info2 *path_info,
+		int flags);
+bool sanitize_path(const char *path, const char **sanitized, bool *allocated);
+
 struct pmemfile_vinode *vinode_new_dir(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent, const char *name, mode_t mode,
 		bool add_to_parent, volatile bool *parent_refed);

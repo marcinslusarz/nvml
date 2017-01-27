@@ -862,6 +862,90 @@ traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	_traverse_pathat(pfp, parent, path, get_parent, path_info, flags);
 }
 
+/*
+ * resolve_pathat - traverses directory structure
+ *
+ * Traverses directory structure starting from parent using pathname
+ * components from path, stopping at parent of the last component.
+ * If there's any problem in path resolution path_info->vinode is set to
+ * the deepest inode reachable. If there's no problem in path resolution
+ * path_info->vinode is set to the parent of the last component.
+ * path_info->remaining is set to the part of a path that was not resolved.
+ *
+ * Takes reference on path_info->vinode.
+ */
+void
+resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+		const char *path, struct pmemfile_path_info2 *path_info,
+		int flags)
+{
+	if (path[0] == '/') {
+		while (path[0] == '/')
+			path++;
+		parent = pfp->root;
+	}
+
+	char tmp[PATH_MAX];
+	const char *ending_slash = NULL;
+
+	memset(path_info, 0, sizeof(*path_info));
+
+	size_t off = strlen(path);
+	while (off >= 1 && path[off - 1] == '/') {
+		ending_slash = path + off - 1;
+		off--;
+	}
+
+	parent = vinode_ref(pfp, parent);
+	while (1) {
+		struct pmemfile_vinode *child;
+		const char *slash = strchr(path, '/');
+
+		if (slash == NULL || slash == ending_slash)
+			break;
+
+		strncpy(tmp, path, (uintptr_t)slash - (uintptr_t)path);
+		tmp[slash - path] = 0;
+
+		child = vinode_lookup_dirent(pfp, parent, tmp, flags);
+		if (!child)
+			break;
+
+		vinode_unref_tx(pfp, parent);
+		parent = child;
+		path = slash + 1;
+
+		while (path[0] == '/')
+			path++;
+	}
+
+	path_info->remaining = path;
+	path_info->vinode = parent;
+}
+
+bool
+sanitize_path(const char *path, const char **sanitized, bool *allocated)
+{
+	const char *slash = strchr(path, '/');
+	if (slash) {
+		const char *after_slash = slash + 1;
+
+		while (*after_slash == '/')
+			after_slash++;
+
+		if (*after_slash != 0)
+			return false;
+
+		*sanitized = strndup(path, (uintptr_t)slash - (uintptr_t)path);
+		*allocated = true;
+	} else {
+		*sanitized = path;
+		*allocated = false;
+	}
+
+	return true;
+}
+
 static int
 _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path, mode_t mode)
