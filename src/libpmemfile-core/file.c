@@ -817,50 +817,53 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 	struct pmemfile_vinode *volatile src_unlinked = NULL;
 	volatile bool dst_parent_refed = false;
 	volatile bool src_parent_refed = false;
+	const char *src_sanitized, *dst_sanitized;
+	bool src_allocated = false, dst_allocated = false;
+	struct pmemfile_vinode *src_vinode = NULL, *dst_vinode = NULL;
 
-	struct pmemfile_path_info src, dst;
-	traverse_path(pfp, olddir, oldpath, true, &src, 0);
-	traverse_path(pfp, newdir, newpath, true, &dst, 0);
+	struct pmemfile_path_info2 src, dst;
+	resolve_pathat(pfp, olddir, oldpath, &src, 0);
+	resolve_pathat(pfp, newdir, newpath, &dst, 0);
 
 	int error = 0;
 
-	if (src.remaining[0] != 0 && !vinode_is_dir(src.vinode)) {
+	if (!vinode_is_dir(src.vinode)) {
 		error = ENOTDIR;
 		goto end;
 	}
 
-	if (dst.remaining[0] != 0 && !vinode_is_dir(dst.vinode)) {
+	if (!vinode_is_dir(dst.vinode)) {
 		error = ENOTDIR;
 		goto end;
 	}
 
-	if (src.remaining[0] != 0 || strchr(dst.remaining, '/')) {
+	if (!sanitize_path(src.remaining, &src_sanitized, &src_allocated)) {
 		error = ENOENT;
 		goto end;
 	}
 
-	struct pmemfile_vinode *src_parent;
-	struct pmemfile_vinode *dst_parent;
-	bool src_is_dir;
-	const char *src_name;
-	const char *dst_name;
-
-	src_parent = src.parent;
-	src_name = src.name;
-	src_is_dir = vinode_is_dir(src.vinode);
-
-	if (src_is_dir) {
-		LOG(LSUP, "renaming directories is not supported yet");
-		error = ENOTSUP;
+	if (!sanitize_path(dst.remaining, &dst_sanitized, &dst_allocated)) {
+		error = ENOENT;
 		goto end;
 	}
 
-	if (dst.remaining[0] == 0) {
-		dst_parent = dst.parent;
-		dst_name = dst.name;
-	} else {
-		dst_parent = dst.vinode;
-		dst_name = dst.remaining;
+	src_vinode = vinode_lookup_dirent(pfp, src.vinode, src_sanitized, 0);
+	if (!src_vinode) {
+		error = ENOENT;
+		goto end;
+	}
+
+	dst_vinode = vinode_lookup_dirent(pfp, dst.vinode, dst_sanitized, 0);
+
+	struct pmemfile_vinode *src_parent = src.vinode;
+	struct pmemfile_vinode *dst_parent = dst.vinode;
+	const char *src_name = src_sanitized;
+	const char *dst_name = dst_sanitized;
+
+	if (vinode_is_dir(src_vinode)) {
+		LOG(LSUP, "renaming directories is not supported yet");
+		error = ENOTSUP;
+		goto end;
 	}
 
 	if (src_parent == dst_parent)
@@ -882,12 +885,13 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 
 		struct pmemfile_time t;
 		file_get_time(&t);
-		vinode_add_dirent(pfp, dst_parent, dst_name, src.vinode, &t);
+		vinode_add_dirent(pfp, dst_parent, dst_name, src_vinode, &t);
 
 		vinode_unlink_dirent(pfp, src_parent, src_name,
 				&src_unlinked, &src_parent_refed, true);
 
-		if (src_unlinked != src.vinode) // XXX restart?
+		if (src_unlinked != src_vinode)
+			// XXX restart? lookups under lock?
 			pmemobj_tx_abort(ENOENT);
 
 	} TX_ONABORT {
@@ -914,21 +918,22 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 		vinode_unref_tx(pfp, src_unlinked);
 
 	if (error == 0) {
-		vinode_clear_debug_path(pfp, src.vinode);
-		vinode_set_debug_path(pfp, dst.vinode, src.vinode, newpath);
+		vinode_clear_debug_path(pfp, src_vinode);
+		vinode_set_debug_path(pfp, dst.vinode, src_vinode, newpath);
 	}
 
 end:
 	vinode_unref_tx(pfp, dst.vinode);
 	vinode_unref_tx(pfp, src.vinode);
-	if (dst.parent)
-		vinode_unref_tx(pfp, dst.parent);
-	if (src.parent)
-		vinode_unref_tx(pfp, src.parent);
-	if (src.name)
-		free(src.name);
-	if (dst.name)
-		free(dst.name);
+
+	if (dst_vinode)
+		vinode_unref_tx(pfp, dst_vinode);
+	if (src_vinode)
+		vinode_unref_tx(pfp, src_vinode);
+	if (dst_allocated)
+		free((char *)dst_sanitized);
+	if (src_allocated)
+		free((char *)src_sanitized);
 
 	if (error) {
 		if (dst_parent_refed)
