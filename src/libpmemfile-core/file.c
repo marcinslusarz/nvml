@@ -1139,40 +1139,59 @@ static ssize_t
 _pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *pathname, char *buf, size_t bufsiz)
 {
+	int error = 0;
 	ssize_t ret;
-	struct pmemfile_path_info info;
-	traverse_path(pfp, dir, pathname, false, &info, 0);
+	struct pmemfile_vinode *vinode = NULL;
+	struct pmemfile_path_info2 info;
+	resolve_pathat(pfp, dir, pathname, &info, 0);
 
-	if (info.remaining[0] != 0) {
-		if (vinode_is_dir(info.vinode))
-			errno = ENOENT;
-		else
-			errno = ENOTDIR;
-
-		ret = -1;
+	const char *sanitized;
+	bool allocated = false;
+	if (!vinode_is_dir(info.vinode)) {
+		error = ENOTDIR;
 		goto end;
 	}
 
-	if (!vinode_is_symlink(info.vinode)) {
-		errno = EINVAL;
-		ret = -1;
+	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+		error = ENOENT;
 		goto end;
 	}
 
-	util_rwlock_rdlock(&info.vinode->rwlock);
+	vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+	if (!vinode) {
+		error = ENOENT;
+		goto end;
+	}
 
-	const struct pmemfile_inode *inode = D_RO(info.vinode->inode);
+	if (!vinode_is_symlink(vinode)) {
+		error = EINVAL;
+		goto end;
+	}
+
+	util_rwlock_rdlock(&vinode->rwlock);
+
+	const struct pmemfile_inode *inode = D_RO(vinode->inode);
 	size_t len = strlen(inode->file_data.data);
 	if (len > bufsiz)
 		len = bufsiz;
 	memcpy(buf, inode->file_data.data, len);
 	ret = (ssize_t)len;
 
-	util_rwlock_unlock(&info.vinode->rwlock);
+	util_rwlock_unlock(&vinode->rwlock);
 
 end:
+	if (vinode)
+		vinode_unref_tx(pfp, vinode);
 	if (info.vinode)
 		vinode_unref_tx(pfp, info.vinode);
+	if (allocated)
+		free((char *)sanitized);
+
+	if (error) {
+		errno = error;
+		return -1;
+	}
+
 	return ret;
 }
 
