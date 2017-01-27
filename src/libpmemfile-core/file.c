@@ -264,7 +264,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	int error = 0;
 	PMEMfile *file = NULL;
 
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	bool allocated = false;
 	const char *sanitized;
 	struct pmemfile_vinode *volatile vinode = NULL;
@@ -456,7 +456,7 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 
 	at = pool_get_dir_for_path(pfp, dir, path, &at_unref);
 
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	resolve_pathat(pfp, at, path, &info, flags);
 
 	vinode_ref(pfp, info.vinode);
@@ -530,7 +530,7 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		return -1;
 	}
 
-	struct pmemfile_path_info2 src, dst;
+	struct pmemfile_path_info src, dst;
 	const char *src_sanitized, *dst_sanitized;
 	bool src_allocated = false, dst_allocated = false;
 	struct pmemfile_vinode *src_vinode = NULL, *dst_vinode = NULL;
@@ -688,7 +688,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	int error = 0;
 
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, pathname, &info, 0);
 	struct pmemfile_vinode *vparent = info.vinode;
 	struct pmemfile_vinode *volatile vinode = NULL;
@@ -807,7 +807,7 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 	bool src_allocated = false, dst_allocated = false;
 	struct pmemfile_vinode *src_vinode = NULL, *dst_vinode = NULL;
 
-	struct pmemfile_path_info2 src, dst;
+	struct pmemfile_path_info src, dst;
 	resolve_pathat(pfp, olddir, oldpath, &src, 0);
 	resolve_pathat(pfp, newdir, newpath, &dst, 0);
 
@@ -1015,7 +1015,7 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 
 	int error = 0;
 
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, linkpath, &info, 0);
 	struct pmemfile_vinode *vinode = NULL;
 
@@ -1128,7 +1128,7 @@ _pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	int error = 0;
 	ssize_t ret;
 	struct pmemfile_vinode *vinode = NULL;
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, pathname, &info, 0);
 
 	const char *sanitized;

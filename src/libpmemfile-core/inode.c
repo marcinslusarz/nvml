@@ -686,7 +686,7 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	LOG(LDBG, "path %s", path);
 
 	int error = 0;
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, path, &info, 0);
 
 	const char *sanitized;

@@ -35,24 +35,6 @@
 #include "inode.h"
 
 struct pmemfile_path_info {
-	/* Vinode of the last reachable component in the path. */
-	struct pmemfile_vinode *vinode;
-	/* Remaining part of the path that was not reachable. */
-	const char *remaining;
-
-	/* Parent of the found vinode. */
-	struct pmemfile_vinode *parent;
-	/* Name of the found file. Valid only when remaining[0] == 0. */
-	char *name;
-
-	bool last_is_dot;
-};
-
-void traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *path, bool get_parent,
-		struct pmemfile_path_info *path_info, int flags);
-
-struct pmemfile_path_info2 {
 	/*
 	 * Vinode of the last reachable component in the path, except for
 	 * the last part.
@@ -63,7 +45,7 @@ struct pmemfile_path_info2 {
 };
 
 void resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *path, struct pmemfile_path_info2 *path_info,
+		const char *path, struct pmemfile_path_info *path_info,
 		int flags);
 bool sanitize_path(const char *path, const char **sanitized, bool *allocated);
 

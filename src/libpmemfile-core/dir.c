@@ -709,161 +709,6 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 	return bytes_read;
 }
 
-static void
-get_parent_info(PMEMfilepool *pfp, struct pmemfile_vinode *parent_tree[2],
-		struct pmemfile_path_info *path_info)
-{
-	struct pmemfile_vinode *parent;
-
-	if (vinode_is_dir(parent_tree[0]))
-		parent = parent_tree[0]->parent;
-	else
-		parent = parent_tree[1];
-	path_info->parent = vinode_ref(pfp, parent);
-
-	util_rwlock_rdlock(&parent->rwlock);
-
-	struct pmemfile_dirent *dirent =
-		vinode_lookup_dirent_by_vinode_locked(pfp, parent,
-				parent_tree[0]);
-
-	path_info->name = strdup(dirent->name);
-
-	util_rwlock_unlock(&parent->rwlock);
-}
-
-static void
-_handle_last_component(PMEMfilepool *pfp,
-		const char *path,
-		struct pmemfile_vinode *parent_tree[2],
-		const char *lookup_path,
-		bool get_parent,
-		struct pmemfile_path_info *path_info,
-		int flags)
-{
-	struct pmemfile_vinode *child =
-		vinode_lookup_dirent(pfp, parent_tree[0], lookup_path, flags);
-	if (child) {
-		if (get_parent) {
-			if (strcmp(lookup_path, ".") == 0) {
-				get_parent_info(pfp, parent_tree, path_info);
-				vinode_unref_tx(pfp, parent_tree[0]);
-				path_info->last_is_dot = true;
-			} else if (strcmp(lookup_path, "..") == 0) {
-				struct pmemfile_vinode *parent_tree2[2] =
-					{ parent_tree[0]->parent, NULL };
-				get_parent_info(pfp, parent_tree2, path_info);
-				vinode_unref_tx(pfp, parent_tree[0]);
-			} else {
-				path_info->parent = parent_tree[0];
-				path_info->name = strdup(path);
-			}
-		} else
-			vinode_unref_tx(pfp, parent_tree[0]);
-
-		while (path[0])
-			path++;
-
-		path_info->vinode = child;
-	} else {
-		if (get_parent)
-			get_parent_info(pfp, parent_tree, path_info);
-
-		path_info->vinode = parent_tree[0];
-	}
-
-	path_info->remaining = path;
-}
-
-/*
- * traverse_pathat - traverses directory structure
- *
- * Traverses directory structure starting from parent using pathname
- * components from path.
- * Returns the deepest inode reachable and sets *name to the remaining path
- * that was unreachable.
- *
- * Takes reference on returned inode.
- */
-static void
-_traverse_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *path, bool get_parent,
-		struct pmemfile_path_info *path_info, int flags)
-{
-	char tmp[PATH_MAX];
-
-	memset(path_info, 0, sizeof(*path_info));
-	struct pmemfile_vinode *parent_tree[2];
-	parent_tree[0] = vinode_ref(pfp, parent);
-	parent_tree[1] = vinode_ref(pfp, parent);
-
-	while (1) {
-		struct pmemfile_vinode *child;
-		const char *lookup_path = path;
-		const char *slash = strchr(lookup_path, '/');
-
-		if (slash) {
-			/* handle paths ending with / */
-			const char *it = slash;
-			while (*it == '/')
-				it++;
-
-			if (*it == 0) {
-				strncpy(tmp, path,
-					(uintptr_t)slash - (uintptr_t)path);
-				tmp[slash - path] = 0;
-				lookup_path = tmp;
-				slash = NULL;
-			}
-		}
-
-		if (slash == NULL) {
-			_handle_last_component(pfp, path, parent_tree,
-					lookup_path, get_parent, path_info,
-					flags);
-			vinode_unref_tx(pfp, parent_tree[1]);
-			break;
-		}
-
-		strncpy(tmp, path, (uintptr_t)slash - (uintptr_t)path);
-		tmp[slash - path] = 0;
-
-		child = vinode_lookup_dirent(pfp, parent_tree[0], tmp, flags);
-		if (!child) {
-			if (get_parent)
-				get_parent_info(pfp, parent_tree, path_info);
-
-			path_info->remaining = path;
-			path_info->vinode = parent_tree[0];
-			vinode_unref_tx(pfp, parent_tree[1]);
-			break;
-		}
-
-		vinode_unref_tx(pfp, parent_tree[1]);
-		parent_tree[1] = parent_tree[0];
-		parent_tree[0] = child;
-		path = slash + 1;
-
-		while (path[0] == '/')
-			path++;
-	}
-}
-
-void
-traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *path, bool get_parent,
-		struct pmemfile_path_info *path_info,
-		int flags)
-{
-	if (path[0] == '/') {
-		while (path[0] == '/')
-			path++;
-		parent = pfp->root;
-	}
-
-	_traverse_pathat(pfp, parent, path, get_parent, path_info, flags);
-}
-
 /*
  * resolve_pathat - traverses directory structure
  *
@@ -878,7 +723,7 @@ traverse_path(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
  */
 void
 resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *path, struct pmemfile_path_info2 *path_info,
+		const char *path, struct pmemfile_path_info *path_info,
 		int flags)
 {
 	if (path[0] == '/') {
@@ -952,7 +797,7 @@ static int
 _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path, mode_t mode)
 {
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, path, &info, 0);
 
 	struct pmemfile_vinode *parent = info.vinode;
@@ -1060,7 +905,7 @@ int
 _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path)
 {
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, path, &info, 0);
 
 	struct pmemfile_vinode *vparent = info.vinode;
@@ -1272,7 +1117,7 @@ _pmemfile_chdir(PMEMfilepool *pfp, struct pmemfile_vinode *dir)
 int
 pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 {
-	struct pmemfile_path_info2 info;
+	struct pmemfile_path_info info;
 	struct pmemfile_vinode *at;
 	int ret = -1;
 	int error = 0;
