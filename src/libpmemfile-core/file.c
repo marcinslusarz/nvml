@@ -531,7 +531,7 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 	struct pmemfile_path_info src, dst;
 	const char *src_sanitized, *dst_sanitized;
 	bool src_allocated = false, dst_allocated = false;
-	struct pmemfile_vinode *src_vinode = NULL, *dst_vinode = NULL;
+	struct pmemfile_vinode *src_vinode = NULL;
 
 	resolve_pathat(pfp, olddir, oldpath, &src, 0);
 	resolve_pathat(pfp, newdir, newpath, &dst, 0);
@@ -595,8 +595,6 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 end:
 	vinode_unref_tx(pfp, dst.vinode);
 	vinode_unref_tx(pfp, src.vinode);
-	if (dst_vinode)
-		vinode_unref_tx(pfp, dst_vinode);
 	if (src_vinode)
 		vinode_unref_tx(pfp, src_vinode);
 	if (dst_allocated)
