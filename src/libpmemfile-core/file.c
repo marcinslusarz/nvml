@@ -1134,7 +1134,7 @@ _pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *pathname, char *buf, size_t bufsiz)
 {
 	int error = 0;
-	ssize_t ret;
+	ssize_t ret = -1;
 	struct pmemfile_vinode *vinode = NULL;
 	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, pathname, &info, 0);
