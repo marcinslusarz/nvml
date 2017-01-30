@@ -132,8 +132,8 @@ test_open_create_close(PMEMfilepool *pfp)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 1, 0, "aaa"},
-	    {0100666, 1, 0, "bbb"},
+	    {0100777, 1, 0, "aaa"},
+	    {0100777, 1, 0, "bbb"},
 	    {}});
 
 	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
@@ -163,8 +163,8 @@ test_open_close(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 1, 0, "aaa"},
-	    {0100666, 1, 0, "bbb"},
+	    {0100777, 1, 0, "aaa"},
+	    {0100777, 1, 0, "bbb"},
 	    {}});
 
 	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
@@ -187,8 +187,8 @@ test_link(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 1, 0, "aaa"},
-	    {0100666, 1, 0, "bbb"},
+	    {0100777, 1, 0, "aaa"},
+	    {0100777, 1, 0, "bbb"},
 	    {}});
 
 	/* successful link */
@@ -197,9 +197,9 @@ test_link(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 2, 0, "aaa"},
-	    {0100666, 1, 0, "bbb"},
-	    {0100666, 2, 0, "aaa.link"},
+	    {0100777, 2, 0, "aaa"},
+	    {0100777, 1, 0, "bbb"},
+	    {0100777, 2, 0, "aaa.link"},
 	    {}});
 
 	/* destination already exists */
@@ -211,9 +211,9 @@ test_link(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 2, 0, "aaa"},
-	    {0100666, 1, 0, "bbb"},
-	    {0100666, 2, 0, "aaa.link"},
+	    {0100777, 2, 0, "aaa"},
+	    {0100777, 1, 0, "bbb"},
+	    {0100777, 2, 0, "aaa.link"},
 	    {}});
 
 	/* source does not exist */
@@ -225,9 +225,9 @@ test_link(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 2, 0, "aaa"},
-	    {0100666, 1, 0, "bbb"},
-	    {0100666, 2, 0, "aaa.link"},
+	    {0100777, 2, 0, "aaa"},
+	    {0100777, 1, 0, "bbb"},
+	    {0100777, 2, 0, "aaa.link"},
 	    {}});
 
 	/* successful link from link */
@@ -236,10 +236,10 @@ test_link(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 3, 0, "aaa"},
-	    {0100666, 1, 0, "bbb"},
-	    {0100666, 3, 0, "aaa.link"},
-	    {0100666, 3, 0, "aaa2.link"},
+	    {0100777, 3, 0, "aaa"},
+	    {0100777, 1, 0, "bbb"},
+	    {0100777, 3, 0, "aaa.link"},
+	    {0100777, 3, 0, "aaa2.link"},
 	    {}});
 
 	/* another successful link */
@@ -248,11 +248,11 @@ test_link(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 3, 0, "aaa"},
-	    {0100666, 2, 0, "bbb"},
-	    {0100666, 3, 0, "aaa.link"},
-	    {0100666, 3, 0, "aaa2.link"},
-	    {0100666, 2, 0, "bbb2.link"},
+	    {0100777, 3, 0, "aaa"},
+	    {0100777, 2, 0, "bbb"},
+	    {0100777, 3, 0, "aaa.link"},
+	    {0100777, 3, 0, "aaa2.link"},
+	    {0100777, 2, 0, "bbb2.link"},
 	    {}});
 
 	PMEMFILE_MKDIR(pfp, "/dir", 0777);
@@ -303,11 +303,11 @@ test_link(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 3, 0, "aaa"},
-	    {0100666, 2, 0, "bbb"},
-	    {0100666, 3, 0, "aaa.link"},
-	    {0100666, 3, 0, "aaa2.link"},
-	    {0100666, 2, 0, "bbb2.link"},
+	    {0100777, 3, 0, "aaa"},
+	    {0100777, 2, 0, "bbb"},
+	    {0100777, 3, 0, "aaa.link"},
+	    {0100777, 3, 0, "aaa2.link"},
+	    {0100777, 2, 0, "bbb2.link"},
 	    {}});
 
 	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
@@ -387,9 +387,9 @@ test_unlink(const char *path)
 	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
 	    {040777, 2, 4008, "."},
 	    {040777, 2, 4008, ".."},
-	    {0100666, 3, 0, "aaa"},
-	    {0100666, 3, 0, "aaa.link"},
-	    {0100666, 3, 0, "aaa2.link"},
+	    {0100777, 3, 0, "aaa"},
+	    {0100777, 3, 0, "aaa.link"},
+	    {0100777, 3, 0, "aaa2.link"},
 	    {}});
 
 	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {

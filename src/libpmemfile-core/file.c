@@ -251,13 +251,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		LOG(LDBG, "mode %o", mode);
 		mode &= S_IRWXU | S_IRWXG | S_IRWXO |
 				S_ISUID | S_ISGID | S_ISVTX;
-
-		// XXX: remove this, there's no reason files can't have
-		// executable flags
-		if (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
-			LOG(LSUP, "execute bits are not supported");
-			mode = mode & ~(mode_t)(S_IXUSR | S_IXGRP | S_IXOTH);
-		}
 	}
 	va_end(ap);
 

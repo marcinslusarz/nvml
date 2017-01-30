@@ -490,17 +490,17 @@ test6(PMEMfilepool *pfp)
 	    {040777, 4, 32680, ".."},
 	    {040755, 2, 4008, "dir1"},
 	    {040755, 2, 4008, "dir2"},
-	    {0100644, 1, 0, "file3"},
+	    {0100755, 1, 0, "file3"},
 	    {}});
 	PMEMFILE_LIST_FILES(pfp, "/dir1", (const struct pmemfile_ls[]) {
 	    {040755, 2, 4008, "."},
 	    {040777, 4, 32680, ".."},
-	    {0100644, 1, 0, "file1"},
+	    {0100755, 1, 0, "file1"},
 	    {}});
 	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
 	    {040755, 2, 4008, "."},
 	    {040777, 4, 32680, ".."},
-	    {0100644, 1, 0, "file2"},
+	    {0100755, 1, 0, "file2"},
 	    {}});
 
 	PMEMFILE_RENAME(pfp, "/file3", "/file4");
@@ -509,19 +509,19 @@ test6(PMEMfilepool *pfp)
 	    {040777, 4, 32680, ".."},
 	    {040755, 2, 4008, "dir1"},
 	    {040755, 2, 4008, "dir2"},
-	    {0100644, 1, 0, "file4"},
+	    {0100755, 1, 0, "file4"},
 	    {}});
 	PMEMFILE_RENAME(pfp, "/dir1/file1", "/dir1/file11");
 	PMEMFILE_LIST_FILES(pfp, "/dir1", (const struct pmemfile_ls[]) {
 	    {040755, 2, 4008, "."},
 	    {040777, 4, 32680, ".."},
-	    {0100644, 1, 0, "file11"},
+	    {0100755, 1, 0, "file11"},
 	    {}});
 	PMEMFILE_RENAME(pfp, "/dir2/file2", "/dir2/file22");
 	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
 	    {040755, 2, 4008, "."},
 	    {040777, 4, 32680, ".."},
-	    {0100644, 1, 0, "file22"},
+	    {0100755, 1, 0, "file22"},
 	    {}});
 
 	PMEMFILE_RENAME(pfp, "/file4", "/dir2/file4");
@@ -534,8 +534,8 @@ test6(PMEMfilepool *pfp)
 	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
 	    {040755, 2, 4008, "."},
 	    {040777, 4, 32680, ".."},
-	    {0100644, 1, 0, "file4"},
-	    {0100644, 1, 0, "file22"},
+	    {0100755, 1, 0, "file4"},
+	    {0100755, 1, 0, "file22"},
 	    {}});
 	PMEMFILE_RENAME(pfp, "/dir1/file11", "/dir2/file11");
 	PMEMFILE_LIST_FILES(pfp, "/dir1", (const struct pmemfile_ls[]) {
@@ -545,16 +545,16 @@ test6(PMEMfilepool *pfp)
 	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
 	    {040755, 2, 4008, "."},
 	    {040777, 4, 32680, ".."},
-	    {0100644, 1, 0, "file4"},
-	    {0100644, 1, 0, "file22"},
-	    {0100644, 1, 0, "file11"},
+	    {0100755, 1, 0, "file4"},
+	    {0100755, 1, 0, "file22"},
+	    {0100755, 1, 0, "file11"},
 	    {}});
 	PMEMFILE_RENAME(pfp, "/dir2/file11", "/dir2/file22");
 	PMEMFILE_LIST_FILES(pfp, "/dir2", (const struct pmemfile_ls[]) {
 	    {040755, 2, 4008, "."},
 	    {040777, 4, 32680, ".."},
-	    {0100644, 1, 0, "file4"},
-	    {0100644, 1, 0, "file22"},
+	    {0100755, 1, 0, "file4"},
+	    {0100755, 1, 0, "file22"},
 	    {}});
 
 	PMEMFILE_UNLINK(pfp, "/dir2/file22");
