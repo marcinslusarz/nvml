@@ -47,7 +47,6 @@ create_pool(const char *path)
 	return pfp;
 }
 
-#if 0
 static PMEMfilepool *
 open_pool(const char *path)
 {
@@ -56,7 +55,6 @@ open_pool(const char *path)
 		UT_FATAL("!pmemfile_pool_open %s", path);
 	return pfp;
 }
-#endif
 
 static void
 test0(PMEMfilepool *pfp)
@@ -186,6 +184,162 @@ test0(PMEMfilepool *pfp)
 	pmemfile_pool_close(pfp);
 }
 
+static void
+test_symlink_valid(PMEMfilepool *pfp, const char *path)
+{
+	char buf[4096];
+
+	memset(buf, 0, sizeof(buf));
+	PMEMfile *file = PMEMFILE_OPEN(pfp, path, O_RDONLY);
+	PMEMFILE_READ(pfp, file, buf, sizeof(buf), 7);
+	PMEMFILE_CLOSE(pfp, file);
+	UT_ASSERTeq(memcmp(buf, "qwerty\n", 7), 0);
+}
+
+static void
+test_symlink_to_dir_valid(PMEMfilepool *pfp, const char *path)
+{
+	char buf[1];
+	PMEMfile *file = pmemfile_open(pfp, path, O_RDONLY | O_NOFOLLOW);
+	UT_ASSERTeq(file, NULL);
+	UT_ASSERTeq(errno, ELOOP);
+
+	file = PMEMFILE_OPEN(pfp, path, O_RDONLY | O_NOFOLLOW | O_PATH);
+	PMEMFILE_READ(pfp, file, buf, sizeof(buf), -1, EBADF);
+	PMEMFILE_CLOSE(pfp, file);
+}
+
+static void
+test_symlink_invalid(PMEMfilepool *pfp, const char *path)
+{
+	PMEMfile *file = pmemfile_open(pfp, path, O_RDONLY);
+	UT_ASSERTeq(file, NULL);
+	UT_ASSERTeq(errno, ENOENT);
+}
+
+static void
+test1(PMEMfilepool *pfp)
+{
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0755);
+	PMEMFILE_MKDIR(pfp, "/dir1/internal_dir", 0755);
+	PMEMFILE_MKDIR(pfp, "/dir2", 0755);
+
+	PMEMFILE_SYMLINK(pfp, "/dir1/internal_dir", "/dir2/symlink_dir1");
+	PMEMFILE_SYMLINK(pfp, "../dir1/internal_dir", "/dir2/symlink_dir2");
+
+	PMEMFILE_SYMLINK(pfp, "/dir1/not_existing_dir", "/dir2/symlink_dir3");
+	PMEMFILE_SYMLINK(pfp, "../not_existing_dir", "/dir2/symlink_dir4");
+
+	PMEMFILE_SYMLINK(pfp, "/dir2/symlink_dir1", "/symlink_to_symlink_dir");
+
+	PMEMFILE_SYMLINK(pfp, "/dir1", "/dir2/symlink_dir1/dir1");
+	PMEMFILE_SYMLINK(pfp, "/dir1/", "/dir2/symlink_dir1/dir1slash");
+
+	PMEMfile *file = PMEMFILE_OPEN(pfp, "/dir1/internal_dir/file",
+			O_CREAT | O_WRONLY, 0644);
+	PMEMFILE_WRITE(pfp, file, "qwerty\n", 7, 7);
+	PMEMFILE_CLOSE(pfp, file);
+
+	test_symlink_valid(pfp, "/dir2/symlink_dir1/file");
+	test_symlink_valid(pfp, "/dir2/symlink_dir2/file");
+	test_symlink_valid(pfp, "/symlink_to_symlink_dir/file");
+
+	test_symlink_to_dir_valid(pfp, "/dir2/symlink_dir1/dir1");
+	test_symlink_to_dir_valid(pfp, "/dir2/symlink_dir1/dir1slash");
+
+	test_symlink_invalid(pfp, "/dir2/symlink_dir3/file");
+	test_symlink_invalid(pfp, "/dir2/symlink_dir4/file");
+
+	PMEMFILE_UNLINK(pfp, "/symlink_to_symlink_dir");
+	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir1/dir1");
+	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir1/dir1slash");
+	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir4");
+	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir3");
+	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir2");
+	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir1");
+	PMEMFILE_UNLINK(pfp, "/dir1/internal_dir/file");
+	PMEMFILE_RMDIR(pfp, "/dir2");
+	PMEMFILE_RMDIR(pfp, "/dir1/internal_dir");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+		    {040777, 2, 4008, "."},
+		    {040777, 2, 4008, ".."},
+		    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	pmemfile_pool_close(pfp);
+}
+
+static void
+test2(PMEMfilepool *pfp)
+{
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
+
+	PMEMfile *file = PMEMFILE_OPEN(pfp, "/file1", O_CREAT | O_WRONLY, 0644);
+	PMEMFILE_WRITE(pfp, file, "qwerty\n", 7, 7);
+	PMEMFILE_CLOSE(pfp, file);
+
+	PMEMFILE_MKDIR(pfp, "/dir", 0755);
+
+	PMEMFILE_SYMLINK(pfp, "/file1", "/dir/sym1-exists");
+	PMEMFILE_SYMLINK(pfp, "/file2", "/dir/sym2-not_exists");
+	PMEMFILE_SYMLINK(pfp, "../file1", "/dir/sym3-exists-relative");
+	PMEMFILE_SYMLINK(pfp, "../file2", "/dir/sym4-not_exists-relative");
+
+	char buf[4096];
+
+	memset(buf, 0, sizeof(buf));
+	file = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
+	PMEMFILE_READ(pfp, file, buf, sizeof(buf), 7);
+	PMEMFILE_CLOSE(pfp, file);
+	UT_ASSERTeq(memcmp(buf, "qwerty\n", 7), 0);
+
+	test_symlink_valid(pfp, "/dir/sym1-exists");
+	test_symlink_invalid(pfp, "/dir/sym2-not_exists");
+
+	test_symlink_valid(pfp, "/dir/sym3-exists-relative");
+	test_symlink_invalid(pfp, "/dir/sym4-not_exists-relative");
+
+	PMEMFILE_UNLINK(pfp, "/dir/sym1-exists");
+	PMEMFILE_UNLINK(pfp, "/dir/sym2-not_exists");
+	PMEMFILE_UNLINK(pfp, "/dir/sym3-exists-relative");
+	PMEMFILE_UNLINK(pfp, "/dir/sym4-not_exists-relative");
+	PMEMFILE_UNLINK(pfp, "/file1");
+	PMEMFILE_RMDIR(pfp, "/dir");
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	pmemfile_pool_close(pfp);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -197,6 +351,8 @@ main(int argc, char *argv[])
 	const char *path = argv[1];
 
 	test0(create_pool(path));
+	test1(open_pool(path));
+	test2(open_pool(path));
 
 	DONE(NULL);
 }
