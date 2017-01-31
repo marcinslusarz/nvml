@@ -735,22 +735,10 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 	return bytes_read;
 }
 
-/*
- * resolve_pathat - traverses directory structure
- *
- * Traverses directory structure starting from parent using pathname
- * components from path, stopping at parent of the last component.
- * If there's any problem in path resolution path_info->vinode is set to
- * the deepest inode reachable. If there's no problem in path resolution
- * path_info->vinode is set to the parent of the last component.
- * path_info->remaining is set to the part of a path that was not resolved.
- *
- * Takes reference on path_info->vinode.
- */
-void
-resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+static void
+resolve_pathat_nested(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, struct pmemfile_path_info *path_info,
-		int flags)
+		int flags, int nest_level)
 {
 	if (path[0] == '/') {
 		while (path[0] == '/')
@@ -791,6 +779,26 @@ resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	path_info->remaining = path;
 	path_info->vinode = parent;
+}
+
+/*
+ * resolve_pathat - traverses directory structure
+ *
+ * Traverses directory structure starting from parent using pathname
+ * components from path, stopping at parent of the last component.
+ * If there's any problem in path resolution path_info->vinode is set to
+ * the deepest inode reachable. If there's no problem in path resolution
+ * path_info->vinode is set to the parent of the last component.
+ * path_info->remaining is set to the part of a path that was not resolved.
+ *
+ * Takes reference on path_info->vinode.
+ */
+void
+resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+		const char *path, struct pmemfile_path_info *path_info,
+		int flags)
+{
+	resolve_pathat_nested(pfp, parent, path, path_info, flags, 0);
 }
 
 bool
