@@ -125,7 +125,8 @@ struct pmemfile_vinode *inode_ref(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		struct pmemfile_vinode *parent,
 		volatile bool *parent_refed,
-		const char *name);
+		const char *name,
+		size_t namelen);
 
 struct pmemfile_vinode *inode_ref_new(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,

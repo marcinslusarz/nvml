@@ -62,7 +62,8 @@ void vinode_add_dirent(PMEMfilepool *pfp,
 void vinode_set_debug_path_locked(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		struct pmemfile_vinode *child_vinode,
-		const char *name);
+		const char *name,
+		size_t namelen);
 
 void vinode_set_debug_path(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,

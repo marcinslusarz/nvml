@@ -246,7 +246,7 @@ static struct pmemfile_vinode *
 _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode,
 		bool is_new, struct pmemfile_vinode *parent,
 		volatile bool *parent_refed,
-		const char *name)
+		const char *name, size_t namelen)
 {
 	struct pmemfile_inode_map *c = pfp->inode_map;
 	int tx = 0;
@@ -334,8 +334,9 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode,
 			*parent_refed = true;
 	}
 
-	if (parent && name)
-		vinode_set_debug_path_locked(pfp, parent, vinode, name);
+	if (parent && name && namelen)
+		vinode_set_debug_path_locked(pfp, parent, vinode, name,
+				namelen);
 
 	b->arr[empty_slot].pinode = inode;
 	b->arr[empty_slot].vinode = vinode;
@@ -369,7 +370,8 @@ inode_ref_new(PMEMfilepool *pfp,
 		volatile bool *parent_refed,
 		const char *name)
 {
-	return _inode_get(pfp, inode, true, parent, parent_refed, name);
+	return _inode_get(pfp, inode, true, parent, parent_refed, name,
+			strlen(name));
 }
 
 /*
@@ -383,9 +385,11 @@ inode_ref(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		struct pmemfile_vinode *parent,
 		volatile bool *parent_refed,
-		const char *name)
+		const char *name,
+		size_t namelen)
 {
-	return _inode_get(pfp, inode, false, parent, parent_refed, name);
+	return _inode_get(pfp, inode, false, parent, parent_refed, name,
+			namelen);
 }
 
 /*

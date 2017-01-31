@@ -60,7 +60,7 @@ initialize_super_block(PMEMfilepool *pfp)
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (!TOID_IS_NULL(super->root_inode)) {
 			pfp->root = inode_ref(pfp, super->root_inode, NULL,
-					NULL, NULL);
+					NULL, NULL, 0);
 		} else {
 			pfp->root = vinode_new_dir(pfp, NULL, "/", 0777, false,
 					NULL);
