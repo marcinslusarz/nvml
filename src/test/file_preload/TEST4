@@ -43,8 +43,6 @@ require_fs_type any
 
 setup
 
-rm -f a.dump b.dump
-
 mkdir -p $DIR/dummy_mount_point
 mkdir -p $DIR/some_dir
 ln -s ../dummy_mount_point $DIR/some_dir/some_link

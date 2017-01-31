@@ -64,11 +64,11 @@ expect_normal_exit ./dummy_prog$EXESUFFIX \
 	$DIR \
 	dummy_mount_point/b \
 	dummy_mount_point \
-	b > root_dir.log
+	b > $DIR/root_dir.log
 
-LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /a > a.dump
+LD_LIBRARY_PATH=../../debug ../tools/pmemfile-cat/pmemfile-cat $DIR/dummy_fs /a > $DIR/a.dump
 
-cmp a.dump a.expected_dump
-cmp root_dir.log root_dir.expected_log
+cmp $DIR/a.dump a.expected_dump
+cmp $DIR/root_dir.log root_dir.expected_log
 
 pass
