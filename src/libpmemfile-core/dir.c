@@ -445,9 +445,10 @@ vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
  * returns !0 on successful translation
  */
 static int
-file_seek_dir(PMEMfile *file, struct pmemfile_inode *inode,
-		struct pmemfile_dir **dir, unsigned *dirent)
+file_seek_dir(PMEMfile *file, struct pmemfile_dir **dir, unsigned *dirent)
 {
+	struct pmemfile_inode *inode = D_RW(file->vinode->inode);
+
 	if (file->offset == 0) {
 		*dir = &inode->file_data.dir;
 	} else if (DIR_ID(file->offset) == file->dir_pos.dir_id) {
@@ -487,13 +488,13 @@ file_seek_dir(PMEMfile *file, struct pmemfile_inode *inode,
 }
 
 static int
-file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
-		struct linux_dirent *dirp, unsigned count)
+file_getdents(PMEMfilepool *pfp, PMEMfile *file, struct linux_dirent *dirp,
+		unsigned count)
 {
 	struct pmemfile_dir *dir;
 	unsigned dirent_id;
 
-	if (file_seek_dir(file, inode, &dir, &dirent_id) == 0)
+	if (file_seek_dir(file, &dir, &dirent_id) == 0)
 		return 0;
 
 	int read1 = 0;
@@ -583,12 +584,10 @@ pmemfile_getdents(PMEMfilepool *pfp, PMEMfile *file,
 
 	int bytes_read = 0;
 
-	struct pmemfile_inode *inode = D_RW(vinode->inode);
-
 	util_mutex_lock(&file->mutex);
 	util_rwlock_rdlock(&vinode->rwlock);
 
-	bytes_read = file_getdents(pfp, file, inode, dirp, count);
+	bytes_read = file_getdents(pfp, file, dirp, count);
 	ASSERT(bytes_read >= 0);
 
 	util_rwlock_unlock(&vinode->rwlock);
@@ -599,13 +598,13 @@ pmemfile_getdents(PMEMfilepool *pfp, PMEMfile *file,
 }
 
 static int
-file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
-		struct linux_dirent64 *dirp, unsigned count)
+file_getdents64(PMEMfilepool *pfp, PMEMfile *file, struct linux_dirent64 *dirp,
+		unsigned count)
 {
 	struct pmemfile_dir *dir;
 	unsigned dirent_id;
 
-	if (file_seek_dir(file, inode, &dir, &dirent_id) == 0)
+	if (file_seek_dir(file, &dir, &dirent_id) == 0)
 		return 0;
 
 	int read1 = 0;
@@ -694,12 +693,10 @@ pmemfile_getdents64(PMEMfilepool *pfp, PMEMfile *file,
 
 	int bytes_read = 0;
 
-	struct pmemfile_inode *inode = D_RW(vinode->inode);
-
 	util_mutex_lock(&file->mutex);
 	util_rwlock_rdlock(&vinode->rwlock);
 
-	bytes_read = file_getdents64(pfp, file, inode, dirp, count);
+	bytes_read = file_getdents64(pfp, file, dirp, count);
 	ASSERT(bytes_read >= 0);
 
 	util_rwlock_unlock(&vinode->rwlock);
