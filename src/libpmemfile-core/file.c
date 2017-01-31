@@ -335,7 +335,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			open_file(orig_pathname, vinode, flags);
 		}
 
-		file = Zalloc(sizeof(*file));
+		file = calloc(1, sizeof(*file));
 		if (!file)
 			pmemfile_tx_abort(errno);
 
@@ -456,7 +456,7 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 
 	vinode_ref(pfp, info.vinode);
 
-	PMEMfile *ret = Zalloc(sizeof(*ret));
+	PMEMfile *ret = calloc(1, sizeof(*ret));
 	if (!ret)
 		goto end;
 
@@ -499,7 +499,7 @@ pmemfile_close(PMEMfilepool *pfp, PMEMfile *file)
 
 	util_mutex_destroy(&file->mutex);
 
-	Free(file);
+	free(file);
 }
 
 static int

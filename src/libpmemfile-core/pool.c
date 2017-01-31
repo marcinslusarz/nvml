@@ -71,7 +71,7 @@ initialize_super_block(PMEMfilepool *pfp)
 		}
 		pfp->root->parent = pfp->root;
 #ifdef DEBUG
-		pfp->root->path = Strdup("/");
+		pfp->root->path = strdup("/");
 #endif
 
 		pfp->cwd = vinode_ref(pfp, pfp->root);
@@ -172,7 +172,7 @@ pmemfile_mkfs(const char *pathname, size_t poolsize, mode_t mode)
 {
 	LOG(LDBG, "pathname %s poolsize %zu mode %o", pathname, poolsize, mode);
 
-	PMEMfilepool *pfp = Zalloc(sizeof(*pfp));
+	PMEMfilepool *pfp = calloc(1, sizeof(*pfp));
 	if (!pfp)
 		return NULL;
 
@@ -218,7 +218,7 @@ inode_map_fail:
 no_super:
 	pmemobj_close(pfp->pop);
 pool_create:
-	Free(pfp);
+	free(pfp);
 	errno = error;
 	return NULL;
 }
@@ -231,7 +231,7 @@ pmemfile_pool_open(const char *pathname)
 {
 	LOG(LDBG, "pathname %s", pathname);
 
-	PMEMfilepool *pfp = Zalloc(sizeof(*pfp));
+	PMEMfilepool *pfp = calloc(1, sizeof(*pfp));
 	if (!pfp)
 		return NULL;
 
@@ -278,7 +278,7 @@ inode_map_fail:
 no_super:
 	pmemobj_close(pfp->pop);
 pool_open:
-	Free(pfp);
+	free(pfp);
 	errno = error;
 	return NULL;
 }
@@ -300,5 +300,5 @@ pmemfile_pool_close(PMEMfilepool *pfp)
 	pmemobj_close(pfp->pop);
 	pfp->pop = NULL;
 
-	Free(pfp);
+	free(pfp);
 }

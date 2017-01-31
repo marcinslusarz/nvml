@@ -72,7 +72,7 @@ cb_get(void)
 {
 	struct all_callbacks *c = pthread_getspecific(callbacks_key);
 	if (!c) {
-		c = Zalloc(sizeof(struct all_callbacks) * MAX_TX_STAGE);
+		c = calloc(1, sizeof(struct all_callbacks) * MAX_TX_STAGE);
 		int ret = pthread_setspecific(callbacks_key, c);
 		if (ret) {
 			errno = ret;
@@ -105,7 +105,7 @@ cb_append(struct tx_callback_array *cb, cb_basic func, void *arg)
 		if (count == 0)
 			count = 4;
 
-		void *new_arr = Realloc(cb->arr, count * sizeof(cb->arr[0]));
+		void *new_arr = realloc(cb->arr, count * sizeof(cb->arr[0]));
 		if (!new_arr) {
 			pmemfile_tx_abort(errno);
 			return -1;
@@ -161,18 +161,18 @@ cb_free(void *arg)
 	struct all_callbacks *callbacks = arg;
 
 	for (unsigned i = 0; i < MAX_TX_STAGE; ++i) {
-		Free(callbacks[i].forward.arr);
+		free(callbacks[i].forward.arr);
 		callbacks[i].forward.arr = NULL;
 		callbacks[i].forward.size = 0;
 		callbacks[i].forward.used = 0;
 
-		Free(callbacks[i].backward.arr);
+		free(callbacks[i].backward.arr);
 		callbacks[i].backward.arr = NULL;
 		callbacks[i].backward.size = 0;
 		callbacks[i].backward.used = 0;
 	}
 
-	Free(callbacks);
+	free(callbacks);
 
 	int ret = pthread_setspecific(callbacks_key, NULL);
 	if (ret) {

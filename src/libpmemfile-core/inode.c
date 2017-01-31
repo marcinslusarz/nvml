@@ -123,10 +123,10 @@ inode_map_rand_params(struct pmemfile_inode_map *c)
 struct pmemfile_inode_map *
 inode_map_alloc()
 {
-	struct pmemfile_inode_map *c = Zalloc(sizeof(*c));
+	struct pmemfile_inode_map *c = calloc(1, sizeof(*c));
 
 	c->sz = 2;
-	c->buckets = Zalloc(c->sz * sizeof(c->buckets[0]));
+	c->buckets = calloc(1, c->sz * sizeof(c->buckets[0]));
 
 	inode_map_rand_params(c);
 	c->hash_fun_p = 32212254719ULL;
@@ -151,8 +151,8 @@ inode_map_free(struct pmemfile_inode_map *c)
 	}
 
 	util_rwlock_destroy(&c->rwlock);
-	Free(c->buckets);
-	Free(c);
+	free(c->buckets);
+	free(c);
 }
 
 /*
@@ -171,7 +171,7 @@ static bool
 inode_map_rebuild(struct pmemfile_inode_map *c, size_t new_sz)
 {
 	struct inode_map_bucket *new_buckets =
-			Zalloc(new_sz * sizeof(new_buckets[0]));
+			calloc(1, new_sz * sizeof(new_buckets[0]));
 	size_t idx;
 
 	for (size_t i = 0; i < c->sz; ++i) {
@@ -192,13 +192,13 @@ inode_map_rebuild(struct pmemfile_inode_map *c, size_t new_sz)
 			}
 
 			if (k == BUCKET_SIZE) {
-				Free(new_buckets);
+				free(new_buckets);
 				return false;
 			}
 		}
 	}
 
-	Free(c->buckets);
+	free(c->buckets);
 	c->sz = new_sz;
 	c->buckets = new_buckets;
 
@@ -233,10 +233,10 @@ vinode_unregister_locked(PMEMfilepool *pfp,
 
 #ifdef DEBUG
 	/* "path" field is defined only in DEBUG builds */
-	Free(vinode->path);
+	free(vinode->path);
 #endif
 	util_rwlock_destroy(&vinode->rwlock);
-	Free(vinode);
+	free(vinode);
 }
 
 /*
@@ -321,7 +321,7 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode,
 		}
 	}
 
-	vinode = Zalloc(sizeof(*vinode));
+	vinode = calloc(1, sizeof(*vinode));
 	if (!vinode)
 		goto end;
 

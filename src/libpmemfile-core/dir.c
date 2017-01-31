@@ -68,17 +68,17 @@ vinode_set_debug_path_locked(PMEMfilepool *pfp,
 		return;
 
 	if (parent_vinode == NULL) {
-		child_vinode->path = Strdup(name);
+		child_vinode->path = strdup(name);
 		return;
 	}
 
 	if (strcmp(parent_vinode->path, "/") == 0) {
-		child_vinode->path = Malloc(strlen(name) + 2);
+		child_vinode->path = malloc(strlen(name) + 2);
 		sprintf(child_vinode->path, "/%s", name);
 		return;
 	}
 
-	char *p = Malloc(strlen(parent_vinode->path) + 1 + strlen(name) + 1);
+	char *p = malloc(strlen(parent_vinode->path) + 1 + strlen(name) + 1);
 	sprintf(p, "%s/%s", parent_vinode->path, name);
 	child_vinode->path = p;
 #endif
@@ -109,7 +109,7 @@ vinode_clear_debug_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode)
 {
 	util_rwlock_wrlock(&vinode->rwlock);
 #ifdef DEBUG
-	Free(vinode->path);
+	free(vinode->path);
 	vinode->path = NULL;
 #endif
 	util_rwlock_unlock(&vinode->rwlock);
