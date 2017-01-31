@@ -359,8 +359,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	} TX_END
 
 end:
-	if (info.vinode)
-		vinode_unref_tx(pfp, info.vinode);
+	vinode_unref_tx(pfp, info.vinode);
 	if (allocated)
 		free((char *)sanitized);
 
@@ -724,8 +723,7 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	util_rwlock_unlock(&vparent->rwlock);
 
 end:
-	if (info.vinode)
-		vinode_unref_tx(pfp, info.vinode);
+	vinode_unref_tx(pfp, info.vinode);
 	if (vinode)
 		vinode_unref_tx(pfp, vinode);
 	if (allocated)
@@ -1074,8 +1072,7 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 	util_rwlock_unlock(&vparent->rwlock);
 
 end:
-	if (info.vinode)
-		vinode_unref_tx(pfp, info.vinode);
+	vinode_unref_tx(pfp, info.vinode);
 
 	if (vinode)
 		vinode_unref_tx(pfp, vinode);
@@ -1177,10 +1174,9 @@ _pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	util_rwlock_unlock(&vinode->rwlock);
 
 end:
+	vinode_unref_tx(pfp, info.vinode);
 	if (vinode)
 		vinode_unref_tx(pfp, vinode);
-	if (info.vinode)
-		vinode_unref_tx(pfp, info.vinode);
 	if (allocated)
 		free((char *)sanitized);
 

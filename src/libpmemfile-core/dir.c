@@ -1047,8 +1047,7 @@ vparent_end:
 	util_rwlock_unlock(&vparent->rwlock);
 
 end:
-	if (vparent)
-		vinode_unref_tx(pfp, vparent);
+	vinode_unref_tx(pfp, vparent);
 
 	if (vdir)
 		vinode_unref_tx(pfp, vdir);
