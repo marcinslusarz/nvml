@@ -38,4 +38,11 @@
 #define LDBG 4  /* debug info */
 #define LTRC 10 /* traces, very verbose */
 
+static inline void
+pmemfile_tx_abort(int err)
+{
+	pmemobj_tx_abort(err);
+	__builtin_unreachable();
+}
+
 #endif

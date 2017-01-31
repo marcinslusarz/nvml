@@ -137,7 +137,7 @@ vinode_add_dirent(PMEMfilepool *pfp,
 	size_t namelen = strlen(name);
 	if (namelen > PMEMFILE_MAX_FILE_NAME) {
 		LOG(LUSR, "file name too long");
-		pmemobj_tx_abort(ENAMETOOLONG);
+		pmemfile_tx_abort(ENAMETOOLONG);
 	}
 
 	if (strchr(name, '/') != NULL)
@@ -149,7 +149,7 @@ vinode_add_dirent(PMEMfilepool *pfp,
 	if (parent->nlink == 0)
 		/* but let directory creation succeed */
 		if (strcmp(name, ".") != 0)
-			pmemobj_tx_abort(ENOENT);
+			pmemfile_tx_abort(ENOENT);
 
 	struct pmemfile_dir *dir = &parent->file_data.dir;
 
@@ -159,7 +159,7 @@ vinode_add_dirent(PMEMfilepool *pfp,
 	do {
 		for (uint32_t i = 0; i < dir->num_elements; ++i) {
 			if (strcmp(dir->dirents[i].name, name) == 0)
-				pmemobj_tx_abort(EEXIST);
+				pmemfile_tx_abort(EEXIST);
 
 			if (!found && dir->dirents[i].name[0] == 0) {
 				dirent = &dir->dirents[i];
@@ -230,7 +230,7 @@ vinode_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	if (mode & ~(mode_t)0777) {
 		/* XXX: what the kernel does in this case? */
 		ERR("invalid mode flags 0%o", mode);
-		pmemobj_tx_abort(EINVAL);
+		pmemfile_tx_abort(EINVAL);
 	}
 
 	struct pmemfile_time t;
@@ -389,15 +389,14 @@ vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	if (!dirent) {
 		if (errno == ENOENT && !abort_on_ENOENT)
 			return;
-		pmemobj_tx_abort(errno);
-		ASSERT(0);
+		pmemfile_tx_abort(errno);
 	}
 
 	TOID(struct pmemfile_inode) tinode = dirent->inode;
 	struct pmemfile_inode *inode = D_RW(tinode);
 
 	if (inode_is_dir(inode))
-		pmemobj_tx_abort(EISDIR);
+		pmemfile_tx_abort(EISDIR);
 
 	*vinode = inode_ref(pfp, tinode, parent, parent_refed, NULL);
 	rwlock_tx_wlock(&(*vinode)->rwlock);
@@ -977,7 +976,7 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		struct pmemfile_dir *ddir = &idir->file_data.dir;
 		if (!TOID_IS_NULL(ddir->next)) {
 			LOG(LUSR, "directory %s not empty", path);
-			pmemobj_tx_abort(ENOTEMPTY);
+			pmemfile_tx_abort(ENOTEMPTY);
 		}
 
 		struct pmemfile_dirent *dirdot = &ddir->dirents[0];
@@ -995,7 +994,7 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 			if (!TOID_IS_NULL(d->inode)) {
 				LOG(LUSR, "directory %s not empty", path);
-				pmemobj_tx_abort(ENOTEMPTY);
+				pmemfile_tx_abort(ENOTEMPTY);
 			}
 		}
 

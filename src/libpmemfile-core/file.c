@@ -206,17 +206,17 @@ static void
 open_file(const char *orig_pathname, struct pmemfile_vinode *vinode, int flags)
 {
 	if ((flags & O_DIRECTORY) && !vinode_is_dir(vinode))
-		pmemobj_tx_abort(ENOTDIR);
+		pmemfile_tx_abort(ENOTDIR);
 
 	if (flags & O_TRUNC) {
 		if (!vinode_is_regular_file(vinode)) {
 			LOG(LUSR, "truncating non regular file");
-			pmemobj_tx_abort(EINVAL);
+			pmemfile_tx_abort(EINVAL);
 		}
 
 		if ((flags & O_ACCMODE) == O_RDONLY) {
 			LOG(LUSR, "O_TRUNC without write permissions");
-			pmemobj_tx_abort(EACCES);
+			pmemfile_tx_abort(EACCES);
 		}
 
 		rwlock_tx_wlock(&vinode->rwlock);
@@ -336,10 +336,8 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		}
 
 		file = Zalloc(sizeof(*file));
-		if (!file) {
-			pmemobj_tx_abort(errno);
-			ASSERT(0);
-		}
+		if (!file)
+			pmemfile_tx_abort(errno);
 
 		file->vinode = vinode;
 
@@ -882,7 +880,7 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 
 		if (src_unlinked != src_vinode)
 			// XXX restart? lookups under lock?
-			pmemobj_tx_abort(ENOENT);
+			pmemfile_tx_abort(ENOENT);
 
 	} TX_ONABORT {
 		error = errno;

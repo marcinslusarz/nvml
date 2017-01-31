@@ -35,6 +35,7 @@
  */
 
 #include "callbacks.h"
+#include "internal.h"
 #include "out.h"
 #include "util.h"
 
@@ -106,7 +107,7 @@ cb_append(struct tx_callback_array *cb, cb_basic func, void *arg)
 
 		void *new_arr = Realloc(cb->arr, count * sizeof(cb->arr[0]));
 		if (!new_arr) {
-			pmemobj_tx_abort(errno);
+			pmemfile_tx_abort(errno);
 			return -1;
 		}
 

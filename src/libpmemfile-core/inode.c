@@ -255,7 +255,7 @@ _inode_get(PMEMfilepool *pfp, TOID(struct pmemfile_inode) inode,
 		ERR("unknown inode version 0x%x for inode 0x%lx",
 				D_RO(inode)->version, inode.oid.off);
 		if (pmemobj_tx_stage() == TX_STAGE_WORK)
-			pmemobj_tx_abort(EINVAL);
+			pmemfile_tx_abort(EINVAL);
 		else {
 			errno = EINVAL;
 			return NULL;
@@ -449,7 +449,7 @@ file_get_time(struct pmemfile_time *t)
 	struct timespec tm;
 	if (clock_gettime(CLOCK_REALTIME, &tm)) {
 		ERR("!clock_gettime");
-		pmemobj_tx_abort(errno);
+		pmemfile_tx_abort(errno);
 	}
 	t->sec = tm.tv_sec;
 	t->nsec = tm.tv_nsec;
