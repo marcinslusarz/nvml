@@ -740,6 +740,9 @@ resolve_pathat_nested(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, struct pmemfile_path_info *path_info,
 		int flags, int nest_level)
 {
+	if (nest_level > 40)
+		return;
+
 	if (path[0] == '/') {
 		while (path[0] == '/')
 			path++;
@@ -747,8 +750,6 @@ resolve_pathat_nested(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 	}
 
 	const char *ending_slash = NULL;
-
-	memset(path_info, 0, sizeof(*path_info));
 
 	size_t off = strlen(path);
 	while (off >= 1 && path[off - 1] == '/') {
@@ -769,6 +770,24 @@ resolve_pathat_nested(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		if (!child)
 			break;
 
+		if (vinode_is_symlink(child)) {
+			util_rwlock_rdlock(&child->rwlock);
+			const char *symlink_target =
+					D_RO(child->inode)->file_data.data;
+			char *new_path = malloc(strlen(symlink_target) + 1 +
+					strlen(slash + 1) + 1);
+			sprintf(new_path, "%s/%s", symlink_target, slash + 1);
+			util_rwlock_unlock(&child->rwlock);
+			vinode_unref_tx(pfp, child);
+
+			resolve_pathat_nested(pfp, parent, new_path, path_info,
+					flags, nest_level + 1);
+
+			vinode_unref_tx(pfp, parent);
+			free(new_path);
+			return;
+		}
+
 		vinode_unref_tx(pfp, parent);
 		parent = child;
 		path = slash + 1;
@@ -777,7 +796,8 @@ resolve_pathat_nested(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 			path++;
 	}
 
-	path_info->remaining = path;
+	// XXX: optimize
+	path_info->remaining = strdup(path);
 	path_info->vinode = parent;
 }
 
@@ -798,7 +818,18 @@ resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, struct pmemfile_path_info *path_info,
 		int flags)
 {
-	resolve_pathat_nested(pfp, parent, path, path_info, flags, 0);
+	memset(path_info, 0, sizeof(*path_info));
+
+	resolve_pathat_nested(pfp, parent, path, path_info, flags, 1);
+}
+
+void
+path_info_cleanup(PMEMfilepool *pfp, struct pmemfile_path_info *path_info)
+{
+	if (path_info->vinode)
+		vinode_unref_tx(pfp, path_info->vinode);
+	if (path_info->remaining)
+		free(path_info->remaining);
 }
 
 bool
@@ -835,6 +866,11 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	int error = 0;
 	volatile bool parent_refed = false;
 	bool allocated = false;
+
+	if (parent == NULL) {
+		error = ELOOP;
+		goto end;
+	}
 
 	if (!vinode_is_dir(parent)) {
 		error = ENOTDIR;
@@ -880,7 +916,7 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		vinode_unref_tx(pfp, child);
 
 end:
-	vinode_unref_tx(pfp, parent);
+	path_info_cleanup(pfp, &info);
 
 	if (allocated)
 		free((char *)sanitized);
@@ -944,6 +980,11 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	int error = 0;
 	bool allocated = false;
 	const char *sanitized;
+
+	if (vparent == NULL) {
+		error = ELOOP;
+		goto end;
+	}
 
 	if (!vinode_is_dir(vparent)) {
 		error = ENOTDIR;
@@ -1082,7 +1123,7 @@ vparent_end:
 	util_rwlock_unlock(&vparent->rwlock);
 
 end:
-	vinode_unref_tx(pfp, vparent);
+	path_info_cleanup(pfp, &info);
 
 	if (vdir)
 		vinode_unref_tx(pfp, vdir);
@@ -1165,6 +1206,11 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 
 	resolve_pathat(pfp, at, path, &info, 0);
 
+	if (info.vinode == NULL) {
+		error = ELOOP;
+		goto end;
+	}
+
 	if (!vinode_is_dir(info.vinode)) {
 		error = ENOTDIR;
 		goto end;
@@ -1192,7 +1238,7 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 		error = errno;
 
 end:
-	vinode_unref_tx(pfp, info.vinode);
+	path_info_cleanup(pfp, &info);
 
 	if (at_unref)
 		vinode_unref_tx(pfp, at);

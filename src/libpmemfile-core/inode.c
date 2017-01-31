@@ -696,6 +696,12 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	const char *sanitized;
 	bool allocated = false;
 	struct pmemfile_vinode *vinode = NULL;
+
+	if (info.vinode == NULL) {
+		error = ELOOP;
+		goto end;
+	}
+
 	if (!vinode_is_dir(info.vinode)) {
 		error = ENOTDIR;
 		goto end;
@@ -725,10 +731,13 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	error = vinode_stat(vinode, buf);
 
 end:
-	vinode_unref_tx(pfp, info.vinode);
+	path_info_cleanup(pfp, &info);
+
 	vinode_unref_tx(pfp, vinode);
+
 	if (allocated)
 		free((char *)sanitized);
+
 	if (error) {
 		errno = error;
 		return -1;

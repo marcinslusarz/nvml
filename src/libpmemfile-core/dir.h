@@ -41,12 +41,13 @@ struct pmemfile_path_info {
 	 */
 	struct pmemfile_vinode *vinode;
 	/* Remaining part of the path. */
-	const char *remaining;
+	char *remaining;
 };
 
 void resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, struct pmemfile_path_info *path_info,
 		int flags);
+void path_info_cleanup(PMEMfilepool *pfp, struct pmemfile_path_info *path_info);
 bool sanitize_path(const char *path, const char **sanitized, bool *allocated);
 
 struct pmemfile_vinode *vinode_new_dir(PMEMfilepool *pfp,
