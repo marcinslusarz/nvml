@@ -199,14 +199,20 @@ test_symlink_valid(PMEMfilepool *pfp, const char *path)
 static void
 test_symlink_to_dir_valid(PMEMfilepool *pfp, const char *path)
 {
-	char buf[1];
-	PMEMfile *file = pmemfile_open(pfp, path, O_RDONLY | O_NOFOLLOW);
+	PMEMfile *file = pmemfile_open(pfp, path, O_RDONLY);
+	UT_ASSERTne(file, NULL);
+	PMEMFILE_CLOSE(pfp, file);
+
+	file = pmemfile_open(pfp, path, O_RDONLY | O_NOFOLLOW);
 	UT_ASSERTeq(file, NULL);
 	UT_ASSERTeq(errno, ELOOP);
 
+#if 0
+	char buf[1];
 	file = PMEMFILE_OPEN(pfp, path, O_RDONLY | O_NOFOLLOW | O_PATH);
 	PMEMFILE_READ(pfp, file, buf, sizeof(buf), -1, EBADF);
 	PMEMFILE_CLOSE(pfp, file);
+#endif
 }
 
 static void

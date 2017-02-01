@@ -131,8 +131,7 @@ check_flags(int flags)
 	}
 
 	if (flags & O_NOFOLLOW) {
-		LOG(LSUP, "O_NOFOLLOW");
-		// XXX we don't support symlinks yet, so we can just ignore it
+		LOG(LTRC, "O_NOFOLLOW");
 		flags &= ~O_NOFOLLOW;
 	}
 
@@ -294,8 +293,12 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 					sanitized, 0);
 		}
 
-		if (vinode && vinode_is_symlink(vinode) &&
-				(flags & O_NOFOLLOW) == 0) {
+		if (vinode && vinode_is_symlink(vinode)) {
+			if (flags & O_NOFOLLOW) {
+				error = ELOOP;
+				goto end;
+			}
+
 			char symlink_target[PATH_MAX];
 			COMPILE_ERROR_ON(sizeof(symlink_target) <
 					PMEMFILE_IN_INODE_STORAGE);
