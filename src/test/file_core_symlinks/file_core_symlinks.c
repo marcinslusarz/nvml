@@ -418,6 +418,69 @@ test3(PMEMfilepool *pfp)
 	pmemfile_pool_close(pfp);
 }
 
+static void
+check_path(PMEMfilepool *pfp, int follow_symlink, const char *path,
+		const char *parent, const char *child)
+{
+	char tmp_path[PATH_MAX], dir_path[PATH_MAX];
+
+	strncpy(tmp_path, path, PATH_MAX);
+	tmp_path[PATH_MAX - 1] = 0;
+
+	PMEMfile *f = pmemfile_open_parent(pfp, PMEMFILE_AT_CWD, tmp_path,
+		PATH_MAX,
+		follow_symlink ? PMEMFILE_OPEN_PARENT_SYMLINK_FOLLOW : 0);
+	UT_ASSERTne(f, NULL);
+
+	char *dir_path2 = pmemfile_get_dir_path(pfp, f, dir_path, PATH_MAX);
+	UT_ASSERTeq(dir_path2, dir_path);
+
+	if (strcmp(dir_path, parent) != 0)
+		UT_FATAL("parent: %s != %s", dir_path, parent);
+
+	if (strcmp(tmp_path, child) != 0)
+		UT_FATAL("child: %s != %s", tmp_path, child);
+
+	PMEMFILE_CLOSE(pfp, f);
+}
+
+
+static void
+test4(PMEMfilepool *pfp)
+{
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0777);
+	PMEMFILE_MKDIR(pfp, "/dir2", 0777);
+	PMEMFILE_CREATE(pfp, "/dir2/file", 0, 0755);
+
+	PMEMFILE_SYMLINK(pfp, "/dir2/file", "/dir1/symlink");
+
+	check_path(pfp, 0, "/dir1/symlink", "/dir1", "symlink");
+	check_path(pfp, 1, "/dir1/symlink", "/dir2", "file");
+
+	PMEMFILE_UNLINK(pfp, "/dir1/symlink");
+	PMEMFILE_UNLINK(pfp, "/dir2/file");
+	PMEMFILE_RMDIR(pfp, "/dir2");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	pmemfile_pool_close(pfp);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -432,6 +495,7 @@ main(int argc, char *argv[])
 	test1(open_pool(path));
 	test2(open_pool(path));
 	test3(open_pool(path));
+	test4(open_pool(path));
 
 	DONE(NULL);
 }

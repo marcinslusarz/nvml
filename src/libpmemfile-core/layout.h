@@ -95,6 +95,18 @@ struct pmemfile_time {
 #define PMEMFILE_INODE_VERSION(a) ((uint32_t)0x00444E49 | \
 		((uint32_t)(a + '0') << 24))
 
+#define PMEMFILE_IN_INODE_STORAGE (4096\
+				- 4  /* version */ \
+				- 4  /* uid */ \
+				- 4  /* gid */ \
+				- 4  /* reserved */ \
+				- 16 /* atime */ \
+				- 16 /* ctime */ \
+				- 16 /* mtime */ \
+				- 8  /* nlink */ \
+				- 8  /* size */ \
+				- 8  /* flags */)
+
 /* Inode */
 struct pmemfile_inode {
 	/* Layout version */
@@ -134,17 +146,7 @@ struct pmemfile_inode {
 		/* Directory specific data. */
 		struct pmemfile_dir dir;
 
-		char data[4096
-				- 4  /* version */
-				- 4  /* uid */
-				- 4  /* gid */
-				- 4  /* reserved */
-				- 16 /* atime */
-				- 16 /* ctime */
-				- 16 /* mtime */
-				- 8  /* nlink */
-				- 8  /* size */
-				- 8  /* flags */];
+		char data[PMEMFILE_IN_INODE_STORAGE];
 	} file_data;
 };
 

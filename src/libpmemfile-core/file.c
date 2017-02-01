@@ -298,7 +298,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 				(flags & O_NOFOLLOW) == 0) {
 			char symlink_target[PATH_MAX];
 			COMPILE_ERROR_ON(sizeof(symlink_target) <
-				sizeof(D_RO(vinode->inode)->file_data.data));
+					PMEMFILE_IN_INODE_STORAGE);
 
 			util_rwlock_rdlock(&vinode->rwlock);
 			strcpy(symlink_target,
@@ -495,12 +495,59 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 	struct pmemfile_path_info info;
 	resolve_pathat(pfp, at, path, &info, flags);
 
-	if (info.vinode == NULL) {
-		error = ELOOP;
-		goto end;
-	}
+	struct pmemfile_vinode *vparent;
+	bool path_info_changed;
 
-	vinode_ref(pfp, info.vinode);
+	do {
+		path_info_changed = false;
+		vparent = info.vinode;
+
+		if (vparent == NULL) {
+			error = ELOOP;
+			goto end;
+		}
+
+		if (flags & PMEMFILE_OPEN_PARENT_SYMLINK_FOLLOW) {
+			bool allocated;
+			const char *sanitized;
+
+			if (!sanitize_path(info.remaining, &sanitized,
+					&allocated))
+				goto ok;
+
+			if (sanitized[0] == 0)
+				goto ok;
+
+			struct pmemfile_vinode *vinode =
+					vinode_lookup_dirent(pfp, info.vinode,
+					sanitized, 0);
+
+			if (vinode && vinode_is_symlink(vinode)) {
+				char symlink_target[PATH_MAX];
+				COMPILE_ERROR_ON(sizeof(symlink_target) <
+						PMEMFILE_IN_INODE_STORAGE);
+
+				util_rwlock_rdlock(&vinode->rwlock);
+				strcpy(symlink_target,
+					D_RO(vinode->inode)->file_data.data);
+				util_rwlock_unlock(&vinode->rwlock);
+
+				struct pmemfile_path_info info2;
+				resolve_pathat(pfp, info.vinode, symlink_target,
+						&info2, 0);
+				path_info_cleanup(pfp, &info);
+				memcpy(&info, &info2, sizeof(info));
+				path_info_changed = true;
+			}
+
+			if (vinode)
+				vinode_unref_tx(pfp, vinode);
+
+ok:
+			if (allocated)
+				free((char *)sanitized);
+		}
+	} while (path_info_changed);
 
 	ret = calloc(1, sizeof(*ret));
 	if (!ret) {
@@ -508,7 +555,7 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 		goto end;
 	}
 
-	ret->vinode = info.vinode;
+	ret->vinode = vinode_ref(pfp, vparent);
 	ret->flags = PFILE_READ | PFILE_NOATIME;
 	util_mutex_init(&ret->mutex, NULL);
 	size_t len = strlen(info.remaining);
@@ -623,8 +670,7 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 				(flags & AT_SYMLINK_FOLLOW)) {
 			char symlink_target[PATH_MAX];
 			COMPILE_ERROR_ON(sizeof(symlink_target) <
-				sizeof(D_RO(src_vinode->inode)->
-						file_data.data));
+					PMEMFILE_IN_INODE_STORAGE);
 
 			util_rwlock_rdlock(&src_vinode->rwlock);
 			strcpy(symlink_target,
@@ -1154,7 +1200,7 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 	size_t len = strlen(target);
 	struct pmemfile_inode *inode;
 
-	if (len >= sizeof(inode->file_data.data)) {
+	if (len >= PMEMFILE_IN_INODE_STORAGE) {
 		error = ENAMETOOLONG;
 		goto end;
 	}

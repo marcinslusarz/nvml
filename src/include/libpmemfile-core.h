@@ -144,6 +144,7 @@ char *pmemfile_get_dir_path(PMEMfilepool *pfp, PMEMfile *dir, char *buf,
 		size_t size);
 
 #define PMEMFILE_OPEN_PARENT_STOP_AT_ROOT (1<<0)
+#define PMEMFILE_OPEN_PARENT_SYMLINK_FOLLOW (1<<1)
 PMEMfile *pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *at,
 		char *path, size_t path_size, int flags);
 /*
