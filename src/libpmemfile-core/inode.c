@@ -670,19 +670,13 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		return -1;
 	}
 
-	flags &= ~AT_SYMLINK_NOFOLLOW; /* No symlinks for now XXX */
-
-	flags &= ~AT_NO_AUTOMOUNT; /* No automounting */
-
 	if (path[0] == 0 && (flags & AT_EMPTY_PATH)) {
 		LOG(LSUP, "AT_EMPTY_PATH not supported yet");
 		errno = EINVAL;
 		return -1;
 	}
 
-	flags &= ~AT_EMPTY_PATH;
-
-	if (flags != 0) {
+	if (flags & ~(AT_NO_AUTOMOUNT|AT_SYMLINK_NOFOLLOW|AT_EMPTY_PATH)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -693,35 +687,65 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, path, &info, 0);
 
-	const char *sanitized;
-	bool allocated = false;
 	struct pmemfile_vinode *vinode = NULL;
+	bool path_info_changed;
 
-	if (info.vinode == NULL) {
-		error = ELOOP;
-		goto end;
-	}
+	do {
+		const char *sanitized;
+		bool allocated;
+		path_info_changed = false;
 
-	if (!vinode_is_dir(info.vinode)) {
-		error = ENOTDIR;
-		goto end;
-	}
+		if (info.vinode == NULL) {
+			error = ELOOP;
+			goto end;
+		}
 
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
-		error = ENOENT;
-		goto end;
-	}
+		if (!vinode_is_dir(info.vinode)) {
+			error = ENOTDIR;
+			goto end;
+		}
 
-	if (sanitized[0] == 0) {
-		ASSERT(info.vinode == pfp->root);
-		vinode = vinode_ref(pfp, info.vinode);
-	} else {
-		vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+		if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+			error = ENOENT;
+			goto end;
+		}
+
+		if (sanitized[0] == 0) {
+			ASSERT(info.vinode == pfp->root);
+			vinode = vinode_ref(pfp, info.vinode);
+		} else {
+			vinode = vinode_lookup_dirent(pfp, info.vinode,
+					sanitized, 0);
+			if (vinode && vinode_is_symlink(vinode) &&
+					!(flags & AT_SYMLINK_NOFOLLOW)) {
+				char symlink_target[PATH_MAX];
+				COMPILE_ERROR_ON(sizeof(symlink_target) <
+						PMEMFILE_IN_INODE_STORAGE);
+
+				util_rwlock_rdlock(&vinode->rwlock);
+				strcpy(symlink_target,
+					D_RO(vinode->inode)->file_data.data);
+				util_rwlock_unlock(&vinode->rwlock);
+
+				vinode_unref_tx(pfp, vinode);
+
+				struct pmemfile_path_info info2;
+				resolve_pathat(pfp, info.vinode, symlink_target,
+						&info2, 0);
+				path_info_cleanup(pfp, &info);
+				memcpy(&info, &info2, sizeof(info));
+				path_info_changed = true;
+			}
+		}
+
+		if (allocated)
+			free((char *)sanitized);
+
 		if (!vinode) {
 			error = ENOENT;
 			goto end;
 		}
-	}
+	} while (path_info_changed);
 
 	if (!vinode_is_dir(vinode) && strchr(info.remaining, '/')) {
 		error = ENOTDIR;
@@ -734,9 +758,6 @@ end:
 	path_info_cleanup(pfp, &info);
 
 	vinode_unref_tx(pfp, vinode);
-
-	if (allocated)
-		free((char *)sanitized);
 
 	if (error) {
 		errno = error;
@@ -829,6 +850,6 @@ pmemfile_fstat(PMEMfilepool *pfp, PMEMfile *file, struct stat *buf)
 int
 pmemfile_lstat(PMEMfilepool *pfp, const char *path, struct stat *buf)
 {
-	// XXX because symlinks are not yet implemented
-	return pmemfile_stat(pfp, path, buf);
+	return pmemfile_fstatat(pfp, PMEMFILE_AT_CWD, path, buf,
+			AT_SYMLINK_NOFOLLOW);
 }

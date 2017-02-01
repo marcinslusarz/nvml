@@ -348,7 +348,8 @@ PMEMFILE_PRINT_FILES64(PMEMfilepool *pfp, PMEMfile *dir, const char *dirp,
 		char type = *(char *)&dirp[i];
 		i += 1;
 
-		PMEMFILE_FSTATAT(pfp, dir, dirp + i, &statbuf, 0);
+		PMEMFILE_FSTATAT(pfp, dir, dirp + i, &statbuf,
+				AT_SYMLINK_NOFOLLOW);
 		if (type == DT_REG) {
 			UT_ASSERTeq(S_ISREG(statbuf.st_mode), 1);
 		} else if (type == DT_DIR) {

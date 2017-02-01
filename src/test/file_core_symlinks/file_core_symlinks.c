@@ -516,6 +516,50 @@ test5(PMEMfilepool *pfp)
 	pmemfile_pool_close(pfp);
 }
 
+static void
+test6(PMEMfilepool *pfp)
+{
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0777);
+	PMEMFILE_MKDIR(pfp, "/dir2", 0777);
+
+	PMEMFILE_SYMLINK(pfp, "/dir2", "/dir1/symlink");
+
+	struct stat buf;
+	PMEMFILE_STAT(pfp, "/dir1/symlink", &buf);
+	UT_ASSERTeq(S_ISLNK(buf.st_mode), 0);
+
+	PMEMFILE_LSTAT(pfp, "/dir1/symlink", &buf);
+	UT_ASSERTeq(S_ISLNK(buf.st_mode), 1);
+
+	PMEMFILE_FSTATAT(pfp, NULL, "/dir1/symlink", &buf, 0);
+	UT_ASSERTeq(S_ISLNK(buf.st_mode), 0);
+
+	PMEMFILE_FSTATAT(pfp, NULL, "/dir1/symlink", &buf, AT_SYMLINK_NOFOLLOW);
+	UT_ASSERTeq(S_ISLNK(buf.st_mode), 1);
+
+	PMEMFILE_UNLINK(pfp, "/dir1/symlink");
+	PMEMFILE_RMDIR(pfp, "/dir2");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	pmemfile_pool_close(pfp);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -532,6 +576,7 @@ main(int argc, char *argv[])
 	test3(open_pool(path));
 	test4(open_pool(path));
 	test5(open_pool(path));
+	test6(open_pool(path));
 
 	DONE(NULL);
 }
