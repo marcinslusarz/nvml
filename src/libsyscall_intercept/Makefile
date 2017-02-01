@@ -42,12 +42,11 @@ SOURCE = \
 	patcher.c \
 	intercept_util.c \
 	intercept_desc.c \
-	disasm_wrapper.c \
-	../libpmem/cpu.c
+	disasm_wrapper.c
 
 ASMSOURCE = \
 	intercept_template.s \
-	syscall_no_intercept.s
+	util.s
 
 include ../Makefile.inc
 

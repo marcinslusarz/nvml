@@ -44,7 +44,6 @@
 #include "intercept.h"
 #include "intercept_util.h"
 #include "disasm_wrapper.h"
-#include "util.h"
 
 /*
  * open_orig_file
@@ -152,7 +151,7 @@ has_jump(const struct intercept_desc *desc, unsigned char *addr)
 	if (addr >= desc->text_start && addr <= desc->text_end) {
 		uint64_t offset = (uint64_t)(addr - desc->text_start);
 
-		return util_isset(desc->jump_table, offset);
+		return desc->jump_table[offset / 8] & (1 << (offset % 8));
 	} else {
 		return false;
 	}
@@ -172,7 +171,8 @@ mark_jump(const struct intercept_desc *desc, const unsigned char *addr)
 		 * over 4 gigabytes of code -- todo more checks.
 		 */
 
-		util_setbit(desc->jump_table, (uint32_t)offset);
+		unsigned char tmp = (unsigned char)(1 << (offset % 8));
+		desc->jump_table[offset / 8] |= tmp;
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,18 +30,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * syscall_no_intercept.s
- *
- * Provide an easy way to do syscalls from
- * the intercepting call. The syscall function
- * from glibc is likely also intercepted,
- * so using that would just lead to infinite recursion.
- */
+.global xlongjmp;
+.type   xlongjmp, @function
 
-.globl syscall_no_intercept;
+.global has_ymm_registers;
+.type   has_ymm_registers, @function
+
+.global syscall_no_intercept;
+.type   syscall_no_intercept, @function
 
 .text
+
+xlongjmp:
+	.cfi_startproc
+	movq        %rdx, %rax
+	movq        %rsi, %rsp
+	jmp         *%rdi
+	.cfi_endproc
+
+.size   xlongjmp, .-xlongjmp
+
+has_ymm_registers:
+	.cfi_startproc
+	movq        $0x1, %rax
+	cpuid
+	movq        %rcx, %rax
+	shrq        $28, %rax
+	andq        $1, %rax
+	retq
+	.cfi_endproc
+
+.size   has_ymm_registers, .-has_ymm_registers
 
 syscall_no_intercept:
 	movq        %rdi, %rax  /* convert from linux ABI calling */
@@ -53,3 +72,5 @@ syscall_no_intercept:
 	movq        8(%rsp), %r9
 	syscall
 	ret
+
+.size   syscall_no_intercept, .-syscall_no_intercept
