@@ -218,6 +218,14 @@ test_symlink_invalid(PMEMfilepool *pfp, const char *path)
 }
 
 static void
+test_symlink_loop(PMEMfilepool *pfp, const char *path)
+{
+	PMEMfile *file = pmemfile_open(pfp, path, O_RDONLY);
+	UT_ASSERTeq(file, NULL);
+	UT_ASSERTeq(errno, ELOOP);
+}
+
+static void
 test1(PMEMfilepool *pfp)
 {
 	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
@@ -244,6 +252,9 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_SYMLINK(pfp, "/dir1", "/dir2/symlink_dir1/dir1");
 	PMEMFILE_SYMLINK(pfp, "/dir1/", "/dir2/symlink_dir1/dir1slash");
 
+	PMEMFILE_SYMLINK(pfp, "/dir1/loop", "/loop1");
+	PMEMFILE_SYMLINK(pfp, "/loop1", "/dir1/loop");
+
 	PMEMfile *file = PMEMFILE_OPEN(pfp, "/dir1/internal_dir/file",
 			O_CREAT | O_WRONLY, 0644);
 	PMEMFILE_WRITE(pfp, file, "qwerty\n", 7, 7);
@@ -259,6 +270,8 @@ test1(PMEMfilepool *pfp)
 	test_symlink_invalid(pfp, "/dir2/symlink_dir3/file");
 	test_symlink_invalid(pfp, "/dir2/symlink_dir4/file");
 
+	test_symlink_loop(pfp, "/loop1/file");
+
 	PMEMFILE_UNLINK(pfp, "/symlink_to_symlink_dir");
 	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir1/dir1");
 	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir1/dir1slash");
@@ -267,6 +280,8 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir2");
 	PMEMFILE_UNLINK(pfp, "/dir2/symlink_dir1");
 	PMEMFILE_UNLINK(pfp, "/dir1/internal_dir/file");
+	PMEMFILE_UNLINK(pfp, "/dir1/loop");
+	PMEMFILE_UNLINK(pfp, "/loop1");
 	PMEMFILE_RMDIR(pfp, "/dir2");
 	PMEMFILE_RMDIR(pfp, "/dir1/internal_dir");
 	PMEMFILE_RMDIR(pfp, "/dir1");
