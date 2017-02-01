@@ -258,33 +258,66 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	PMEMfile *file = NULL;
 
 	struct pmemfile_path_info info;
-	bool allocated = false;
+	bool allocated;
 	const char *sanitized;
-	struct pmemfile_vinode *volatile vinode = NULL;
+	struct pmemfile_vinode *volatile vinode;
+	struct pmemfile_vinode *vparent;
+	bool path_info_changed;
+
 	resolve_pathat(pfp, dir, pathname, &info, 0);
-	struct pmemfile_vinode *vparent = info.vinode;
 
-	if (vparent == NULL) {
-		error = ELOOP;
-		goto end;
-	}
+	do {
+		path_info_changed = false;
+		allocated = false;
+		vparent = info.vinode;
+		vinode = NULL;
+		if (vparent == NULL) {
+			error = ELOOP;
+			goto end;
+		}
 
-	if (!vinode_is_dir(vparent)) {
-		error = ENOTDIR;
-		goto end;
-	}
+		if (!vinode_is_dir(vparent)) {
+			error = ENOTDIR;
+			goto end;
+		}
 
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
-		error = ENOENT;
-		goto end;
-	}
+		if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+			error = ENOENT;
+			goto end;
+		}
 
-	if (sanitized[0] == 0) {
-		ASSERT(vparent == pfp->root);
-		vinode = vinode_ref(pfp, vparent);
-	} else {
-		vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
-	}
+		if (sanitized[0] == 0) {
+			ASSERT(vparent == pfp->root);
+			vinode = vinode_ref(pfp, vparent);
+		} else {
+			vinode = vinode_lookup_dirent(pfp, info.vinode,
+					sanitized, 0);
+		}
+
+		if (vinode && vinode_is_symlink(vinode) &&
+				(flags & O_NOFOLLOW) == 0) {
+			char symlink_target[PATH_MAX];
+			COMPILE_ERROR_ON(sizeof(symlink_target) <
+				sizeof(D_RO(vinode->inode)->file_data.data));
+
+			util_rwlock_rdlock(&vinode->rwlock);
+			strcpy(symlink_target,
+					D_RO(vinode->inode)->file_data.data);
+			util_rwlock_unlock(&vinode->rwlock);
+
+			vinode_unref_tx(pfp, vinode);
+
+			struct pmemfile_path_info info2;
+			resolve_pathat(pfp, info.vinode, symlink_target,
+					&info2, 0);
+			path_info_cleanup(pfp, &info);
+			memcpy(&info, &info2, sizeof(info));
+			if (allocated)
+				free((char *)sanitized);
+			flags &= ~(O_CREAT|O_EXCL);
+			path_info_changed = true;
+		}
+	} while (path_info_changed);
 
 	if (vinode && !vinode_is_dir(vinode) && strchr(info.remaining, '/')) {
 		error = ENOTDIR;
