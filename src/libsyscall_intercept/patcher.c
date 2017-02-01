@@ -70,11 +70,8 @@
 
 #include "intercept.h"
 #include "intercept_util.h"
-#include "../libpmem/cpu.h"
-#include "util.h"
 
 #include <assert.h>
-#include <cpuid.h>
 #include <stdint.h>
 #include <syscall.h>
 #include <sys/mman.h>
@@ -83,6 +80,9 @@
 #include <stdio.h>
 
 #define PAGE_SIZE ((size_t)0x1000)
+
+/* The size of a trampoline jump, jmp instruction + pointer */
+enum { TRAMPOLINE_SIZE = 6 + 8 };
 
 static unsigned char *
 round_down_address(unsigned char *address)
@@ -128,8 +128,6 @@ create_absolute_jump(unsigned char *from, void *to)
 	from[11] = d[5];
 	from[12] = d[6];
 	from[13] = d[7];
-
-	COMPILE_ERROR_ON(TRAMPOLINE_SIZE != 14);
 }
 
 /*
@@ -453,6 +451,14 @@ init_patcher(void)
 	simd_restore_YMM_size =
 	    (size_t)(&intercept_asm_wrapper_simd_restore_YMM_end -
 	    &intercept_asm_wrapper_simd_restore_YMM);
+
+	/*
+	 * has_ymm_registers -- checks if AVX instructions are supported,
+	 * thus YMM registers can be used on this CPU.
+	 *
+	 * in util.s
+	 */
+	extern bool has_ymm_registers(void);
 
 	must_save_ymm_registers = has_ymm_registers();
 }

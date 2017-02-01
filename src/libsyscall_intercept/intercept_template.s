@@ -213,9 +213,6 @@
  * return address pushed on the stack before calling the C function.
  */
 
-.global xlongjmp;
-.type   xlongjmp, @function
-
 .global backtrace_placeholder;
 .type   backtrace_placeholder, @function
 
@@ -246,15 +243,6 @@
 .global intercept_asm_wrapper_mov_r11_stack_first_return_addr;
 
 .text
-
-xlongjmp:
-	.cfi_startproc
-	mov         %rdx, %rax
-	mov         %rsi, %rsp
-	jmp         *%rdi
-	.cfi_endproc
-
-.size   xlongjmp, .-xlongjmp
 
 backtrace_placeholder:
 	.cfi_startproc
