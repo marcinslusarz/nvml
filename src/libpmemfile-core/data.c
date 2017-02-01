@@ -115,7 +115,7 @@ is_block_data_initialized(const struct pmemfile_block *block)
 {
 	ASSERT(block != NULL);
 
-	return (block->flags & block_initialized) != 0;
+	return (block->flags & BLOCK_INITIALIZED) != 0;
 }
 
 /*
@@ -172,15 +172,15 @@ file_allocate_block_data(PMEMfilepool *pfp,
 	uint32_t size;
 
 	if (pmemfile_core_block_size != 0) {
+		ASSERT(pmemfile_core_block_size <= MAX_BLOCK_SIZE);
 		ASSERT(pmemfile_core_block_size % FILE_PAGE_SIZE == 0);
-		ASSERT(pmemfile_core_block_size <= UINT32_MAX);
 
 		size = (uint32_t)pmemfile_core_block_size;
 	} else {
-		if (count <= UINT32_MAX)
+		if (count <= MAX_BLOCK_SIZE)
 			size = (uint32_t)count;
 		else
-			size = UINT32_MAX;
+			size = (uint32_t)MAX_BLOCK_SIZE;
 	}
 
 	/* XXX, snapshot separated to let pmemobj use small object cache  */
@@ -192,8 +192,8 @@ file_allocate_block_data(PMEMfilepool *pfp,
 	if (use_usable_size) {
 		size_t usable = pmemobj_alloc_usable_size(block->data.oid);
 		ASSERT(usable >= size);
-		if (usable > UINT32_MAX)
-			size = UINT32_MAX;
+		if (usable > MAX_BLOCK_SIZE)
+			size = MAX_BLOCK_SIZE;
 		else
 			size = (uint32_t)(usable & ~(FILE_PAGE_SIZE - 1));
 	}
@@ -282,15 +282,16 @@ is_append(struct pmemfile_file *file, struct pmemfile_inode *inode,
 static uint64_t
 overallocate_size(uint64_t count)
 {
-	/* XXX the original algorithm, just so tests pass */
 	if (count <= 4096)
 		return 16 * 1024;
 	else if (count <= 64 * 1024)
 		return 256 * 1024;
 	else if (count <= 1024 * 1024)
 		return 4 * 1024 * 1024;
-	else
+	else if (count <= 64 * 1024 * 1024)
 		return 64 * 1024 * 1024;
+	else
+		return count;
 }
 
 static void
@@ -299,9 +300,6 @@ file_allocate_range(PMEMfilepool *pfp, PMEMfile *file,
 {
 	ASSERT(size > 0);
 	ASSERT(offset + size > offset);
-
-	/* make sure file size doesn't overflow while aligning the range size */
-	ASSERT(offset + size < SIZE_MAX - 2 * FILE_PAGE_SIZE);
 
 	bool over = pmemfile_overallocate_on_append &&
 	    is_append(file, inode, offset, size);
@@ -314,8 +312,7 @@ file_allocate_range(PMEMfilepool *pfp, PMEMfile *file,
 	offset -= offset % FILE_PAGE_SIZE;
 
 	/* align the size */
-	size += FILE_PAGE_SIZE - 1;
-	size -= size % FILE_PAGE_SIZE;
+	size = page_roundup(size);
 
 	struct pmemfile_block *block = find_block(file, offset);
 
@@ -346,17 +343,15 @@ file_allocate_range(PMEMfilepool *pfp, PMEMfile *file,
 			/* In a hole before the first block */
 
 			size_t count = size;
-			if (file->vinode->first_block->offset < count)
-				count = file->vinode->first_block->offset;
+			uint64_t first_offset =
+			    file->vinode->first_block->offset;
+
+			if (offset + count > first_offset)
+				count = (uint32_t)(first_offset - offset);
 
 			block = allocate_block(pfp, file, inode, count, false);
 
 			block->offset = offset;
-
-			uint64_t next_offset =
-			    file->vinode->first_block->offset;
-			if (offset + block->size > next_offset)
-				block->size = (uint32_t)(next_offset - offset);
 
 			block->next =
 			    (TOID(struct pmemfile_block))
@@ -463,7 +458,7 @@ write_block_range(PMEMfilepool *pfp, struct pmemfile_block *block,
 
 	char *data = D_RW(block->data);
 
-	if ((block->flags & block_initialized) == 0) {
+	if ((block->flags & BLOCK_INITIALIZED) == 0) {
 		if (len != block->size) {
 			char *start_zero = data;
 			size_t count = offset;
@@ -479,7 +474,7 @@ write_block_range(PMEMfilepool *pfp, struct pmemfile_block *block,
 		}
 
 		TX_ADD_FIELD_DIRECT(block, flags);
-		block->flags |= block_initialized;
+		block->flags |= BLOCK_INITIALIZED;
 	}
 
 	VALGRIND_ADD_TO_TX(data + offset, len);
@@ -550,10 +545,6 @@ iterate_on_file_range(PMEMfilepool *pfp, PMEMfile *file,
 			continue;
 		}
 
-		/*
-		 * Two more asserts, that should stay here as long as
-		 * sparse files are not implemented.
-		 */
 		ASSERT(is_offset_in_block(block, offset));
 
 		/*
@@ -625,7 +616,7 @@ file_write(PMEMfilepool *pfp, PMEMfile *file, struct pmemfile_inode *inode,
 	if (file->offset + count > original_size)
 		new_size = file->offset + count;
 
-	/* All blocks needed for writing are properly allocated by this point */
+	/* All blocks needed for writing are properly allocated at this point */
 
 	iterate_on_file_range(pfp, file, file->offset, count, (char *)buf,
 	    write_to_blocks);
@@ -683,8 +674,8 @@ pmemfile_write_locked(PMEMfilepool *pfp, PMEMfile *file, const void *buf,
 			TX_SET(vinode->inode, mtime, tm);
 		}
 	} TX_ONABORT {
-		vinode_destroy_data_state(vinode);
 		error = errno;
+		vinode_destroy_data_state(vinode);
 	} TX_ONCOMMIT {
 		file->offset += count;
 	} TX_END
