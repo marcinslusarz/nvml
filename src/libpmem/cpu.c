@@ -102,10 +102,6 @@ cpuid(unsigned func, unsigned subfunc, unsigned cpuinfo[4])
 #define bit_CLWB	(1 << 24)
 #endif
 
-#ifndef bit_AVX
-#define bit_AVX	(1 << 28)
-#endif
-
 /*
  * is_cpu_feature_present -- (internal) checks if CPU feature is supported
  */
@@ -189,14 +185,4 @@ is_cpu_clwb_present(void)
 	LOG(4, "CLWB %ssupported", ret == 0 ? "not " : "");
 
 	return ret;
-}
-
-/*
- * has_ymm_registers -- checks if AVX instructions are supported,
- * thus YMM registers can be used on this CPU.
- */
-int
-has_ymm_registers(void)
-{
-	return is_cpu_feature_present(0x1, ECX_IDX, bit_AVX);
 }

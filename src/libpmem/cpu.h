@@ -1,5 +1,5 @@
 /*
- * Copyright 2016, Intel Corporation
+ * Copyright 2016-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,6 +41,5 @@ int is_cpu_genuine_intel(void);
 int is_cpu_clflush_present(void);
 int is_cpu_clflushopt_present(void);
 int is_cpu_clwb_present(void);
-int has_ymm_registers(void);
 
 #endif
