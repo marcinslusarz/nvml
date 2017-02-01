@@ -50,6 +50,8 @@ void PMEMFILE_CLOSE(PMEMfilepool *pfp, PMEMfile *file);
 void PMEMFILE_CREATE(PMEMfilepool *pfp, const char *path, int flags,
 		mode_t mode);
 void PMEMFILE_LINK(PMEMfilepool *pfp, const char *oldpath, const char *newpath);
+void PMEMFILE_LINKAT(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
+		PMEMfile *newdir, const char *newpath, int flags);
 void PMEMFILE_UNLINK(PMEMfilepool *pfp, const char *path);
 ssize_t PMEMFILE_READ(PMEMfilepool *pfp, PMEMfile *file, void *buf,
 		size_t count, ssize_t expected, ...);

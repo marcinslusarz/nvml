@@ -555,43 +555,96 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 {
 	LOG(LDBG, "oldpath %s newpath %s", oldpath, newpath);
 
-	flags &= ~AT_SYMLINK_FOLLOW; /* No symlinks for now XXX */
-
 	if (oldpath[0] == 0 && (flags & AT_EMPTY_PATH)) {
 		LOG(LSUP, "AT_EMPTY_PATH not supported yet");
 		errno = EINVAL;
 		return -1;
 	}
 
-	flags &= ~AT_EMPTY_PATH;
-
-	if (flags != 0) {
+	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	struct pmemfile_path_info src, dst;
-	const char *src_sanitized, *dst_sanitized;
-	bool src_allocated = false, dst_allocated = false;
-	struct pmemfile_vinode *src_vinode = NULL;
+	struct pmemfile_path_info src, dst = { NULL, NULL };
+	const char *dst_sanitized;
+	bool dst_allocated = false;
+	struct pmemfile_vinode *src_vinode;
 
 	resolve_pathat(pfp, olddir, oldpath, &src, 0);
-	resolve_pathat(pfp, newdir, newpath, &dst, 0);
 
 	int error = 0;
+	bool src_path_info_changed;
 
-	if (src.vinode == NULL) {
-		error = ELOOP;
-		goto end;
-	}
+	do {
+		src_path_info_changed = false;
+		src_vinode = NULL;
+
+		if (src.vinode == NULL) {
+			error = ELOOP;
+			goto end;
+		}
+
+		if (!vinode_is_dir(src.vinode)) {
+			error = ENOTDIR;
+			goto end;
+		}
+
+		const char *src_sanitized;
+		bool src_allocated;
+		if (!sanitize_path(src.remaining, &src_sanitized,
+				&src_allocated)) {
+			error = ENOENT;
+			goto end;
+		}
+
+		src_vinode = vinode_lookup_dirent(pfp, src.vinode,
+				src_sanitized, 0);
+		if (src_allocated)
+			free((char *)src_sanitized);
+
+		if (!src_vinode) {
+			error = ENOENT;
+			goto end;
+		}
+
+		if (vinode_is_dir(src_vinode)) {
+			error = EPERM;
+			goto end;
+		}
+
+		if (strchr(src.remaining, '/')) {
+			error = ENOTDIR;
+			goto end;
+		}
+		path_info_cleanup(pfp, &src);
+
+		if (vinode_is_symlink(src_vinode) &&
+				(flags & AT_SYMLINK_FOLLOW)) {
+			char symlink_target[PATH_MAX];
+			COMPILE_ERROR_ON(sizeof(symlink_target) <
+				sizeof(D_RO(src_vinode->inode)->
+						file_data.data));
+
+			util_rwlock_rdlock(&src_vinode->rwlock);
+			strcpy(symlink_target,
+				D_RO(src_vinode->inode)->file_data.data);
+			util_rwlock_unlock(&src_vinode->rwlock);
+
+			vinode_unref_tx(pfp, src_vinode);
+
+			struct pmemfile_path_info src2;
+			resolve_pathat(pfp, src.vinode, symlink_target, &src2,
+					0);
+			memcpy(&src, &src2, sizeof(src));
+			src_path_info_changed = true;
+		}
+	} while (src_path_info_changed);
+
+	resolve_pathat(pfp, newdir, newpath, &dst, 0);
 
 	if (dst.vinode == NULL) {
 		error = ELOOP;
-		goto end;
-	}
-
-	if (!vinode_is_dir(src.vinode)) {
-		error = ENOTDIR;
 		goto end;
 	}
 
@@ -600,29 +653,8 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		goto end;
 	}
 
-	if (!sanitize_path(src.remaining, &src_sanitized, &src_allocated)) {
-		error = ENOENT;
-		goto end;
-	}
-
 	if (!sanitize_path(dst.remaining, &dst_sanitized, &dst_allocated)) {
 		error = ENOENT;
-		goto end;
-	}
-
-	src_vinode = vinode_lookup_dirent(pfp, src.vinode, src_sanitized, 0);
-	if (!src_vinode) {
-		error = ENOENT;
-		goto end;
-	}
-
-	if (vinode_is_dir(src_vinode)) {
-		error = EPERM;
-		goto end;
-	}
-
-	if (strchr(src.remaining, '/')) {
-		error = ENOTDIR;
 		goto end;
 	}
 
@@ -652,8 +684,6 @@ end:
 		vinode_unref_tx(pfp, src_vinode);
 	if (dst_allocated)
 		free((char *)dst_sanitized);
-	if (src_allocated)
-		free((char *)src_sanitized);
 
 	if (error) {
 		errno = error;

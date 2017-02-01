@@ -355,6 +355,69 @@ test2(PMEMfilepool *pfp)
 	pmemfile_pool_close(pfp);
 }
 
+static void
+test3(PMEMfilepool *pfp)
+{
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
+
+	PMEMFILE_MKDIR(pfp, "/dir", 0777);
+
+	PMEMfile *file = PMEMFILE_OPEN(pfp, "/file", O_CREAT | O_WRONLY, 0644);
+	PMEMFILE_WRITE(pfp, file, "qwerty\n", 7, 7);
+	PMEMFILE_CLOSE(pfp, file);
+
+	PMEMFILE_SYMLINK(pfp, "/file", "/dir/symlink");
+
+	PMEMFILE_LINK(pfp, "/dir/symlink", "/link_to_symlink");
+	PMEMFILE_LINKAT(pfp,
+			NULL, "/dir/symlink",
+			NULL, "/link_to_symlink2", 0);
+	PMEMFILE_LINKAT(pfp,
+			NULL, "/dir/symlink",
+			NULL, "/link_to_underlying_file",
+			AT_SYMLINK_FOLLOW);
+
+	PMEMFILE_LIST_FILES(pfp, "/dir", (const struct pmemfile_ls[]) {
+			    {0040777, 2, 4008, "."},
+			    {0040777, 3, 4008, ".."},
+			    {0120777, 3, 5, "symlink", "/file"},
+			    {}});
+
+	PMEMFILE_LIST_FILES(pfp, "/", (const struct pmemfile_ls[]) {
+				{0040777, 3, 4008, "."},
+				{0040777, 3, 4008, ".."},
+				{0040777, 2, 4008, "dir"},
+				{0100644, 2, 7, "file"},
+				{0120777, 3, 5, "link_to_symlink", "/file"},
+				{0120777, 3, 5, "link_to_symlink2", "/file"},
+				{0100644, 2, 7, "link_to_underlying_file"},
+				{}});
+
+	PMEMFILE_UNLINK(pfp, "/link_to_underlying_file");
+	PMEMFILE_UNLINK(pfp, "/link_to_symlink2");
+	PMEMFILE_UNLINK(pfp, "/link_to_symlink");
+	PMEMFILE_UNLINK(pfp, "/dir/symlink");
+	PMEMFILE_UNLINK(pfp, "/file");
+	PMEMFILE_RMDIR(pfp, "/dir");
+
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	pmemfile_pool_close(pfp);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -368,6 +431,7 @@ main(int argc, char *argv[])
 	test0(create_pool(path));
 	test1(open_pool(path));
 	test2(open_pool(path));
+	test3(open_pool(path));
 
 	DONE(NULL);
 }

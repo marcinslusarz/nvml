@@ -132,6 +132,14 @@ PMEMFILE_LINK(PMEMfilepool *pfp, const char *oldpath, const char *newpath)
 }
 
 void
+PMEMFILE_LINKAT(PMEMfilepool *pfp, PMEMfile *olddir, const char *oldpath,
+		PMEMfile *newdir, const char *newpath, int flags)
+{
+	int ret = pmemfile_linkat(pfp, olddir, oldpath, newdir, newpath, flags);
+	UT_ASSERTeq(ret, 0);
+}
+
+void
 PMEMFILE_UNLINK(PMEMfilepool *pfp, const char *path)
 {
 	int ret = pmemfile_unlink(pfp, path);
