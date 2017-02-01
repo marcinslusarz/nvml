@@ -444,7 +444,6 @@ check_path(PMEMfilepool *pfp, int follow_symlink, const char *path,
 	PMEMFILE_CLOSE(pfp, f);
 }
 
-
 static void
 test4(PMEMfilepool *pfp)
 {
@@ -481,6 +480,42 @@ test4(PMEMfilepool *pfp)
 	pmemfile_pool_close(pfp);
 }
 
+static void
+test5(PMEMfilepool *pfp)
+{
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	PMEMFILE_ASSERT_EMPTY_DIR(pfp, "/");
+
+	PMEMFILE_MKDIR(pfp, "/dir1", 0777);
+	PMEMFILE_MKDIR(pfp, "/dir2", 0777);
+
+	PMEMFILE_SYMLINK(pfp, "/dir2", "/dir1/symlink");
+
+	char buf[PATH_MAX];
+	PMEMFILE_CHDIR(pfp, "/dir1/symlink");
+	PMEMFILE_GETCWD(pfp, buf, sizeof(buf), "/dir2");
+
+	PMEMFILE_CHDIR(pfp, "/");
+	PMEMFILE_UNLINK(pfp, "/dir1/symlink");
+	PMEMFILE_RMDIR(pfp, "/dir2");
+	PMEMFILE_RMDIR(pfp, "/dir1");
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 1,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 1,
+		.blocks = 0});
+
+	pmemfile_pool_close(pfp);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -496,6 +531,7 @@ main(int argc, char *argv[])
 	test2(open_pool(path));
 	test3(open_pool(path));
 	test4(open_pool(path));
+	test5(open_pool(path));
 
 	DONE(NULL);
 }

@@ -1195,8 +1195,6 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	int ret = -1;
 	int error = 0;
 	bool at_unref;
-	bool allocated = false;
-	const char *sanitized;
 
 	if (!path) {
 		errno = ENOENT;
@@ -1207,32 +1205,64 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 
 	resolve_pathat(pfp, at, path, &info, 0);
 
-	if (info.vinode == NULL) {
-		error = ELOOP;
-		goto end;
-	}
-
-	if (!vinode_is_dir(info.vinode)) {
-		error = ENOTDIR;
-		goto end;
-	}
-
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
-		error = ENOENT;
-		goto end;
-	}
-
+	bool path_info_changed;
 	struct pmemfile_vinode *dir;
-	if (sanitized[0] == 0) {
-		ASSERT(info.vinode == pfp->root);
-		dir = vinode_ref(pfp, info.vinode);
-	} else {
-		dir = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+	do {
+		bool allocated;
+		const char *sanitized;
+
+		path_info_changed = false;
+
+		if (info.vinode == NULL) {
+			error = ELOOP;
+			goto end;
+		}
+
+		if (!vinode_is_dir(info.vinode)) {
+			error = ENOTDIR;
+			goto end;
+		}
+
+		if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+			error = ENOENT;
+			goto end;
+		}
+
+		if (sanitized[0] == 0) {
+			ASSERT(info.vinode == pfp->root);
+			dir = vinode_ref(pfp, info.vinode);
+		} else {
+			dir = vinode_lookup_dirent(pfp, info.vinode, sanitized,
+					0);
+			if (dir && vinode_is_symlink(dir)) {
+				char symlink_target[PATH_MAX];
+				COMPILE_ERROR_ON(sizeof(symlink_target) <
+						PMEMFILE_IN_INODE_STORAGE);
+
+				util_rwlock_rdlock(&dir->rwlock);
+				strcpy(symlink_target,
+					D_RO(dir->inode)->file_data.data);
+				util_rwlock_unlock(&dir->rwlock);
+
+				vinode_unref_tx(pfp, dir);
+
+				struct pmemfile_path_info info2;
+				resolve_pathat(pfp, info.vinode, symlink_target,
+						&info2, 0);
+				path_info_cleanup(pfp, &info);
+				memcpy(&info, &info2, sizeof(info));
+				path_info_changed = true;
+			}
+		}
+
+		if (allocated)
+			free((char *)sanitized);
+
 		if (!dir) {
 			error = ENOENT;
 			goto end;
 		}
-	}
+	} while (path_info_changed);
 
 	ret = _pmemfile_chdir(pfp, dir);
 	if (ret)
@@ -1243,8 +1273,6 @@ end:
 
 	if (at_unref)
 		vinode_unref_tx(pfp, at);
-	if (allocated)
-		free((char *)sanitized);
 	if (error)
 		errno = error;
 
