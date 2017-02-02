@@ -55,6 +55,13 @@ test1(PMEMfilepool *pfp)
 	    {0100644, 1, 0, "file1"},
 	    {}});
 
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 0});
+
 	const char *data = "Marcin S";
 	char data2[4096];
 	char bufFF[4096], buf00[4096];
@@ -69,6 +76,13 @@ test1(PMEMfilepool *pfp)
 	    {040777, 2, 4008, ".."},
 	    {0100644, 1, 9, "file1"},
 	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 1});
 
 	/* try to read write-only file */
 	PMEMFILE_READ(pfp, f, data2, len, -1, EBADF);
@@ -89,6 +103,13 @@ test1(PMEMfilepool *pfp)
 	/* read from end of file */
 	PMEMFILE_READ(pfp, f, data2, len, 0);
 	PMEMFILE_CLOSE(pfp, f);
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 1});
 
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
@@ -137,6 +158,13 @@ test1(PMEMfilepool *pfp)
 	    {040777, 2, 4008, ".."},
 	    {0100644, 1, 9, "file1"},
 	    {}});
+
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 1});
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDWR);
 
@@ -187,6 +215,13 @@ test1(PMEMfilepool *pfp)
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_CUR, 9 + 100 + 4);
 	PMEMFILE_LSEEK(pfp, f, 0, SEEK_SET, 0);
 
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = 1});
+
 	/* validate the whole file contents */
 	memset(data2, 0xff, sizeof(data2));
 	PMEMFILE_READ(pfp, f, data2, sizeof(data2), 9 + 100 + 4);
@@ -207,6 +242,12 @@ test1(PMEMfilepool *pfp)
 
 	PMEMFILE_CLOSE(pfp, f);
 
+	PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
+		.inodes = 2,
+		.dirs = 0,
+		.block_arrays = 0,
+		.inode_arrays = 0,
+		.blocks = (env_block_size == 4096) ? 2 : 1});
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 	/* check read after EOF returns 0 */
@@ -311,9 +352,9 @@ test2(PMEMfilepool *pfp)
 		PMEMFILE_STATS(pfp, (const struct pmemfile_stats) {
 			.inodes = 2,
 			.dirs = 0,
-			.block_arrays = 5,
+			.block_arrays = 7,
 			.inode_arrays = 1,
-			.blocks = 502});
+			.blocks = 633});
 
 	f = PMEMFILE_OPEN(pfp, "/file1", O_RDONLY);
 

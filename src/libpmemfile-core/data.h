@@ -35,6 +35,7 @@
 #include "file.h"
 
 extern size_t pmemfile_core_block_size;
+extern bool pmemfile_overallocate_on_append;
 
 void vinode_destroy_data_state(struct pmemfile_vinode *vinode);
 void vinode_truncate(struct pmemfile_vinode *vinode);

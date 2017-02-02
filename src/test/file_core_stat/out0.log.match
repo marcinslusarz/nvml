@@ -40,7 +40,7 @@ st_gid:     $(N)
 st_rdev:    0x0
 st_size:    102400
 st_blksize: 1
-st_blocks:  201
+st_blocks:  224
 st_atim:    $(*)
 st_mtim:    $(*)
 st_ctim:    $(*)
@@ -55,7 +55,7 @@ st_gid:     $(N)
 st_rdev:    0x0
 st_size:    102400
 st_blksize: 1
-st_blocks:  201
+st_blocks:  224
 st_atim:    $(*)
 st_mtim:    $(*)
 st_ctim:    $(*)

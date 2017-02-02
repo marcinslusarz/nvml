@@ -69,6 +69,7 @@ struct pmemfile_vinode {
 		uint32_t idx;
 	} first_free_block;
 
+	struct pmemfile_block *first_block;
 	struct ctree *blocks;
 };
 

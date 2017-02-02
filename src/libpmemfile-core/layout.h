@@ -36,8 +36,11 @@
  * On-media structures.
  */
 
-#include "libpmemobj.h"
 #include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+
+#include "libpmemobj.h"
 
 POBJ_LAYOUT_BEGIN(pmemfile);
 POBJ_LAYOUT_ROOT(pmemfile, struct pmemfile_super);
@@ -56,6 +59,8 @@ struct pmemfile_block {
 	uint64_t offset;
 	TOID(struct pmemfile_block) next;
 };
+
+#define BLOCK_INITIALIZED 1
 
 /* File */
 struct pmemfile_block_array {
@@ -184,5 +189,24 @@ struct pmemfile_super {
 			- 16 /* toid */
 			- 16 /* toid */];
 };
+
+/*
+ * The size of data allocated for each block is a positive integer multiple
+ * of FILE_PAGE_SIZE.
+ *
+ * XXX: The current code can read from / write to blocks with any positive size,
+ * any offset alignment, so this information doesn't necessarily have to be
+ * part of the on-media layout.
+ * But later the code might (probably will) depend on this.
+ */
+#define FILE_PAGE_SIZE ((size_t)0x1000)
+
+static inline size_t
+page_roundup(size_t n)
+{
+	return ((n + FILE_PAGE_SIZE - 1) / FILE_PAGE_SIZE) * FILE_PAGE_SIZE;
+}
+
+#define MAX_BLOCK_SIZE (UINT32_MAX - (UINT32_MAX % FILE_PAGE_SIZE))
 
 #endif
