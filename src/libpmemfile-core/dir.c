@@ -51,6 +51,58 @@
 #include "util.h"
 
 /*
+ * str_compare -- compares 2 strings
+ *
+ * s1 is NUL-terminated,
+ * s2 is not - its length is s2n
+ */
+static int
+str_compare(const char *s1, const char *s2, size_t s2n)
+{
+	int ret = strncmp(s1, s2, s2n);
+	if (ret)
+		return ret;
+	if (s1[s2n] != 0)
+		return 1;
+	return 0;
+}
+
+bool
+str_contains(const char *str, size_t len, char c)
+{
+	for (size_t i = 0; i < len; ++i)
+		if (str[i] == c)
+			return true;
+
+	return false;
+}
+
+bool
+more_than_1_component(const char *path)
+{
+	path = strchr(path, '/');
+	if (!path)
+		return false;
+
+	while (*path == '/')
+		path++;
+
+	if (*path == 0)
+		return false;
+
+	return true;
+}
+
+size_t
+component_length(const char *path)
+{
+	const char *slash = strchr(path, '/');
+	if (!slash)
+		return strlen(path);
+	return (uintptr_t)slash - (uintptr_t)path;
+}
+
+/*
  * vinode_set_debug_path_locked -- (internal) sets full path in runtime
  * structures of child_inode based on parent inode and name.
  *
@@ -74,13 +126,13 @@ vinode_set_debug_path_locked(PMEMfilepool *pfp,
 	}
 
 	if (strcmp(parent_vinode->path, "/") == 0) {
-		child_vinode->path = malloc(strlen(name) + 2);
-		sprintf(child_vinode->path, "/%s", name);
+		child_vinode->path = malloc(namelen + 2);
+		sprintf(child_vinode->path, "/%.*s", (int)namelen, name);
 		return;
 	}
 
-	char *p = malloc(strlen(parent_vinode->path) + 1 + strlen(name) + 1);
-	sprintf(p, "%s/%s", parent_vinode->path, name);
+	char *p = malloc(strlen(parent_vinode->path) + 1 + namelen + 1);
+	sprintf(p, "%s/%.*s", parent_vinode->path, (int)namelen, name);
 	child_vinode->path = p;
 #endif
 }
@@ -93,12 +145,13 @@ void
 vinode_set_debug_path(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		struct pmemfile_vinode *child_vinode,
-		const char *name)
+		const char *name,
+		size_t namelen)
 {
 	util_rwlock_wrlock(&child_vinode->rwlock);
 
 	vinode_set_debug_path_locked(pfp, parent_vinode, child_vinode, name,
-			strlen(name));
+			namelen);
 
 	util_rwlock_unlock(&child_vinode->rwlock);
 }
@@ -127,30 +180,31 @@ void
 vinode_add_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		const char *name,
+		size_t namelen,
 		struct pmemfile_vinode *child_vinode,
 		const struct pmemfile_time *tm)
 {
-	LOG(LDBG, "parent 0x%lx ppath %s name %s child_inode 0x%lx",
+	LOG(LDBG, "parent 0x%lx ppath %s name %.*s child_inode 0x%lx",
 		parent_vinode->inode.oid.off, pmfi_path(parent_vinode),
-		name, child_vinode->inode.oid.off);
+		(int)namelen, name, child_vinode->inode.oid.off);
 
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
 
-	size_t namelen = strlen(name);
 	if (namelen > PMEMFILE_MAX_FILE_NAME) {
 		LOG(LUSR, "file name too long");
 		pmemfile_tx_abort(ENAMETOOLONG);
 	}
 
-	if (strchr(name, '/') != NULL)
-		FATAL("trying to add dirent with slash: %s", name);
+	if (str_contains(name, namelen, '/'))
+		FATAL("trying to add dirent with slash: %.*s", (int)namelen,
+				name);
 
 	struct pmemfile_inode *parent = D_RW(parent_vinode->inode);
 
 	/* don't create files in deleted directories */
 	if (parent->nlink == 0)
 		/* but let directory creation succeed */
-		if (strcmp(name, ".") != 0)
+		if (str_compare(".", name, namelen) != 0)
 			pmemfile_tx_abort(ENOENT);
 
 	struct pmemfile_dir *dir = &parent->file_data.dir;
@@ -160,7 +214,8 @@ vinode_add_dirent(PMEMfilepool *pfp,
 
 	do {
 		for (uint32_t i = 0; i < dir->num_elements; ++i) {
-			if (strcmp(dir->dirents[i].name, name) == 0)
+			if (str_compare(dir->dirents[i].name, name, namelen)
+					== 0)
 				pmemfile_tx_abort(EEXIST);
 
 			if (!found && dir->dirents[i].name[0] == 0) {
@@ -220,12 +275,12 @@ vinode_add_dirent(PMEMfilepool *pfp,
  */
 struct pmemfile_vinode *
 vinode_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *name, mode_t mode, bool add_to_parent,
-		volatile bool *parent_refed)
+		const char *name, size_t namelen, mode_t mode,
+		bool add_to_parent, volatile bool *parent_refed)
 {
-	LOG(LDBG, "parent 0x%lx ppath %s new_name %s",
+	LOG(LDBG, "parent 0x%lx ppath %s new_name %.*s",
 			parent ? parent->inode.oid.off : 0,
-			pmfi_path(parent), name);
+			pmfi_path(parent), (int)namelen, name);
 
 	ASSERTeq(pmemobj_tx_stage(), TX_STAGE_WORK);
 
@@ -237,37 +292,20 @@ vinode_new_dir(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 
 	struct pmemfile_time t;
 	struct pmemfile_vinode *child = inode_alloc(pfp, S_IFDIR | mode, &t,
-			parent, parent_refed, name);
+			parent, parent_refed, name, namelen);
 
 	/* add . and .. to new directory */
-	vinode_add_dirent(pfp, child, ".", child, &t);
+	vinode_add_dirent(pfp, child, ".", 1, child, &t);
 
 	if (parent == NULL) /* special case - root directory */
-		vinode_add_dirent(pfp, child, "..", child, &t);
+		vinode_add_dirent(pfp, child, "..", 2, child, &t);
 	else
-		vinode_add_dirent(pfp, child, "..", parent, &t);
+		vinode_add_dirent(pfp, child, "..", 2, parent, &t);
 
 	if (add_to_parent)
-		vinode_add_dirent(pfp, parent, name, child, &t);
+		vinode_add_dirent(pfp, parent, name, namelen, child, &t);
 
 	return child;
-}
-
-/*
- * strcmp2 -- compares 2 strings
- *
- * s1 is NUL-terminated,
- * s2 is not - its length is s2n
- */
-static int
-strcmp2(const char *s1, const char *s2, size_t s2n)
-{
-	int ret = strncmp(s1, s2, s2n);
-	if (ret)
-		return ret;
-	if (s1[s2n] != 0)
-		return 1;
-	return 0;
 }
 
 /*
@@ -298,7 +336,7 @@ vinode_lookup_dirent_by_name_locked(PMEMfilepool *pfp,
 		for (uint32_t i = 0; i < dir->num_elements; ++i) {
 			struct pmemfile_dirent *d = &dir->dirents[i];
 
-			if (strcmp2(d->name, name, namelen) == 0)
+			if (str_compare(d->name, name, namelen) == 0)
 				return d;
 		}
 
@@ -351,26 +389,26 @@ vinode_lookup_dirent_by_vinode_locked(PMEMfilepool *pfp,
  * Takes reference on found inode. Caller must hold reference to parent inode.
  * Does not need transaction.
  */
-static struct pmemfile_vinode *
-_vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
+struct pmemfile_vinode *
+vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *name, size_t namelen, int flags)
 {
 	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
 			pmfi_path(parent), name);
 
-	if (name[0] == 0)
+	if (namelen == 0)
 		return NULL;
 
 	if ((flags & PMEMFILE_OPEN_PARENT_STOP_AT_ROOT) &&
 			parent == pfp->root &&
-			strcmp2("..", name, namelen) == 0)
+			str_compare("..", name, namelen) == 0)
 		return NULL;
 
 	struct pmemfile_vinode *vinode = NULL;
 
 	util_rwlock_rdlock(&parent->rwlock);
 
-	if (strcmp2("..", name, namelen) == 0) {
+	if (str_compare("..", name, namelen) == 0) {
 		vinode = vinode_ref(pfp, parent->parent);
 		goto end;
 	}
@@ -392,13 +430,6 @@ end:
 	return vinode;
 }
 
-struct pmemfile_vinode *
-vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *name, int flags)
-{
-	return _vinode_lookup_dirent(pfp, parent, name, strlen(name), flags);
-}
-
 /*
  * vinode_unlink_dirent -- removes dirent from directory
  *
@@ -407,15 +438,16 @@ vinode_lookup_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
  */
 void
 vinode_unlink_dirent(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
-		const char *name, struct pmemfile_vinode *volatile *vinode,
+		const char *name, size_t namelen,
+		struct pmemfile_vinode *volatile *vinode,
 		volatile bool *parent_refed, bool abort_on_ENOENT)
 {
-	LOG(LDBG, "parent 0x%lx ppath %s name %s", parent->inode.oid.off,
-			pmfi_path(parent), name);
+	LOG(LDBG, "parent 0x%lx ppath %s name %.*s", parent->inode.oid.off,
+			pmfi_path(parent), (int)namelen, name);
 
 	struct pmemfile_dirent *dirent =
 			vinode_lookup_dirent_by_name_locked(pfp, parent, name,
-					strlen(name));
+					namelen);
 	if (!dirent) {
 		if (errno == ENOENT && !abort_on_ENOENT)
 			return;
@@ -765,7 +797,7 @@ resolve_pathat_nested(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		if (slash == NULL || slash == ending_slash)
 			break;
 
-		child = _vinode_lookup_dirent(pfp, parent, path,
+		child = vinode_lookup_dirent(pfp, parent, path,
 				(uintptr_t)slash - (uintptr_t)path, flags);
 		if (!child)
 			break;
@@ -796,7 +828,6 @@ resolve_pathat_nested(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 			path++;
 	}
 
-	// XXX: optimize
 	path_info->remaining = strdup(path);
 	path_info->vinode = parent;
 }
@@ -833,29 +864,6 @@ path_info_cleanup(PMEMfilepool *pfp, struct pmemfile_path_info *path_info)
 	memset(path_info, 0, sizeof(*path_info));
 }
 
-bool
-sanitize_path(const char *path, const char **sanitized, bool *allocated)
-{
-	const char *slash = strchr(path, '/');
-	if (slash) {
-		const char *after_slash = slash + 1;
-
-		while (*after_slash == '/')
-			after_slash++;
-
-		if (*after_slash != 0)
-			return false;
-
-		*sanitized = strndup(path, (uintptr_t)slash - (uintptr_t)path);
-		*allocated = true;
-	} else {
-		*sanitized = path;
-		*allocated = false;
-	}
-
-	return true;
-}
-
 static int
 _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		const char *path, mode_t mode)
@@ -866,7 +874,6 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_vinode *parent = info.vinode;
 	int error = 0;
 	volatile bool parent_refed = false;
-	bool allocated = false;
 
 	if (parent == NULL) {
 		error = ELOOP;
@@ -878,14 +885,15 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
-	const char *sanitized;
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+	if (more_than_1_component(info.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
 
+	size_t namelen = component_length(info.remaining);
+
 	/* mkdir("/") */
-	if (sanitized[0] == 0) {
+	if (namelen == 0) {
 		ASSERT(parent == pfp->root);
 		error = EEXIST;
 		goto end;
@@ -893,7 +901,7 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	/* optimization - vinode_add_dirent handles it in safe way */
 	struct pmemfile_vinode *child = vinode_lookup_dirent(pfp, parent,
-			sanitized, 0);
+			info.remaining, namelen, 0);
 	if (child) {
 		vinode_unref_tx(pfp, child);
 		error = EEXIST;
@@ -905,8 +913,8 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	util_rwlock_wrlock(&parent->rwlock);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		child = vinode_new_dir(pfp, parent, sanitized, mode, true,
-				&parent_refed);
+		child = vinode_new_dir(pfp, parent, info.remaining, namelen,
+				mode, true, &parent_refed);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
@@ -918,9 +926,6 @@ _pmemfile_mkdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 end:
 	path_info_cleanup(pfp, &info);
-
-	if (allocated)
-		free((char *)sanitized);
 
 	if (error) {
 		if (parent_refed)
@@ -979,8 +984,6 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_vinode *vparent = info.vinode;
 	struct pmemfile_vinode *vdir = NULL;
 	int error = 0;
-	bool allocated = false;
-	const char *sanitized;
 
 	if (vparent == NULL) {
 		error = ELOOP;
@@ -992,13 +995,15 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+	if (more_than_1_component(info.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
 
+	size_t namelen = component_length(info.remaining);
+
 	/* Does not make sense, but it's specified by POSIX. */
-	if (strcmp(sanitized, ".") == 0) {
+	if (str_compare(".", info.remaining, namelen) == 0) {
 		error = EINVAL;
 		goto end;
 	}
@@ -1007,12 +1012,12 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	 * If we managed to enter a directory, then the parent directory has
 	 * at least this entry as child.
 	 */
-	if (strcmp(sanitized, "..") == 0) {
+	if (str_compare("..", info.remaining, namelen) == 0) {
 		error = ENOTEMPTY;
 		goto end;
 	}
 
-	if (sanitized[0] == 0) {
+	if (namelen == 0) {
 		ASSERT(vparent == pfp->root);
 		error = EBUSY;
 		goto end;
@@ -1024,14 +1029,14 @@ _pmemfile_rmdirat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	struct pmemfile_dirent *dirent =
 			vinode_lookup_dirent_by_name_locked(pfp, vparent,
-						sanitized, strlen(sanitized));
+						info.remaining, namelen);
 	if (!dirent) {
 		error = ENOENT;
 		goto vparent_end;
 	}
 
-	vdir = inode_ref(pfp, dirent->inode, vparent, NULL, sanitized,
-			strlen(sanitized));
+	vdir = inode_ref(pfp, dirent->inode, vparent, NULL, info.remaining,
+			namelen);
 	if (!vdir) {
 		error = errno;
 		goto vparent_end;
@@ -1129,9 +1134,6 @@ end:
 	if (vdir)
 		vinode_unref_tx(pfp, vdir);
 
-	if (allocated)
-		free((char *)sanitized);
-
 	if (error) {
 		errno = error;
 		return -1;
@@ -1208,9 +1210,6 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 	bool path_info_changed;
 	struct pmemfile_vinode *dir;
 	do {
-		bool allocated;
-		const char *sanitized;
-
 		path_info_changed = false;
 
 		if (info.vinode == NULL) {
@@ -1223,17 +1222,19 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 			goto end;
 		}
 
-		if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+		if (more_than_1_component(info.remaining)) {
 			error = ENOENT;
 			goto end;
 		}
 
-		if (sanitized[0] == 0) {
+		size_t namelen = component_length(info.remaining);
+
+		if (namelen == 0) {
 			ASSERT(info.vinode == pfp->root);
 			dir = vinode_ref(pfp, info.vinode);
 		} else {
-			dir = vinode_lookup_dirent(pfp, info.vinode, sanitized,
-					0);
+			dir = vinode_lookup_dirent(pfp, info.vinode,
+					info.remaining, namelen, 0);
 			if (dir && vinode_is_symlink(dir)) {
 				char symlink_target[PATH_MAX];
 				COMPILE_ERROR_ON(sizeof(symlink_target) <
@@ -1254,9 +1255,6 @@ pmemfile_chdir(PMEMfilepool *pfp, const char *path)
 				path_info_changed = true;
 			}
 		}
-
-		if (allocated)
-			free((char *)sanitized);
 
 		if (!dir) {
 			error = ENOENT;

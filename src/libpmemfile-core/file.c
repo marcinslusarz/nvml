@@ -181,20 +181,22 @@ check_flags(int flags)
 }
 
 static struct pmemfile_vinode *
-create_file(PMEMfilepool *pfp, const char *filename, const char *full_path,
-		struct pmemfile_vinode *parent_vinode, int flags, mode_t mode)
+create_file(PMEMfilepool *pfp, const char *filename, size_t namelen,
+		const char *full_path, struct pmemfile_vinode *parent_vinode,
+		int flags, mode_t mode)
 {
 	struct pmemfile_time t;
 
 	rwlock_tx_wlock(&parent_vinode->rwlock);
 
 	struct pmemfile_vinode *vinode = inode_alloc(pfp, S_IFREG | mode, &t,
-			parent_vinode, NULL, filename);
+			parent_vinode, NULL, filename, namelen);
 
 	if (is_tmpfile(flags))
 		vinode_orphan(pfp, vinode);
 	else
-		vinode_add_dirent(pfp, parent_vinode, filename, vinode, &t);
+		vinode_add_dirent(pfp, parent_vinode, filename,
+				namelen, vinode, &t);
 
 	rwlock_tx_unlock_on_commit(&parent_vinode->rwlock);
 
@@ -257,17 +259,15 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	PMEMfile *file = NULL;
 
 	struct pmemfile_path_info info;
-	bool allocated;
-	const char *sanitized;
 	struct pmemfile_vinode *volatile vinode;
 	struct pmemfile_vinode *vparent;
 	bool path_info_changed;
+	size_t namelen;
 
 	resolve_pathat(pfp, dir, pathname, &info, 0);
 
 	do {
 		path_info_changed = false;
-		allocated = false;
 		vparent = info.vinode;
 		vinode = NULL;
 		if (vparent == NULL) {
@@ -280,17 +280,19 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			goto end;
 		}
 
-		if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+		if (more_than_1_component(info.remaining)) {
 			error = ENOENT;
 			goto end;
 		}
 
-		if (sanitized[0] == 0) {
+		namelen = component_length(info.remaining);
+
+		if (namelen == 0) {
 			ASSERT(vparent == pfp->root);
 			vinode = vinode_ref(pfp, vparent);
 		} else {
 			vinode = vinode_lookup_dirent(pfp, info.vinode,
-					sanitized, 0);
+					info.remaining, namelen, 0);
 		}
 
 		if (vinode && vinode_is_symlink(vinode)) {
@@ -315,8 +317,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 					&info2, 0);
 			path_info_cleanup(pfp, &info);
 			memcpy(&info, &info2, sizeof(info));
-			if (allocated)
-				free((char *)sanitized);
 			flags &= ~(O_CREAT|O_EXCL);
 			path_info_changed = true;
 		}
@@ -370,7 +370,7 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		if (vinode == NULL) {
-			vinode = create_file(pfp, sanitized,
+			vinode = create_file(pfp, info.remaining, namelen,
 					orig_pathname, vparent, flags, mode);
 		} else {
 			open_file(orig_pathname, vinode, flags);
@@ -399,9 +399,6 @@ _pmemfile_openat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 
 end:
 	path_info_cleanup(pfp, &info);
-
-	if (allocated)
-		free((char *)sanitized);
 
 	if (error) {
 		if (vinode != NULL)
@@ -511,19 +508,17 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 		}
 
 		if (flags & PMEMFILE_OPEN_PARENT_SYMLINK_FOLLOW) {
-			bool allocated;
-			const char *sanitized;
+			if (more_than_1_component(info.remaining))
+				break;
 
-			if (!sanitize_path(info.remaining, &sanitized,
-					&allocated))
-				goto ok;
+			size_t namelen = component_length(info.remaining);
 
-			if (sanitized[0] == 0)
-				goto ok;
+			if (namelen == 0)
+				break;
 
 			struct pmemfile_vinode *vinode =
 					vinode_lookup_dirent(pfp, info.vinode,
-					sanitized, 0);
+					info.remaining, namelen, 0);
 
 			if (vinode && vinode_is_symlink(vinode)) {
 				char symlink_target[PATH_MAX];
@@ -545,10 +540,6 @@ pmemfile_open_parent(PMEMfilepool *pfp, PMEMfile *dir, char *path,
 
 			if (vinode)
 				vinode_unref_tx(pfp, vinode);
-
-ok:
-			if (allocated)
-				free((char *)sanitized);
 		}
 	} while (path_info_changed);
 
@@ -617,8 +608,6 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 	}
 
 	struct pmemfile_path_info src, dst = { NULL, NULL };
-	const char *dst_sanitized;
-	bool dst_allocated = false;
 	struct pmemfile_vinode *src_vinode;
 
 	resolve_pathat(pfp, olddir, oldpath, &src, 0);
@@ -640,19 +629,15 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 			goto end;
 		}
 
-		const char *src_sanitized;
-		bool src_allocated;
-		if (!sanitize_path(src.remaining, &src_sanitized,
-				&src_allocated)) {
+		if (more_than_1_component(src.remaining)) {
 			error = ENOENT;
 			goto end;
 		}
 
-		src_vinode = vinode_lookup_dirent(pfp, src.vinode,
-				src_sanitized, 0);
-		if (src_allocated)
-			free((char *)src_sanitized);
+		size_t src_namelen = component_length(src.remaining);
 
+		src_vinode = vinode_lookup_dirent(pfp, src.vinode,
+				src.remaining, src_namelen, 0);
 		if (!src_vinode) {
 			error = ENOENT;
 			goto end;
@@ -702,18 +687,20 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 		goto end;
 	}
 
-	if (!sanitize_path(dst.remaining, &dst_sanitized, &dst_allocated)) {
+	if (more_than_1_component(dst.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
+
+	size_t dst_namelen = component_length(dst.remaining);
 
 	util_rwlock_wrlock(&dst.vinode->rwlock);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
 		struct pmemfile_time t;
 		file_get_time(&t);
-		vinode_add_dirent(pfp, dst.vinode, dst_sanitized, src_vinode,
-				&t);
+		vinode_add_dirent(pfp, dst.vinode, dst.remaining, dst_namelen,
+				src_vinode, &t);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
@@ -722,7 +709,8 @@ _pmemfile_linkat(PMEMfilepool *pfp,
 
 	if (error == 0) {
 		vinode_clear_debug_path(pfp, src_vinode);
-		vinode_set_debug_path(pfp, dst.vinode, src_vinode, newpath);
+		vinode_set_debug_path(pfp, dst.vinode, src_vinode,
+				dst.remaining, dst_namelen);
 	}
 
 end:
@@ -731,8 +719,6 @@ end:
 
 	if (src_vinode)
 		vinode_unref_tx(pfp, src_vinode);
-	if (dst_allocated)
-		free((char *)dst_sanitized);
 
 	if (error) {
 		errno = error;
@@ -827,9 +813,6 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_vinode *volatile vinode = NULL;
 	volatile bool parent_refed = false;
 
-	const char *sanitized;
-	bool allocated = false;
-
 	if (vparent == NULL) {
 		error = ELOOP;
 		goto end;
@@ -840,10 +823,12 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+	if (more_than_1_component(info.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
+
+	size_t namelen = component_length(info.remaining);
 
 	if (strchr(info.remaining, '/')) {
 		error = ENOTDIR;
@@ -853,8 +838,8 @@ _pmemfile_unlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	util_rwlock_wrlock(&vparent->rwlock);
 
 	TX_BEGIN_CB(pfp->pop, cb_queue, pfp) {
-		vinode_unlink_dirent(pfp, vparent, sanitized, &vinode,
-				&parent_refed, true);
+		vinode_unlink_dirent(pfp, vparent, info.remaining, namelen,
+				&vinode, &parent_refed, true);
 	} TX_ONABORT {
 		error = errno;
 	} TX_END
@@ -866,9 +851,6 @@ end:
 
 	if (vinode)
 		vinode_unref_tx(pfp, vinode);
-
-	if (allocated)
-		free((char *)sanitized);
 
 	if (error) {
 		if (parent_refed)
@@ -948,8 +930,6 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 	struct pmemfile_vinode *volatile src_unlinked = NULL;
 	volatile bool dst_parent_refed = false;
 	volatile bool src_parent_refed = false;
-	const char *src_sanitized, *dst_sanitized;
-	bool src_allocated = false, dst_allocated = false;
 	struct pmemfile_vinode *src_vinode = NULL, *dst_vinode = NULL;
 
 	struct pmemfile_path_info src, dst;
@@ -978,28 +958,32 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 		goto end;
 	}
 
-	if (!sanitize_path(src.remaining, &src_sanitized, &src_allocated)) {
+	if (more_than_1_component(src.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
 
-	if (!sanitize_path(dst.remaining, &dst_sanitized, &dst_allocated)) {
+	size_t src_namelen = component_length(src.remaining);
+
+	if (more_than_1_component(dst.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
 
-	src_vinode = vinode_lookup_dirent(pfp, src.vinode, src_sanitized, 0);
+	size_t dst_namelen = component_length(dst.remaining);
+
+	src_vinode = vinode_lookup_dirent(pfp, src.vinode, src.remaining,
+			src_namelen, 0);
 	if (!src_vinode) {
 		error = ENOENT;
 		goto end;
 	}
 
-	dst_vinode = vinode_lookup_dirent(pfp, dst.vinode, dst_sanitized, 0);
+	dst_vinode = vinode_lookup_dirent(pfp, dst.vinode, dst.remaining,
+			dst_namelen, 0);
 
 	struct pmemfile_vinode *src_parent = src.vinode;
 	struct pmemfile_vinode *dst_parent = dst.vinode;
-	const char *src_name = src_sanitized;
-	const char *dst_name = dst_sanitized;
 
 	if (vinode_is_dir(src_vinode)) {
 		LOG(LSUP, "renaming directories is not supported yet");
@@ -1021,15 +1005,18 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 		// XXX, when src dir == dst dir we can just update dirent,
 		// without linking and unlinking
 
-		vinode_unlink_dirent(pfp, dst_parent, dst_name,
-				&dst_unlinked, &dst_parent_refed, false);
+		vinode_unlink_dirent(pfp, dst_parent, dst.remaining,
+				dst_namelen, &dst_unlinked, &dst_parent_refed,
+				false);
 
 		struct pmemfile_time t;
 		file_get_time(&t);
-		vinode_add_dirent(pfp, dst_parent, dst_name, src_vinode, &t);
+		vinode_add_dirent(pfp, dst_parent, dst.remaining, dst_namelen,
+				src_vinode, &t);
 
-		vinode_unlink_dirent(pfp, src_parent, src_name,
-				&src_unlinked, &src_parent_refed, true);
+		vinode_unlink_dirent(pfp, src_parent, src.remaining,
+				src_namelen, &src_unlinked, &src_parent_refed,
+				true);
 
 		if (src_unlinked != src_vinode)
 			// XXX restart? lookups under lock?
@@ -1060,7 +1047,8 @@ _pmemfile_renameat2(PMEMfilepool *pfp,
 
 	if (error == 0) {
 		vinode_clear_debug_path(pfp, src_vinode);
-		vinode_set_debug_path(pfp, dst.vinode, src_vinode, newpath);
+		vinode_set_debug_path(pfp, dst.vinode, src_vinode,
+				dst.remaining, dst_namelen);
 	}
 
 end:
@@ -1071,10 +1059,6 @@ end:
 		vinode_unref_tx(pfp, dst_vinode);
 	if (src_vinode)
 		vinode_unref_tx(pfp, src_vinode);
-	if (dst_allocated)
-		free((char *)dst_sanitized);
-	if (src_allocated)
-		free((char *)src_sanitized);
 
 	if (error) {
 		if (dst_parent_refed)
@@ -1176,9 +1160,6 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 
 	struct pmemfile_vinode *vparent = info.vinode;
 
-	const char *sanitized;
-	bool allocated = false;
-
 	if (vparent == NULL) {
 		error = ELOOP;
 		goto end;
@@ -1189,12 +1170,15 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 		goto end;
 	}
 
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+	if (more_than_1_component(info.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
 
-	vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+	size_t namelen = component_length(info.remaining);
+
+	vinode = vinode_lookup_dirent(pfp, info.vinode, info.remaining,
+			namelen, 0);
 	if (vinode) {
 		error = EEXIST;
 		goto end;
@@ -1214,13 +1198,14 @@ _pmemfile_symlinkat(PMEMfilepool *pfp, const char *target,
 		struct pmemfile_time t;
 
 		vinode = inode_alloc(pfp, S_IFLNK | 0777, &t, vparent, NULL,
-				info.remaining);
+				info.remaining, namelen);
 		inode = D_RW(vinode->inode);
 		pmemobj_memcpy_persist(pfp->pop, inode->file_data.data, target,
 				len);
 		inode->size = len;
 
-		vinode_add_dirent(pfp, vparent, sanitized, vinode, &t);
+		vinode_add_dirent(pfp, vparent, info.remaining, namelen,
+				vinode, &t);
 	} TX_ONABORT {
 		error = errno;
 		vinode = NULL;
@@ -1233,9 +1218,6 @@ end:
 
 	if (vinode)
 		vinode_unref_tx(pfp, vinode);
-
-	if (allocated)
-		free((char *)sanitized);
 
 	if (error) {
 		errno = error;
@@ -1291,9 +1273,6 @@ _pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	struct pmemfile_path_info info;
 	resolve_pathat(pfp, dir, pathname, &info, 0);
 
-	const char *sanitized;
-	bool allocated = false;
-
 	if (info.vinode == NULL) {
 		error = ELOOP;
 		goto end;
@@ -1304,12 +1283,15 @@ _pmemfile_readlinkat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 		goto end;
 	}
 
-	if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+	if (more_than_1_component(info.remaining)) {
 		error = ENOENT;
 		goto end;
 	}
 
-	vinode = vinode_lookup_dirent(pfp, info.vinode, sanitized, 0);
+	size_t namelen = component_length(info.remaining);
+
+	vinode = vinode_lookup_dirent(pfp, info.vinode, info.remaining,
+			namelen, 0);
 	if (!vinode) {
 		error = ENOENT;
 		goto end;
@@ -1341,9 +1323,6 @@ end:
 
 	if (vinode)
 		vinode_unref_tx(pfp, vinode);
-
-	if (allocated)
-		free((char *)sanitized);
 
 	if (error) {
 		errno = error;

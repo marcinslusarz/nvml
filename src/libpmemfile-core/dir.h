@@ -48,15 +48,19 @@ void resolve_pathat(PMEMfilepool *pfp, struct pmemfile_vinode *parent,
 		const char *path, struct pmemfile_path_info *path_info,
 		int flags);
 void path_info_cleanup(PMEMfilepool *pfp, struct pmemfile_path_info *path_info);
-bool sanitize_path(const char *path, const char **sanitized, bool *allocated);
+bool str_contains(const char *str, size_t len, char c);
+bool more_than_1_component(const char *path);
+size_t component_length(const char *path);
 
 struct pmemfile_vinode *vinode_new_dir(PMEMfilepool *pfp,
-		struct pmemfile_vinode *parent, const char *name, mode_t mode,
-		bool add_to_parent, volatile bool *parent_refed);
+		struct pmemfile_vinode *parent, const char *name,
+		size_t namelen, mode_t mode, bool add_to_parent,
+		volatile bool *parent_refed);
 
 void vinode_add_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		const char *name,
+		size_t namelen,
 		struct pmemfile_vinode *child_vinode,
 		const struct pmemfile_time *tm);
 
@@ -69,16 +73,19 @@ void vinode_set_debug_path_locked(PMEMfilepool *pfp,
 void vinode_set_debug_path(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent_vinode,
 		struct pmemfile_vinode *child_vinode,
-		const char *name);
+		const char *name,
+		size_t namelen);
 
 void vinode_clear_debug_path(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
 
 struct pmemfile_vinode *vinode_lookup_dirent(PMEMfilepool *pfp,
-		struct pmemfile_vinode *parent, const char *name, int flags);
+		struct pmemfile_vinode *parent, const char *name,
+		size_t namelen, int flags);
 
 void vinode_unlink_dirent(PMEMfilepool *pfp,
 		struct pmemfile_vinode *parent,
 		const char *name,
+		size_t namelen,
 		struct pmemfile_vinode *volatile *vinode,
 		volatile bool *parent_refed,
 		bool abort_on_ENOENT);

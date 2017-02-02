@@ -62,8 +62,8 @@ initialize_super_block(PMEMfilepool *pfp)
 			pfp->root = inode_ref(pfp, super->root_inode, NULL,
 					NULL, NULL, 0);
 		} else {
-			pfp->root = vinode_new_dir(pfp, NULL, "/", 0777, false,
-					NULL);
+			pfp->root = vinode_new_dir(pfp, NULL, "/", 1, 0777,
+					false, NULL);
 
 			TX_ADD(pfp->super);
 			super->version = PMEMFILE_SUPER_VERSION(0, 1);

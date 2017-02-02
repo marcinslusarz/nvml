@@ -368,10 +368,11 @@ inode_ref_new(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		struct pmemfile_vinode *parent,
 		volatile bool *parent_refed,
-		const char *name)
+		const char *name,
+		size_t namelen)
 {
 	return _inode_get(pfp, inode, true, parent, parent_refed, name,
-			strlen(name));
+			namelen);
 }
 
 /*
@@ -467,7 +468,7 @@ file_get_time(struct pmemfile_time *t)
 struct pmemfile_vinode *
 inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t,
 		struct pmemfile_vinode *parent, volatile bool *parent_refed,
-		const char *name)
+		const char *name, size_t namelen)
 {
 	LOG(LDBG, "flags 0x%lx", flags);
 
@@ -500,7 +501,7 @@ inode_alloc(PMEMfilepool *pfp, uint64_t flags, struct pmemfile_time *t,
 		inode->size = sizeof(inode->file_data);
 	}
 
-	return inode_ref_new(pfp, tinode, parent, parent_refed, name);
+	return inode_ref_new(pfp, tinode, parent, parent_refed, name, namelen);
 }
 
 /*
@@ -691,8 +692,6 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 	bool path_info_changed;
 
 	do {
-		const char *sanitized;
-		bool allocated;
 		path_info_changed = false;
 
 		if (info.vinode == NULL) {
@@ -705,17 +704,19 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 			goto end;
 		}
 
-		if (!sanitize_path(info.remaining, &sanitized, &allocated)) {
+		if (more_than_1_component(info.remaining)) {
 			error = ENOENT;
 			goto end;
 		}
 
-		if (sanitized[0] == 0) {
+		size_t namelen = component_length(info.remaining);
+
+		if (namelen == 0) {
 			ASSERT(info.vinode == pfp->root);
 			vinode = vinode_ref(pfp, info.vinode);
 		} else {
 			vinode = vinode_lookup_dirent(pfp, info.vinode,
-					sanitized, 0);
+					info.remaining, namelen, 0);
 			if (vinode && vinode_is_symlink(vinode) &&
 					!(flags & AT_SYMLINK_NOFOLLOW)) {
 				char symlink_target[PATH_MAX];
@@ -737,9 +738,6 @@ _pmemfile_fstatat(PMEMfilepool *pfp, struct pmemfile_vinode *dir,
 				path_info_changed = true;
 			}
 		}
-
-		if (allocated)
-			free((char *)sanitized);
 
 		if (!vinode) {
 			error = ENOENT;

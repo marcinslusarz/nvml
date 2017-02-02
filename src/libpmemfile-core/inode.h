@@ -108,7 +108,8 @@ struct pmemfile_vinode *inode_alloc(PMEMfilepool *pfp,
 		uint64_t flags, struct pmemfile_time *t,
 		struct pmemfile_vinode *parent,
 		volatile bool *parent_refed,
-		const char *name);
+		const char *name,
+		size_t namelen);
 
 void inode_free(PMEMfilepool *pfp, TOID(struct pmemfile_inode) tinode);
 
@@ -132,7 +133,8 @@ struct pmemfile_vinode *inode_ref_new(PMEMfilepool *pfp,
 		TOID(struct pmemfile_inode) inode,
 		struct pmemfile_vinode *parent,
 		volatile bool *parent_refed,
-		const char *name);
+		const char *name,
+		size_t namelen);
 
 void vinode_unref_tx(PMEMfilepool *pfp, struct pmemfile_vinode *vinode);
 
