@@ -1,5 +1,5 @@
 total $(N)
 drwxrwxrwx 2 $(S) $(N) .
 drwxrwxrwx 2 $(S) $(N) dummy_dir_a
--rw-r--r-- 1 $(S) 391 file_a
--rw-r--r-- 1 $(S) 4401 file_b
+$(S) 1 $(S) 391 file_a
+$(S) 1 $(S) 4401 file_b
