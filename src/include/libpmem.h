@@ -77,6 +77,8 @@ extern "C" {
 #define PMEM_FILE_EXCL		(1 << 1)
 #define PMEM_FILE_SPARSE	(1 << 2)
 #define PMEM_FILE_TMPFILE	(1 << 3)
+#define PMEM_FILE_LOCK		(1 << 4)
+#define PMEM_FILE_NONBLOCK	(1 << 5)
 
 #ifndef _WIN32
 void *pmem_map_file(const char *path, size_t len, int flags, mode_t mode,
@@ -127,6 +129,46 @@ const char *pmem_errormsg(void);
 const char *pmem_errormsgU(void);
 const wchar_t *pmem_errormsgW(void);
 #endif
+
+/* PMEM2 */
+
+struct pmem_handle;
+typedef struct pmem_handle PMEMhandle;
+
+PMEMhandle *pmem2_open(const char *path, size_t len, int flags, mode_t mode);
+#ifdef _WIN32
+PMEMhandle *pmem2_open_handle(HANDLE h, int flags);
+#else
+PMEMhandle *pmem2_fdopen(int fd, int flags);
+#endif
+size_t pmem2_fsize(PMEMhandle *ph);
+
+void pmem2_close(PMEMhandle *ph);
+
+void *pmem2_map(PMEMhandle *ph, size_t offset, size_t length, int flags);
+void pmem2_unmap(PMEMhandle *ph, void *addr, size_t length);
+
+int pmem2_is_pmem(PMEMhandle *ph);
+int pmem2_msync(PMEMhandle *ph, const void *addr, size_t len);
+int pmem2_deep_flush(PMEMhandle *ph, const void *addr, size_t length);
+#ifdef _WIN32
+HANDLE pmem2_get_handle(PMEMhandle *ph);
+#else
+int pmem2_get_fd(PMEMhandle *ph);
+#endif
+
+/* The functions below are not currently needed. Skip for now? */
+void pmem2_persist(PMEMhandle *ph, const void *addr, size_t len);
+void pmem2_flush(PMEMhandle *ph, const void *addr, size_t len);
+void pmem2_drain(PMEMhandle *ph);
+void *pmem2_memmove_persist(PMEMhandle *ph, void *pmemdest, const void *src, size_t len);
+void *pmem2_memcpy_persist(PMEMhandle *ph, void *pmemdest, const void *src, size_t len);
+void *pmem2_memset_persist(PMEMhandle *ph, void *pmemdest, int c, size_t len);
+/* s/_nodrain/_flush/ ? */
+void *pmem2_memmove_nodrain(PMEMhandle *ph, void *pmemdest, const void *src, size_t len);
+void *pmem2_memcpy_nodrain(PMEMhandle *ph, void *pmemdest, const void *src, size_t len);
+void *pmem2_memset_nodrain(PMEMhandle *ph, void *pmemdest, int c, size_t len);
+/* int pmem2_has_hw_drain(PMEMhandle *ph); doesn't make sense */
 
 #ifdef __cplusplus
 }
