@@ -2041,10 +2041,10 @@ obj_alloc_construct(PMEMobjpool *pop, PMEMoid *oidp, size_t size,
 	carg.constructor = constructor;
 	carg.arg = arg;
 
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 
 	struct operation_context ctx;
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	if (oidp)
 		operation_add_entry(&ctx, &oidp->pool_uuid_lo, pop->uuid_lo,
@@ -2161,10 +2161,10 @@ obj_free(PMEMobjpool *pop, PMEMoid *oidp)
 {
 	ASSERTne(oidp, NULL);
 
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 
 	struct operation_context ctx;
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	operation_add_entry(&ctx, &oidp->pool_uuid_lo, 0, OPERATION_SET);
 
@@ -2241,10 +2241,10 @@ obj_realloc_common(PMEMobjpool *pop,
 	carg.arg = NULL;
 	carg.zero_init = zero_init;
 
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 
 	struct operation_context ctx;
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	int ret = pmalloc_operation(&pop->heap, oidp->off, &oidp->off,
 			size, constructor_realloc, &carg, type_num, 0, 0, &ctx);
@@ -2564,10 +2564,10 @@ obj_alloc_root(PMEMobjpool *pop, size_t size,
 	carg.zero_init = 1;
 	carg.arg = arg;
 
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 
 	struct operation_context ctx;
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	operation_add_entry(&ctx, &pop->root_size, size, OPERATION_SET);
 
@@ -2728,10 +2728,10 @@ pmemobj_set_value(PMEMobjpool *pop, struct pobj_action *act,
 void
 pmemobj_publish(PMEMobjpool *pop, struct pobj_action *actv, int actvcnt)
 {
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 
 	struct operation_context ctx;
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	palloc_publish(&pop->heap, actv, actvcnt, &ctx);
 

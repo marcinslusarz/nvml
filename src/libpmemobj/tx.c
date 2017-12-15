@@ -776,10 +776,10 @@ tx_fulfill_reservations(struct tx *tx)
 
 	PMEMobjpool *pop = tx->pop;
 
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 
 	struct operation_context ctx;
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	palloc_publish(&pop->heap, lane->alloc_actv, lane->actvcnt, &ctx);
 	lane->actvcnt = 0;

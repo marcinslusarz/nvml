@@ -73,8 +73,7 @@ enum operation_entry_type {
 struct operation_context {
 	const void *base;
 
-	const struct redo_ctx *redo_ctx;
-	struct redo_log *redo;
+	struct redo_log_state *redo;
 	const struct pmem_ops *p_ops;
 
 	size_t nentries[MAX_OPERATION_ENTRY_TYPE];
@@ -83,7 +82,7 @@ struct operation_context {
 };
 
 void operation_init(struct operation_context *ctx, const void *base,
-	const struct redo_ctx *redo_ctx, struct redo_log *redo);
+	struct redo_log_state *redo);
 void operation_add_entry(struct operation_context *ctx,
 	void *ptr, uint64_t value, enum operation_type type);
 void operation_add_typed_entry(struct operation_context *ctx,

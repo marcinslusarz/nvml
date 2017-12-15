@@ -92,6 +92,25 @@ redo_log_config_delete(struct redo_ctx *ctx)
 	Free(ctx);
 }
 
+struct redo_log_state *
+redo_log_state_new(struct redo_ctx *ctx, struct redo_log *redo, size_t size)
+{
+	struct redo_log_state *state;
+	state = Zalloc(sizeof(*state));
+	if (!state)
+		return NULL;
+	state->pmem_data = redo;
+	state->ctx = ctx;
+
+	return state;
+}
+
+void
+redo_log_state_delete(struct redo_log_state *state)
+{
+	Free(state);
+}
+
 /*
  * redo_log_nflags -- (internal) get number of finish flags set
  */
@@ -115,9 +134,12 @@ redo_log_nflags(const struct redo_log *redo, size_t nentries)
  * redo_log_store -- (internal) store redo log entry at specified index
  */
 void
-redo_log_store(const struct redo_ctx *ctx, struct redo_log *redo, size_t index,
+redo_log_store(struct redo_log_state *redo_state, size_t index,
 		uint64_t offset, uint64_t value)
 {
+	const struct redo_ctx *ctx = redo_state->ctx;
+	struct redo_log *redo = redo_state->pmem_data;
+
 	LOG(15, "redo %p index %zu offset %" PRIu64 " value %" PRIu64,
 			redo, index, offset, value);
 
@@ -132,9 +154,12 @@ redo_log_store(const struct redo_ctx *ctx, struct redo_log *redo, size_t index,
  * redo_log_store_last -- (internal) store last entry at specified index
  */
 void
-redo_log_store_last(const struct redo_ctx *ctx, struct redo_log *redo,
+redo_log_store_last(struct redo_log_state *redo_state,
 		size_t index, uint64_t offset, uint64_t value)
 {
+	const struct redo_ctx *ctx = redo_state->ctx;
+	struct redo_log *redo = redo_state->pmem_data;
+
 	LOG(15, "redo %p index %zu offset %" PRIu64 " value %" PRIu64,
 			redo, index, offset, value);
 
@@ -157,9 +182,12 @@ redo_log_store_last(const struct redo_ctx *ctx, struct redo_log *redo,
  * redo_log_set_last -- (internal) set finish flag in specified entry
  */
 void
-redo_log_set_last(const struct redo_ctx *ctx, struct redo_log *redo,
+redo_log_set_last(struct redo_log_state *redo_state,
 		size_t index)
 {
+	const struct redo_ctx *ctx = redo_state->ctx;
+	struct redo_log *redo = redo_state->pmem_data;
+
 	LOG(15, "redo %p index %zu", redo, index);
 
 	ASSERT(index < ctx->redo_num_entries);
@@ -177,13 +205,16 @@ redo_log_set_last(const struct redo_ctx *ctx, struct redo_log *redo,
  * redo_log_process -- (internal) process redo log entries
  */
 void
-redo_log_process(const struct redo_ctx *ctx, struct redo_log *redo,
+redo_log_process(struct redo_log_state *redo_state,
 		size_t nentries)
 {
+	const struct redo_ctx *ctx = redo_state->ctx;
+	struct redo_log *redo = redo_state->pmem_data;
+
 	LOG(15, "redo %p nentries %zu", redo, nentries);
 
 #ifdef DEBUG
-	ASSERTeq(redo_log_check(ctx, redo, nentries), 0);
+	ASSERTeq(redo_log_check(redo_state, nentries), 0);
 #endif
 	const struct pmem_ops *p_ops = &ctx->p_ops;
 
@@ -218,9 +249,11 @@ redo_log_process(const struct redo_ctx *ctx, struct redo_log *redo,
  * The redo_log_recover shall be preceded by redo_log_check call.
  */
 void
-redo_log_recover(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t nentries)
+redo_log_recover(struct redo_log_state *redo_state, size_t nentries)
 {
+	const struct redo_ctx *ctx = redo_state->ctx;
+	struct redo_log *redo = redo_state->pmem_data;
+
 	LOG(15, "redo %p nentries %zu", redo, nentries);
 	ASSERTne(ctx, NULL);
 
@@ -228,16 +261,18 @@ redo_log_recover(const struct redo_ctx *ctx, struct redo_log *redo,
 	ASSERT(nflags < 2);
 
 	if (nflags == 1)
-		redo_log_process(ctx, redo, nentries);
+		redo_log_process(redo_state, nentries);
 }
 
 /*
  * redo_log_check -- (internal) check consistency of redo log entries
  */
 int
-redo_log_check(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t nentries)
+redo_log_check(struct redo_log_state *redo_state, size_t nentries)
 {
+	const struct redo_ctx *ctx = redo_state->ctx;
+	struct redo_log *redo = redo_state->pmem_data;
+
 	LOG(15, "redo %p nentries %zu", redo, nentries);
 	ASSERTne(ctx, NULL);
 

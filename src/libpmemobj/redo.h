@@ -52,6 +52,11 @@ struct redo_log {
 	uint64_t value;
 };
 
+struct redo_log_state {
+	const struct redo_ctx *ctx;
+	struct redo_log *pmem_data;
+};
+
 typedef int (*redo_check_offset_fn)(void *ctx, uint64_t offset);
 
 struct redo_ctx *redo_log_config_new(void *base,
@@ -62,18 +67,18 @@ struct redo_ctx *redo_log_config_new(void *base,
 
 void redo_log_config_delete(struct redo_ctx *ctx);
 
-void redo_log_store(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t index, uint64_t offset, uint64_t value);
-void redo_log_store_last(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t index, uint64_t offset, uint64_t value);
-void redo_log_set_last(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t index);
-void redo_log_process(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t nentries);
-void redo_log_recover(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t nentries);
-int redo_log_check(const struct redo_ctx *ctx, struct redo_log *redo,
-		size_t nentries);
+struct redo_log_state *redo_log_state_new(struct redo_ctx *ctx,
+		struct redo_log *redo, size_t size);
+void redo_log_state_delete(struct redo_log_state *state);
+
+void redo_log_store(struct redo_log_state *redo, size_t index, uint64_t offset,
+		uint64_t value);
+void redo_log_store_last(struct redo_log_state *redo, size_t index,
+		uint64_t offset, uint64_t value);
+void redo_log_set_last(struct redo_log_state *redo, size_t index);
+void redo_log_process(struct redo_log_state *redo, size_t nentries);
+void redo_log_recover(struct redo_log_state *redo, size_t nentries);
+int redo_log_check(struct redo_log_state *redo, size_t nentries);
 
 size_t redo_log_nflags(const struct redo_log *redo, size_t nentries);
 uint64_t redo_log_offset(const struct redo_log *redo);

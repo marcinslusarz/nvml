@@ -67,6 +67,10 @@ struct list_head {
 	PMEMmutex lock;
 };
 
+struct lane_list_runtime {
+	struct redo_log_state *redo_state;
+};
+
 int list_insert_new_user(PMEMobjpool *pop,
 	size_t pe_offset, struct list_head *user_head, PMEMoid dest, int before,
 	size_t size, palloc_constr constructor, void *arg, PMEMoid *oidp);
