@@ -71,7 +71,7 @@ int prealloc(PMEMobjpool *pop, uint64_t *off, size_t size,
 
 void pfree(PMEMobjpool *pop, uint64_t *off);
 
-struct redo_log *pmalloc_redo_hold(PMEMobjpool *pop);
+struct redo_log_state *pmalloc_redo_hold(PMEMobjpool *pop);
 void pmalloc_redo_release(PMEMobjpool *pop);
 
 void pmalloc_ctl_register(PMEMobjpool *pop);
