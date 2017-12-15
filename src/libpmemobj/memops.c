@@ -53,13 +53,12 @@
  */
 void
 operation_init(struct operation_context *ctx, const void *base,
-	const struct redo_ctx *redo_ctx, struct redo_log *redo)
+	struct redo_log_state *redo)
 {
 	ctx->base = base;
-	ctx->redo_ctx = redo_ctx;
 	ctx->redo = redo;
-	if (redo_ctx)
-		ctx->p_ops = redo_get_pmem_ops(redo_ctx);
+	if (redo && redo->ctx)
+		ctx->p_ops = redo_get_pmem_ops(redo->ctx);
 	else
 		ctx->p_ops = NULL;
 
@@ -154,19 +153,18 @@ static void
 operation_process_persistent_redo(struct operation_context *ctx)
 {
 	struct operation_entry *e;
-	const struct redo_ctx *redo = ctx->redo_ctx;
 
 	size_t i;
 	for (i = 0; i < ctx->nentries[ENTRY_PERSISTENT]; ++i) {
 		e = &ctx->entries[ENTRY_PERSISTENT][i];
 
-		redo_log_store(redo, ctx->redo, i,
+		redo_log_store(ctx->redo, i,
 				(uintptr_t)e->ptr - (uintptr_t)ctx->base,
 				e->value);
 	}
 
-	redo_log_set_last(redo, ctx->redo, i - 1);
-	redo_log_process(redo, ctx->redo, i);
+	redo_log_set_last(ctx->redo, i - 1);
+	redo_log_process(ctx->redo, i);
 }
 
 /*

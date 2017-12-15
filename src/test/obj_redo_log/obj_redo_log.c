@@ -192,6 +192,9 @@ main(int argc, char *argv[])
 	struct redo_log *redo =
 		(struct redo_log *)((char *)pop->addr + PMEMOBJ_POOL_HDR_SIZE);
 
+	struct redo_log_state *redo_state =
+			redo_log_state_new(pop->redo, redo,
+					redo_size - PMEMOBJ_POOL_HDR_SIZE);
 	uint64_t offset;
 	uint64_t value;
 	int i;
@@ -207,22 +210,20 @@ main(int argc, char *argv[])
 					&index, &offset, &value) != 3)
 				FATAL_USAGE();
 			UT_OUT("s:%ld:0x%08lx:0x%08lx", index, offset, value);
-			redo_log_store(pop->redo, redo, index, offset,
-					value);
+			redo_log_store(redo_state, index, offset, value);
 			break;
 		case 'f':
 			if (sscanf(arg, "f:%zd:0x%zx:0x%zx",
 					&index, &offset, &value) != 3)
 				FATAL_USAGE();
 			UT_OUT("f:%ld:0x%08lx:0x%08lx", index, offset, value);
-			redo_log_store_last(pop->redo, redo, index, offset,
-					value);
+			redo_log_store_last(redo_state, index, offset, value);
 			break;
 		case 'F':
 			if (sscanf(arg, "F:%zd", &index) != 1)
 				FATAL_USAGE();
 			UT_OUT("F:%ld", index);
-			redo_log_set_last(pop->redo, redo, index);
+			redo_log_set_last(redo_state, index);
 			break;
 		case 'r':
 			if (sscanf(arg, "r:0x%zx", &offset) != 1)
@@ -246,15 +247,15 @@ main(int argc, char *argv[])
 					flag, value);
 			break;
 		case 'P':
-			redo_log_process(pop->redo, redo, redo_cnt);
+			redo_log_process(redo_state, redo_cnt);
 			UT_OUT("P");
 			break;
 		case 'R':
-			redo_log_recover(pop->redo, redo, redo_cnt);
+			redo_log_recover(redo_state, redo_cnt);
 			UT_OUT("R");
 			break;
 		case 'C':
-			ret = redo_log_check(pop->redo, redo, redo_cnt);
+			ret = redo_log_check(redo_state, redo_cnt);
 			UT_OUT("C:%d", ret);
 			break;
 		case 'n':

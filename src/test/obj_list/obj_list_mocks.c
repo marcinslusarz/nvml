@@ -163,6 +163,7 @@ FUNC_MOCK_RUN_DEFAULT
 	/* Alloc lane layout */
 	Lane_section.layout = (struct lane_section_layout *)((uintptr_t)Pop +
 			linear_alloc(&heap_offset, LANE_SECTION_LEN));
+	Lane_section.runtime = Zalloc(sizeof(struct lane_list_runtime));
 
 	/* Alloc in band lists */
 	List.oid.pool_uuid_lo = Pop->uuid_lo;
@@ -210,6 +211,10 @@ FUNC_MOCK_END
  */
 FUNC_MOCK(pmemobj_close, void, PMEMobjpool *pop)
 	FUNC_MOCK_RUN_DEFAULT {
+		struct lane_list_runtime *r = Lane_section.runtime;
+		if (r->redo_state)
+			redo_log_state_delete(r->redo_state);
+		Free(r);
 		redo_log_config_delete(Pop->redo);
 		UT_ASSERTeq(pmem_unmap(Pop,
 			Pop->heap_size + Pop->heap_offset), 0);

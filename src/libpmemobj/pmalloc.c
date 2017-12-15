@@ -50,36 +50,48 @@
 #include "alloc_class.h"
 #include "set.h"
 
+struct lane_pmalloc_runtime {
+	struct redo_log_state *redo_state;
 #ifdef DEBUG
-/*
- * In order to prevent allocations from inside of a constructor, each lane hold
- * invocation sets the, otherwise unused, runtime part of the lane section
- * to a value that marks an in progress allocation. Likewise, each lane release
- * sets the runtime variable back to NULL.
- *
- * Because this check requires additional hold/release pair for every single
- * allocation, it's done only for debug builds.
- */
-#define ALLOC_INPROGRESS_MARK ((void *)0x1)
+	/*
+	 * In order to prevent allocations from inside of a constructor here we
+	 * store the information about in progress allocation.
+	 *
+	 * Because this check requires additional hold/release pair for every
+	 * single allocation, it's done only for debug builds.
+	 */
+	int in_use;
 #endif
+};
 
 /*
  * pmalloc_redo_hold -- acquires allocator lane section and returns a pointer to
- * it's redo log
+ * its redo log
  */
-struct redo_log *
+struct redo_log_state *
 pmalloc_redo_hold(PMEMobjpool *pop)
 {
 	struct lane_section *lane;
 	lane_hold(pop, &lane, LANE_SECTION_ALLOCATOR);
 
-#ifdef DEBUG
-	ASSERTeq(lane->runtime, NULL);
-	lane->runtime = ALLOC_INPROGRESS_MARK;
-#endif
+	struct lane_pmalloc_runtime *r = lane->runtime;
+	VALGRIND_ANNOTATE_NEW_MEMORY(r, sizeof(*r));
 
+#ifdef DEBUG
+	ASSERTeq(r->in_use, 0);
+	r->in_use = 1;
+#endif
 	struct lane_alloc_layout *sec = (void *)lane->layout;
-	return sec->redo;
+
+	// XXX should we do this at open time?
+	if (r->redo_state == NULL) {
+		r->redo_state = redo_log_state_new(pop->redo, sec->redo,
+				sizeof(sec->redo));
+		ASSERTne(r->redo_state, NULL); // XXX error handling
+	}
+	VALGRIND_ANNOTATE_NEW_MEMORY(r->redo_state, sizeof(*r->redo_state));
+
+	return r->redo_state;
 }
 
 /*
@@ -92,7 +104,8 @@ pmalloc_redo_release(PMEMobjpool *pop)
 	/* there's no easier way, I've tried */
 	struct lane_section *lane;
 	lane_hold(pop, &lane, LANE_SECTION_ALLOCATOR);
-	lane->runtime = NULL;
+	struct lane_pmalloc_runtime *r = lane->runtime;
+	r->in_use = 0;
 	lane_release(pop);
 #endif
 	lane_release(pop);
@@ -134,10 +147,10 @@ int
 pmalloc(PMEMobjpool *pop, uint64_t *off, size_t size,
 	uint64_t extra_field, uint16_t object_flags)
 {
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 
 	struct operation_context ctx;
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	int ret = pmalloc_operation(&pop->heap, 0, off, size, NULL, NULL,
 		extra_field, object_flags, 0, &ctx);
@@ -160,10 +173,10 @@ pmalloc_construct(PMEMobjpool *pop, uint64_t *off, size_t size,
 	palloc_constr constructor, void *arg,
 	uint64_t extra_field, uint16_t object_flags, uint16_t class_id)
 {
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 	struct operation_context ctx;
 
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	int ret = pmalloc_operation(&pop->heap, 0, off, size, constructor, arg,
 			extra_field, object_flags, class_id, &ctx);
@@ -184,10 +197,10 @@ int
 prealloc(PMEMobjpool *pop, uint64_t *off, size_t size,
 	uint64_t extra_field, uint16_t object_flags)
 {
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 	struct operation_context ctx;
 
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	int ret = pmalloc_operation(&pop->heap, *off, off, size, NULL, NULL,
 		extra_field, object_flags, 0, &ctx);
@@ -207,10 +220,10 @@ prealloc(PMEMobjpool *pop, uint64_t *off, size_t size,
 void
 pfree(PMEMobjpool *pop, uint64_t *off)
 {
-	struct redo_log *redo = pmalloc_redo_hold(pop);
+	struct redo_log_state *redo = pmalloc_redo_hold(pop);
 	struct operation_context ctx;
 
-	operation_init(&ctx, pop, pop->redo, redo);
+	operation_init(&ctx, pop, redo);
 
 	int ret = pmalloc_operation(&pop->heap, *off, off, 0, NULL, NULL,
 		0, 0, 0, &ctx);
@@ -225,7 +238,7 @@ pfree(PMEMobjpool *pop, uint64_t *off)
 static void *
 pmalloc_construct_rt(PMEMobjpool *pop)
 {
-	return NULL;
+	return Zalloc(sizeof(struct lane_pmalloc_runtime));
 }
 
 /*
@@ -234,7 +247,10 @@ pmalloc_construct_rt(PMEMobjpool *pop)
 static void
 pmalloc_destroy_rt(PMEMobjpool *pop, void *rt)
 {
-	/* NOP */
+	struct lane_pmalloc_runtime *r = rt;
+	if (r->redo_state)
+		redo_log_state_delete(r->redo_state);
+	Free(r);
 }
 
 /*
@@ -246,7 +262,13 @@ pmalloc_recovery(PMEMobjpool *pop, void *data, unsigned length)
 	struct lane_alloc_layout *sec = data;
 	ASSERT(sizeof(*sec) <= length);
 
-	redo_log_recover(pop->redo, sec->redo, ALLOC_REDO_LOG_SIZE);
+	struct redo_log_state *redo_state =
+				redo_log_state_new(pop->redo, sec->redo,
+						sizeof(sec->redo));
+
+	redo_log_recover(redo_state, ALLOC_REDO_LOG_SIZE);
+
+	redo_log_state_delete(redo_state);
 
 	return 0;
 }
@@ -261,9 +283,15 @@ pmalloc_check(PMEMobjpool *pop, void *data, unsigned length)
 
 	struct lane_alloc_layout *sec = data;
 
-	int ret = redo_log_check(pop->redo, sec->redo, ALLOC_REDO_LOG_SIZE);
+	struct redo_log_state *redo_state =
+				redo_log_state_new(pop->redo, sec->redo,
+						sizeof(sec->redo));
+
+	int ret = redo_log_check(redo_state, ALLOC_REDO_LOG_SIZE);
 	if (ret != 0)
 		ERR("allocator lane: redo log check failed");
+
+	redo_log_state_delete(redo_state);
 
 	return ret;
 }

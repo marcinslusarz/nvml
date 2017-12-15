@@ -558,7 +558,7 @@ heap_free_chunk_reuse(struct palloc_heap *heap,
 	struct memory_block *m)
 {
 	struct operation_context ctx;
-	operation_init(&ctx, heap->base, NULL, NULL);
+	operation_init(&ctx, heap->base, NULL);
 	ctx.p_ops = &heap->p_ops;
 
 	/*

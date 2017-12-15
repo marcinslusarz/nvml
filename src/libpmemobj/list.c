@@ -184,7 +184,7 @@ list_get_dest(PMEMobjpool *pop, struct list_head *head, PMEMoid dest,
  */
 static size_t
 list_set_oid_redo_log(PMEMobjpool *pop,
-	struct redo_log *redo, size_t redo_index,
+	struct redo_log_state *redo, size_t redo_index,
 	PMEMoid *oidp, uint64_t obj_doffset, int oidp_inited)
 {
 	ASSERT(OBJ_PTR_IS_VALID(pop, oidp));
@@ -194,14 +194,12 @@ list_set_oid_redo_log(PMEMobjpool *pop,
 			ASSERTeq(oidp->pool_uuid_lo, 0);
 		uint64_t oid_uuid_off = OBJ_PTR_TO_OFF(pop,
 				&oidp->pool_uuid_lo);
-		redo_log_store(pop->redo, redo, redo_index, oid_uuid_off,
-				pop->uuid_lo);
+		redo_log_store(redo, redo_index, oid_uuid_off, pop->uuid_lo);
 		redo_index += 1;
 	}
 
 	uint64_t oid_off_off = OBJ_PTR_TO_OFF(pop, &oidp->off);
-	redo_log_store(pop->redo, redo, redo_index, oid_off_off,
-			obj_doffset);
+	redo_log_store(redo, redo_index, oid_off_off, obj_doffset);
 
 	return redo_index + 1;
 }
@@ -212,27 +210,24 @@ list_set_oid_redo_log(PMEMobjpool *pop,
  */
 static size_t
 list_update_head(PMEMobjpool *pop,
-	struct redo_log *redo, size_t redo_index,
+	struct redo_log_state *redo, size_t redo_index,
 	struct list_head *head, uint64_t first_offset)
 {
 	LOG(15, NULL);
 
 	uint64_t pe_first_off_off = OBJ_PTR_TO_OFF(pop, &head->pe_first.off);
 
-	redo_log_store(pop->redo, redo, redo_index + 0,
-			pe_first_off_off, first_offset);
+	redo_log_store(redo, redo_index + 0, pe_first_off_off, first_offset);
 
-	if (head->pe_first.pool_uuid_lo == 0) {
-		uint64_t pe_first_uuid_off = OBJ_PTR_TO_OFF(pop,
-				&head->pe_first.pool_uuid_lo);
-
-		redo_log_store(pop->redo, redo, redo_index + 1,
-				pe_first_uuid_off, pop->uuid_lo);
-
-		return redo_index + 2;
-	} else {
+	if (head->pe_first.pool_uuid_lo != 0)
 		return redo_index + 1;
-	}
+
+	uint64_t pe_first_uuid_off =
+			OBJ_PTR_TO_OFF(pop, &head->pe_first.pool_uuid_lo);
+
+	redo_log_store(redo, redo_index + 1, pe_first_uuid_off, pop->uuid_lo);
+
+	return redo_index + 2;
 }
 
 /*
@@ -281,7 +276,7 @@ list_fill_entry_persist(PMEMobjpool *pop, struct list_entry *entry_ptr,
  */
 static size_t
 list_fill_entry_redo_log(PMEMobjpool *pop,
-	struct redo_log *redo, size_t redo_index,
+	struct redo_log_state *redo, size_t redo_index,
 	struct list_args_common *args,
 	uint64_t next_offset, uint64_t prev_offset, int set_uuid)
 {
@@ -317,10 +312,8 @@ list_fill_entry_redo_log(PMEMobjpool *pop,
 	u64_add_offset(&next_off_off, args->pe_offset);
 	u64_add_offset(&prev_off_off, args->pe_offset);
 
-	redo_log_store(pop->redo, redo, redo_index + 0, next_off_off,
-			next_offset);
-	redo_log_store(pop->redo, redo, redo_index + 1, prev_off_off,
-			prev_offset);
+	redo_log_store(redo, redo_index + 0, next_off_off, next_offset);
+	redo_log_store(redo, redo_index + 1, prev_off_off, prev_offset);
 
 	return redo_index + 2;
 }
@@ -330,7 +323,7 @@ list_fill_entry_redo_log(PMEMobjpool *pop,
  */
 static size_t
 list_remove_single(PMEMobjpool *pop,
-	struct redo_log *redo, size_t redo_index,
+	struct redo_log_state *redo, size_t redo_index,
 	struct list_args_remove *args)
 {
 	LOG(15, NULL);
@@ -350,10 +343,8 @@ list_remove_single(PMEMobjpool *pop,
 		uint64_t prev_next_off = prev_off + NEXT_OFF;
 		u64_add_offset(&prev_next_off, args->pe_offset);
 
-		redo_log_store(pop->redo, redo, redo_index + 0,
-				next_prev_off, prev_off);
-		redo_log_store(pop->redo, redo, redo_index + 1,
-				prev_next_off, next_off);
+		redo_log_store(redo, redo_index + 0, next_prev_off, prev_off);
+		redo_log_store(redo, redo_index + 1, prev_next_off, next_off);
 		redo_index += 2;
 
 		if (args->head->pe_first.off == args->obj_doffset) {
@@ -371,7 +362,7 @@ list_remove_single(PMEMobjpool *pop,
  */
 static size_t
 list_insert_before(PMEMobjpool *pop,
-	struct redo_log *redo, size_t redo_index,
+	struct redo_log_state *redo, size_t redo_index,
 	struct list_args_insert *args, struct list_args_common *args_common,
 	uint64_t *next_offset, uint64_t *prev_offset)
 {
@@ -388,9 +379,9 @@ list_insert_before(PMEMobjpool *pop,
 					NEXT_OFF;
 	u64_add_offset(&dest_prev_next_off, args_common->pe_offset);
 
-	redo_log_store(pop->redo, redo, redo_index + 0,
+	redo_log_store(redo, redo_index + 0,
 			dest_prev_off, args_common->obj_doffset);
-	redo_log_store(pop->redo, redo, redo_index + 1,
+	redo_log_store(redo, redo_index + 1,
 			dest_prev_next_off, args_common->obj_doffset);
 
 	return redo_index + 2;
@@ -401,7 +392,7 @@ list_insert_before(PMEMobjpool *pop,
  */
 static size_t
 list_insert_after(PMEMobjpool *pop,
-	struct redo_log *redo, size_t redo_index,
+	struct redo_log_state *redo, size_t redo_index,
 	struct list_args_insert *args, struct list_args_common *args_common,
 	uint64_t *next_offset, uint64_t *prev_offset)
 {
@@ -418,9 +409,9 @@ list_insert_after(PMEMobjpool *pop,
 					PREV_OFF;
 	u64_add_offset(&dest_next_prev_off, args_common->pe_offset);
 
-	redo_log_store(pop->redo, redo, redo_index + 0,
+	redo_log_store(redo, redo_index + 0,
 			dest_next_off, args_common->obj_doffset);
-	redo_log_store(pop->redo, redo, redo_index + 1,
+	redo_log_store(redo, redo_index + 1,
 			dest_next_prev_off, args_common->obj_doffset);
 
 	return redo_index + 2;
@@ -431,7 +422,7 @@ list_insert_after(PMEMobjpool *pop,
  */
 static size_t
 list_insert_user(PMEMobjpool *pop,
-	struct redo_log *redo, size_t redo_index,
+	struct redo_log_state *redo, size_t redo_index,
 	struct list_args_insert *args, struct list_args_common *args_common,
 	uint64_t *next_offset, uint64_t *prev_offset)
 {
@@ -473,6 +464,48 @@ list_insert_user(PMEMobjpool *pop,
 }
 
 /*
+ * list_lane_hold -- acquires list lane section and returns a pointer to
+ * its redo log
+ */
+static struct redo_log_state *
+list_lane_hold(PMEMobjpool *pop, uint64_t **obj_offset)
+{
+	struct lane_section *lane;
+	lane_hold(pop, &lane, LANE_SECTION_LIST);
+
+	ASSERTne(lane, NULL);
+	ASSERTne(lane->layout, NULL);
+	ASSERTne(lane->runtime, NULL);
+
+	struct lane_list_runtime *r = lane->runtime;
+	VALGRIND_ANNOTATE_NEW_MEMORY(r, sizeof(*r));
+	struct lane_list_layout *section =
+			(struct lane_list_layout *)lane->layout;
+
+	if (obj_offset)
+		*obj_offset = &section->obj_offset;
+
+	// XXX should we do this at open time?
+	if (r->redo_state == NULL) {
+		r->redo_state = redo_log_state_new(pop->redo, section->redo,
+					sizeof(section->redo));
+		ASSERTne(r->redo_state, NULL); // XXX error handling
+	}
+	VALGRIND_ANNOTATE_NEW_MEMORY(r->redo_state, sizeof(*r->redo_state));
+
+	return r->redo_state;
+}
+
+/*
+ * list_lane_release -- releases list lane section
+ */
+static void
+list_lane_release(PMEMobjpool *pop)
+{
+	lane_release(pop);
+}
+
+/*
  * list_insert_new -- allocate and insert element to oob and user lists
  *
  * pop         - pmemobj pool handle
@@ -496,40 +529,31 @@ list_insert_new(PMEMobjpool *pop,
 
 	int ret;
 
-	struct lane_section *lane_section;
-
 #ifdef DEBUG
 	int r = pmemobj_mutex_assert_locked(pop, &user_head->lock);
 	ASSERTeq(r, 0);
 #endif
 
-	lane_hold(pop, &lane_section, LANE_SECTION_LIST);
-
-	ASSERTne(lane_section, NULL);
-	ASSERTne(lane_section->layout, NULL);
-
-	struct lane_list_layout *section =
-		(struct lane_list_layout *)lane_section->layout;
-	struct redo_log *redo = section->redo;
+	uint64_t *obj_offset;
+	struct redo_log_state *redo = list_lane_hold(pop, &obj_offset);
 	size_t redo_index = 0;
-	uint64_t sec_off_off = OBJ_PTR_TO_OFF(pop, &section->obj_offset);
+	uint64_t sec_off_off = OBJ_PTR_TO_OFF(pop, obj_offset);
 
 	if (constructor) {
-		if ((ret = pmalloc_construct(pop,
-				&section->obj_offset, size,
+		if ((ret = pmalloc_construct(pop, obj_offset, size,
 				constructor, arg, 0, 0, 0))) {
 			ERR("!pmalloc_construct");
 			goto err_pmalloc;
 		}
 	} else {
-		ret = pmalloc(pop, &section->obj_offset, size, 0, 0);
+		ret = pmalloc(pop, obj_offset, size, 0, 0);
 		if (ret) {
 			ERR("!pmalloc");
 			goto err_pmalloc;
 		}
 	}
 
-	uint64_t obj_doffset = section->obj_offset;
+	uint64_t obj_doffset = *obj_offset;
 
 	ASSERT((ssize_t)pe_offset >= 0);
 
@@ -561,9 +585,8 @@ list_insert_new(PMEMobjpool *pop,
 	uint64_t prev_offset;
 
 	/* insert element to user list */
-	redo_index = list_insert_user(pop,
-		redo, redo_index, &args, &args_common,
-		&next_offset, &prev_offset);
+	redo_index = list_insert_user(pop, redo, redo_index, &args,
+			&args_common, &next_offset, &prev_offset);
 
 	/* don't need to use redo log for filling new element */
 	list_fill_entry_persist(pop, entry_ptr,
@@ -580,14 +603,14 @@ list_insert_new(PMEMobjpool *pop,
 	}
 
 	/* clear the obj_offset in lane section */
-	redo_log_store_last(pop->redo, redo, redo_index, sec_off_off, 0);
+	redo_log_store_last(redo, redo_index, sec_off_off, 0);
 
-	redo_log_process(pop->redo, redo, REDO_NUM_ENTRIES);
+	redo_log_process(redo, REDO_NUM_ENTRIES);
 
 	ret = 0;
 
 err_pmalloc:
-	lane_release(pop);
+	list_lane_release(pop);
 
 	ASSERT(ret == 0 || ret == -1);
 	return ret;
@@ -650,9 +673,7 @@ list_insert(PMEMobjpool *pop,
 
 	int ret;
 
-	struct lane_section *lane_section;
-
-	lane_hold(pop, &lane_section, LANE_SECTION_LIST);
+	struct redo_log_state *redo = list_lane_hold(pop, NULL);
 
 	if ((ret = pmemobj_mutex_lock(pop, &head->lock))) {
 		errno = ret;
@@ -661,12 +682,6 @@ list_insert(PMEMobjpool *pop,
 		goto err;
 	}
 
-	ASSERTne(lane_section, NULL);
-	ASSERTne(lane_section->layout, NULL);
-
-	struct lane_list_layout *section =
-		(struct lane_list_layout *)lane_section->layout;
-	struct redo_log *redo = section->redo;
 	size_t redo_index = 0;
 
 	dest = list_get_dest(pop, head, dest, pe_offset, before);
@@ -703,13 +718,13 @@ list_insert(PMEMobjpool *pop,
 	redo_index = list_fill_entry_redo_log(pop, redo, redo_index,
 			&args_common, next_offset, prev_offset, 1);
 
-	redo_log_set_last(pop->redo, redo, redo_index - 1);
+	redo_log_set_last(redo, redo_index - 1);
 
-	redo_log_process(pop->redo, redo, REDO_NUM_ENTRIES);
+	redo_log_process(redo, REDO_NUM_ENTRIES);
 
 	pmemobj_mutex_unlock_nofail(pop, &head->lock);
 err:
-	lane_release(pop);
+	list_lane_release(pop);
 
 	ASSERT(ret == 0 || ret == -1);
 	return ret;
@@ -736,17 +751,10 @@ list_remove_free(PMEMobjpool *pop, size_t pe_offset,
 	ASSERTeq(r, 0);
 #endif
 
-	struct lane_section *lane_section;
+	uint64_t *obj_offset;
+	struct redo_log_state *redo = list_lane_hold(pop, &obj_offset);
 
-	lane_hold(pop, &lane_section, LANE_SECTION_LIST);
-
-	ASSERTne(lane_section, NULL);
-	ASSERTne(lane_section->layout, NULL);
-
-	struct lane_list_layout *section =
-		(struct lane_list_layout *)lane_section->layout;
-	uint64_t sec_off_off = OBJ_PTR_TO_OFF(pop, &section->obj_offset);
-	struct redo_log *redo = section->redo;
+	uint64_t sec_off_off = OBJ_PTR_TO_OFF(pop, obj_offset);
 	size_t redo_index = 0;
 
 	uint64_t obj_doffset = oidp->off;
@@ -774,18 +782,17 @@ list_remove_free(PMEMobjpool *pop, size_t pe_offset,
 	else
 		oidp->off = 0;
 
-	redo_log_store_last(pop->redo, redo, redo_index, sec_off_off,
-			obj_doffset);
+	redo_log_store_last(redo, redo_index, sec_off_off, obj_doffset);
 
-	redo_log_process(pop->redo, redo, REDO_NUM_ENTRIES);
+	redo_log_process(redo, REDO_NUM_ENTRIES);
 
 	/*
 	 * Don't need to fill next and prev offsets of removing element
 	 * because the element is freed.
 	 */
-	pfree(pop, &section->obj_offset);
+	pfree(pop, obj_offset);
 
-	lane_release(pop);
+	list_lane_release(pop);
 }
 
 /*
@@ -835,12 +842,7 @@ list_remove(PMEMobjpool *pop,
 
 	int ret;
 
-	struct lane_section *lane_section;
-
-	lane_hold(pop, &lane_section, LANE_SECTION_LIST);
-
-	ASSERTne(lane_section, NULL);
-	ASSERTne(lane_section->layout, NULL);
+	struct redo_log_state *redo = list_lane_hold(pop, NULL);
 
 	if ((ret = pmemobj_mutex_lock(pop, &head->lock))) {
 		errno = ret;
@@ -849,9 +851,6 @@ list_remove(PMEMobjpool *pop,
 		goto err;
 	}
 
-	struct lane_list_layout *section =
-		(struct lane_list_layout *)lane_section->layout;
-	struct redo_log *redo = section->redo;
 	size_t redo_index = 0;
 
 	struct list_entry *entry_ptr =
@@ -878,13 +877,13 @@ list_remove(PMEMobjpool *pop,
 	redo_index = list_fill_entry_redo_log(pop, redo, redo_index,
 			&args_common, 0, 0, 0);
 
-	redo_log_set_last(pop->redo, redo, redo_index - 1);
+	redo_log_set_last(redo, redo_index - 1);
 
-	redo_log_process(pop->redo, redo, REDO_NUM_ENTRIES);
+	redo_log_process(redo, REDO_NUM_ENTRIES);
 
 	pmemobj_mutex_unlock_nofail(pop, &head->lock);
 err:
-	lane_release(pop);
+	list_lane_release(pop);
 
 	ASSERT(ret == 0 || ret == -1);
 	return ret;
@@ -914,12 +913,7 @@ list_move(PMEMobjpool *pop,
 
 	int ret;
 
-	struct lane_section *lane_section;
-
-	lane_hold(pop, &lane_section, LANE_SECTION_LIST);
-
-	ASSERTne(lane_section, NULL);
-	ASSERTne(lane_section->layout, NULL);
+	struct redo_log_state *redo = list_lane_hold(pop, NULL);
 
 	/*
 	 * Grab locks in specified order to avoid dead-locks.
@@ -933,9 +927,6 @@ list_move(PMEMobjpool *pop,
 		goto err;
 	}
 
-	struct lane_list_layout *section =
-		(struct lane_list_layout *)lane_section->layout;
-	struct redo_log *redo = section->redo;
 	size_t redo_index = 0;
 
 	dest = list_get_dest(pop, head_new, dest,
@@ -1020,14 +1011,14 @@ list_move(PMEMobjpool *pop,
 			&args_common, next_offset, prev_offset, set_uuid);
 
 redo_last:
-	redo_log_set_last(pop->redo, redo, redo_index - 1);
+	redo_log_set_last(redo, redo_index - 1);
 
-	redo_log_process(pop->redo, redo, REDO_NUM_ENTRIES);
+	redo_log_process(redo, REDO_NUM_ENTRIES);
 
 unlock:
 	list_mutexes_unlock(pop, head_new, head_old);
 err:
-	lane_release(pop);
+	list_lane_release(pop);
 
 	ASSERT(ret == 0 || ret == -1);
 	return ret;
@@ -1044,7 +1035,13 @@ lane_list_recovery(PMEMobjpool *pop, void *data, unsigned length)
 	struct lane_list_layout *section = data;
 	ASSERT(sizeof(*section) <= length);
 
-	redo_log_recover(pop->redo, section->redo, REDO_NUM_ENTRIES);
+	struct redo_log_state *redo_state =
+				redo_log_state_new(pop->redo, section->redo,
+						sizeof(section->redo));
+
+	redo_log_recover(redo_state, REDO_NUM_ENTRIES);
+
+	redo_log_state_delete(redo_state);
 
 	if (section->obj_offset) {
 		/* alloc or free recovery */
@@ -1064,13 +1061,18 @@ lane_list_check(PMEMobjpool *pop, void *data, unsigned length)
 
 	struct lane_list_layout *section = data;
 
+	struct redo_log_state *redo_state =
+				redo_log_state_new(pop->redo, section->redo,
+						sizeof(section->redo));
+
 	int ret = 0;
-	if ((ret = redo_log_check(pop->redo,
-			section->redo, REDO_NUM_ENTRIES)) != 0) {
+	if ((ret = redo_log_check(redo_state, REDO_NUM_ENTRIES)) != 0) {
+		redo_log_state_delete(redo_state);
 		ERR("list lane: redo log check failed");
 		ASSERT(ret == 0 || ret == -1);
 		return ret;
 	}
+	redo_log_state_delete(redo_state);
 
 	if (section->obj_offset &&
 	    !OBJ_OFF_FROM_HEAP(pop, section->obj_offset)) {
@@ -1089,7 +1091,7 @@ lane_list_check(PMEMobjpool *pop, void *data, unsigned length)
 static void *
 lane_list_construct_rt(PMEMobjpool *pop)
 {
-	return NULL;
+	return Zalloc(sizeof(struct lane_list_runtime));
 }
 
 /*
@@ -1098,7 +1100,10 @@ lane_list_construct_rt(PMEMobjpool *pop)
 static void
 lane_list_destroy_rt(PMEMobjpool *pop, void *rt)
 {
-	/* NOP */
+	struct lane_list_runtime *r = rt;
+	if (r->redo_state)
+		redo_log_state_delete(r->redo_state);
+	Free(r);
 }
 
 /*
