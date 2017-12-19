@@ -44,6 +44,10 @@ static struct {
 	int n_msync;
 	int n_flush;
 	int n_drain;
+	int n_flush_memcpy;
+	int n_flush_memset;
+	int n_drain_memcpy;
+	int n_drain_memset;
 } ops_counter;
 
 FUNC_MOCK(pmem_persist, void, const void *addr, size_t len)
@@ -74,6 +78,84 @@ FUNC_MOCK(pmem_drain, void, void)
 	}
 FUNC_MOCK_END
 
+_FUNC_REAL_DECL(pmem_memmove_persist, void *, void *dest, const void *src,
+		size_t len);
+
+static void *
+mocked_memmove_persist(void *dest, const void *src, size_t len)
+{
+	size_t orig_len = len;
+	size_t cnt = (uint64_t)dest & 63;
+	if (cnt > 0) {
+		if (cnt > len)
+			cnt = len;
+
+		len -= cnt;
+
+		ops_counter.n_flush_memcpy++;
+	}
+	ops_counter.n_flush_memcpy += (len + 63) / 64;
+
+	ops_counter.n_drain_memcpy++;
+	return _FUNC_REAL(pmem_memmove_persist)(dest, src, orig_len);
+}
+
+FUNC_MOCK(pmem_memcpy_persist, void *, void *dest, const void *src, size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memmove_persist(dest, src, len);
+	}
+FUNC_MOCK_END
+
+FUNC_MOCK(pmem_memcpy_nodrain, void *, void *dest, const void *src, size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memmove_persist(dest, src, len);
+	}
+FUNC_MOCK_END
+
+FUNC_MOCK(pmem_memmove_persist, void *, void *dest, const void *src, size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memmove_persist(dest, src, len);
+	}
+FUNC_MOCK_END
+
+FUNC_MOCK(pmem_memmove_nodrain, void *, void *dest, const void *src, size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memmove_persist(dest, src, len);
+	}
+FUNC_MOCK_END
+
+_FUNC_REAL_DECL(pmem_memset_persist, void *, void *dest, int c, size_t len);
+
+static void *
+mocked_memset_persist(void *dest, int c, size_t len)
+{
+	size_t orig_len = len;
+	size_t cnt = (uint64_t)dest & 63;
+	if (cnt > 0) {
+		if (cnt > len)
+			cnt = len;
+
+		len -= cnt;
+
+		ops_counter.n_flush_memset++;
+	}
+	ops_counter.n_flush_memset += (len + 63) / 64;
+
+	ops_counter.n_drain_memset++;
+	return _FUNC_REAL(pmem_memset_persist)(dest, c, orig_len);
+}
+
+FUNC_MOCK(pmem_memset_persist, void *, void *dest, int c, size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memset_persist(dest, c, len);
+	}
+FUNC_MOCK_END
+
+FUNC_MOCK(pmem_memset_nodrain, void *, void *dest, int c, size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memset_persist(dest, c, len);
+	}
+FUNC_MOCK_END
 
 /*
  * reset_counters -- zero all counters
@@ -90,9 +172,11 @@ reset_counters(void)
 static void
 print_reset_counters(const char *task)
 {
-	UT_OUT("%d\t;%d\t;%d\t;%d\t;%s",
+	UT_OUT("%d\t;%d\t;%d\t;%d\t;%d\t\t;%d\t;%d\t;%d\t;%s",
 		ops_counter.n_persist, ops_counter.n_msync,
-		ops_counter.n_flush, ops_counter.n_drain, task);
+		ops_counter.n_flush, ops_counter.n_drain,
+		ops_counter.n_flush_memcpy, ops_counter.n_drain_memcpy,
+		ops_counter.n_flush_memset, ops_counter.n_drain_memset, task);
 
 	reset_counters();
 }
@@ -120,7 +204,8 @@ main(int argc, char *argv[])
 			PMEMOBJ_MIN_POOL, S_IWUSR | S_IRUSR)) == NULL)
 		UT_FATAL("!pmemobj_create: %s", path);
 
-	UT_OUT("persist\t;msync\t;flush\t;drain\t;task");
+	UT_OUT("persist\t;msync\t;flush\t;drain\t;cl_copied\t;memcpy"
+			"\t;cl_set\t;memset\t;task");
 
 	print_reset_counters("pool_create");
 
