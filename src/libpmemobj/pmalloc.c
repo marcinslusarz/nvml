@@ -89,7 +89,7 @@ pmalloc_redo_hold(PMEMobjpool *pop)
 				sizeof(sec->redo));
 		ASSERTne(r->redo_state, NULL); // XXX error handling
 	}
-	VALGRIND_ANNOTATE_NEW_MEMORY(r->redo_state, sizeof(*r->redo_state));
+	redo_log_state_acquire(r->redo_state);
 
 	return r->redo_state;
 }
