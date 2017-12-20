@@ -64,6 +64,7 @@ expect_normal_exit $Env:EXE_DIR\obj_redo_log$Env:EXESUFFIX $FILE $RSIZE `
 	f:1:0x20000000:0x22222222 `
 	s:2:0x30000000:0x33333333 `
 	s:3:0x40000000:0x44444444 `
+	F:1 `
 	n `
 	e:0 `
 	e:1 `
@@ -73,6 +74,7 @@ expect_normal_exit $Env:EXE_DIR\obj_redo_log$Env:EXESUFFIX $FILE $RSIZE `
 	f:2:0x60000000:0x66666666 `
 	s:1:0x70000000:0x77777777 `
 	s:0:0x80000000:0x88888888 `
+	F:3 `
 	e:0 `
 	e:1 `
 	e:2 `

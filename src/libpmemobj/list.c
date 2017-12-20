@@ -491,7 +491,7 @@ list_lane_hold(PMEMobjpool *pop, uint64_t **obj_offset)
 					sizeof(section->redo));
 		ASSERTne(r->redo_state, NULL); // XXX error handling
 	}
-	VALGRIND_ANNOTATE_NEW_MEMORY(r->redo_state, sizeof(*r->redo_state));
+	redo_log_state_acquire(r->redo_state);
 
 	return r->redo_state;
 }
