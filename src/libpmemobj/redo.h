@@ -55,6 +55,8 @@ struct redo_log {
 struct redo_log_state {
 	const struct redo_ctx *ctx;
 	struct redo_log *pmem_data;
+	struct redo_log *vmem_data;
+	size_t size;
 };
 
 typedef int (*redo_check_offset_fn)(void *ctx, uint64_t offset);
@@ -70,6 +72,7 @@ void redo_log_config_delete(struct redo_ctx *ctx);
 struct redo_log_state *redo_log_state_new(struct redo_ctx *ctx,
 		struct redo_log *redo, size_t size);
 void redo_log_state_delete(struct redo_log_state *state);
+void redo_log_state_acquire(struct redo_log_state *state);
 
 void redo_log_store(struct redo_log_state *redo, size_t index, uint64_t offset,
 		uint64_t value);
@@ -80,9 +83,9 @@ void redo_log_process(struct redo_log_state *redo, size_t nentries);
 void redo_log_recover(struct redo_log_state *redo, size_t nentries);
 int redo_log_check(struct redo_log_state *redo, size_t nentries);
 
-size_t redo_log_nflags(const struct redo_log *redo, size_t nentries);
 uint64_t redo_log_offset(const struct redo_log *redo);
 int redo_log_is_last(const struct redo_log *redo);
+size_t redo_log_finish_offset(const struct redo_log *redo, size_t nentries);
 
 const struct pmem_ops *redo_get_pmem_ops(const struct redo_ctx *ctx);
 

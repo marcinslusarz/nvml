@@ -101,6 +101,20 @@ redo_log_check_offset(void *ctx, uint64_t offset)
 	return OBJ_OFF_IS_VALID(pop, offset);
 }
 
+static void *
+obj_memcpy(void *ctx, void *dest, const void *src, size_t len, unsigned flags)
+{
+	pmem_memcpy(dest, src, len, flags);
+	return dest;
+}
+
+static void *
+obj_memset(void *ctx, void *ptr, int c, size_t sz, unsigned flags)
+{
+	pmem_memset(ptr, c, sz, 0);
+	return ptr;
+}
+
 /*
  * pmemobj_open -- pmemobj_open mock
  *
@@ -144,6 +158,12 @@ FUNC_MOCK_RUN_DEFAULT
 		Pop->flush_local = (persist_local_fn)pmem_msync;
 		Pop->drain_local = pmem_drain_nop;
 	}
+
+	Pop->memcpy_local = pmem_memcpy;
+	Pop->memset_local = pmem_memset;
+
+	Pop->p_ops.memcpy = obj_memcpy;
+	Pop->p_ops.memset = obj_memset;
 
 	Pop->p_ops.persist = obj_persist;
 	Pop->p_ops.flush = obj_flush;

@@ -110,6 +110,20 @@ redo_log_check_offset(void *ctx, uint64_t offset)
 	return OBJ_OFF_IS_VALID(pop, offset);
 }
 
+static void *
+obj_memcpy(void *ctx, void *dest, const void *src, size_t len, unsigned flags)
+{
+	pmem_memcpy(dest, src, len, flags);
+	return dest;
+}
+
+static void *
+obj_memset(void *ctx, void *ptr, int c, size_t sz, unsigned flags)
+{
+	pmem_memset(ptr, c, sz, flags);
+	return ptr;
+}
+
 static PMEMobjpool *
 pmemobj_open_mock(const char *fname, size_t redo_size)
 {
@@ -141,6 +155,12 @@ pmemobj_open_mock(const char *fname, size_t redo_size)
 		pop->flush_local = (persist_local_fn)pmem_msync;
 		pop->drain_local = pmem_drain_nop;
 	}
+	pop->memcpy_local = pmem_memcpy;
+	pop->memset_local = pmem_memset;
+
+	memset(&pop->p_ops, 0, sizeof(pop->p_ops));
+	pop->p_ops.memcpy = obj_memcpy;
+	pop->p_ops.memset = obj_memset;
 
 	pop->p_ops.persist = obj_persist;
 	pop->p_ops.flush = obj_flush;
@@ -193,8 +213,7 @@ main(int argc, char *argv[])
 		(struct redo_log *)((char *)pop->addr + PMEMOBJ_POOL_HDR_SIZE);
 
 	struct redo_log_state *redo_state =
-			redo_log_state_new(pop->redo, redo,
-					redo_size - PMEMOBJ_POOL_HDR_SIZE);
+			redo_log_state_new(pop->redo, redo, redo_size);
 	uint64_t offset;
 	uint64_t value;
 	int i;
@@ -237,7 +256,7 @@ main(int argc, char *argv[])
 			if (sscanf(arg, "e:%zd", &index) != 1)
 				FATAL_USAGE();
 
-			struct redo_log *entry = redo + index;
+			struct redo_log *entry = redo + index + 1;
 
 			int flag = redo_log_is_last(entry);
 			offset = redo_log_offset(entry);
@@ -259,12 +278,14 @@ main(int argc, char *argv[])
 			UT_OUT("C:%d", ret);
 			break;
 		case 'n':
-			UT_OUT("n:%ld", redo_log_nflags(redo, redo_cnt));
+			UT_OUT("n:%ld", redo_log_finish_offset(redo, redo_cnt));
 			break;
 		default:
 			FATAL_USAGE();
 		}
 	}
+
+	redo_log_state_delete(redo_state);
 
 	pmemobj_close_mock(pop);
 

@@ -65,8 +65,8 @@ typedef void (*pvector_callback_fn)(struct pmem_info *pip, int v, int vnum,
 static int
 lane_need_recovery_redo(struct redo_log *redo, size_t nentries)
 {
-	/* Needs recovery if any of redo log entries has finish flag set */
-	return redo_log_nflags(redo, nentries) > 0;
+	/* Needs recovery if checksum is not 0. */
+	return redo[0].offset || redo[0].value;
 }
 
 /*
@@ -232,7 +232,12 @@ static void
 info_obj_redo(int v, struct redo_log *redo, size_t nentries)
 {
 	outv_field(v, "Redo log entries", "%lu", nentries);
-	for (size_t i = 0; i < nentries; i++) {
+	outv(v, "Offset checksum: 0x%016jx "
+		"Value checksum: 0x%016jx\n",
+		redo[0].offset,
+		redo[0].value);
+
+	for (size_t i = 1; i <= nentries; i++) {
 		outv(v, "%010zu: "
 			"Offset: 0x%016jx "
 			"Value: 0x%016jx "
