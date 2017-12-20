@@ -397,7 +397,7 @@ memmove_mov_avx512f_bw(char *dest, const char *src, size_t len)
 		memmove_small_avx512f(dest - len, src - len, len);
 }
 
-void
+void *
 EXPORTED_SYMBOL(char *dest, const char *src, size_t len)
 {
 	if ((uintptr_t)dest - (uintptr_t)src >= len)
@@ -406,4 +406,6 @@ EXPORTED_SYMBOL(char *dest, const char *src, size_t len)
 		memmove_mov_avx512f_bw(dest, src, len);
 
 	avx_zeroupper();
+
+	return dest;
 }

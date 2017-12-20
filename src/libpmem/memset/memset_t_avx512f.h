@@ -200,9 +200,10 @@ memset_mov1x64b(char *dest, __m512i zmm)
 	flush64b(dest + 0 * 64);
 }
 
-void
+void *
 EXPORTED_SYMBOL(char *dest, int c, size_t len)
 {
+	char *orig_dest = dest;
 	__m512i zmm = _mm512_set1_epi8((char)c);
 	/* See comment in memset_movnt_avx512f */
 	__m256i ymm = _mm256_set1_epi8((char)c);
@@ -261,4 +262,6 @@ EXPORTED_SYMBOL(char *dest, int c, size_t len)
 		memset_small_avx512f(dest, ymm, len);
 
 	avx_zeroupper();
+
+	return orig_dest;
 }

@@ -683,7 +683,7 @@ pmem_unmap(void *addr, size_t len)
  * memmove_nodrain_normal -- (internal) memmove to pmem without hw drain
  */
 static void *
-memmove_nodrain_normal(void *pmemdest, const void *src, size_t len)
+memmove_nodrain_normal(char *pmemdest, const char *src, size_t len)
 {
 	LOG(15, "pmemdest %p src %p len %zu", pmemdest, src, len);
 
@@ -700,7 +700,11 @@ memmove_nodrain_normal(void *pmemdest, const void *src, size_t len)
  * common case on modern hardware that supports persistent memory.
  */
 static void *(*Func_memmove_nodrain)
-	(void *pmemdest, const void *src, size_t len) = memmove_nodrain_normal;
+	(char *pmemdest, const char *src, size_t len) = memmove_nodrain_normal;
+static void *(*Func_memmove_nodrain_nocache)
+	(char *pmemdest, const char *src, size_t len) = memmove_nodrain_normal;
+static void *(*Func_memmove_nodrain_cache)
+	(char *pmemdest, const char *src, size_t len) = memmove_nodrain_normal;
 
 /*
  * pmem_memmove_nodrain -- memmove to pmem without hw drain
@@ -754,7 +758,7 @@ pmem_memcpy_persist(void *pmemdest, const void *src, size_t len)
  * memset_nodrain_normal -- (internal) memset to pmem without hw drain, normal
  */
 static void *
-memset_nodrain_normal(void *pmemdest, int c, size_t len)
+memset_nodrain_normal(char *pmemdest, int c, size_t len)
 {
 	LOG(15, "pmemdest %p c 0x%x len %zu", pmemdest, c, len);
 
@@ -771,7 +775,11 @@ memset_nodrain_normal(void *pmemdest, int c, size_t len)
  * common case on modern hardware that supports persistent memory.
  */
 static void *(*Func_memset_nodrain)
-	(void *pmemdest, int c, size_t len) = memset_nodrain_normal;
+	(char *pmemdest, int c, size_t len) = memset_nodrain_normal;
+static void *(*Func_memset_nodrain_nocache)
+	(char *pmemdest, int c, size_t len) = memset_nodrain_normal;
+static void *(*Func_memset_nodrain_cache)
+	(char *pmemdest, int c, size_t len) = memset_nodrain_normal;
 
 /*
  * pmem_memset_nodrain -- memset to pmem without hw drain
@@ -800,32 +808,28 @@ pmem_memset_persist(void *pmemdest, int c, size_t len)
 #if SSE2_AVAILABLE || AVX_AVAILABLE || AVX512F_AVAILABLE
 #define MEMCPY_TEMPLATE(postfix) \
 static void *\
-memmove_nodrain_##postfix(void *dest, const void *src, size_t len)\
+memmove_nodrain_##postfix(char *dest, const char *src, size_t len)\
 {\
 	if (len == 0 || src == dest)\
 		return dest;\
 \
 	if (len < Movnt_threshold)\
-		memmove_mov_##postfix(dest, src, len);\
+		return memmove_mov_##postfix(dest, src, len);\
 	else\
-		memmove_movnt_##postfix(dest, src, len);\
-\
-	return dest;\
+		return memmove_movnt_##postfix(dest, src, len);\
 }
 
 #define MEMSET_TEMPLATE(postfix)\
 static void *\
-memset_nodrain_##postfix(void *dest, int c, size_t len)\
+memset_nodrain_##postfix(char *dest, int c, size_t len)\
 {\
 	if (len == 0)\
 		return dest;\
 \
 	if (len < Movnt_threshold)\
-		memset_mov_##postfix(dest, c, len);\
+		return memset_mov_##postfix(dest, c, len);\
 	else\
-		memset_movnt_##postfix(dest, c, len);\
-\
-	return dest;\
+		return memset_movnt_##postfix(dest, c, len);\
 }
 #endif
 
@@ -864,6 +868,52 @@ MEMSET_TEMPLATE(avx512f_clflushopt)
 MEMSET_TEMPLATE(avx512f_clwb)
 MEMSET_TEMPLATE(avx512f_empty)
 #endif
+
+#define PMEM_MEM_CACHE_MASK	(3 << 1)
+
+void *
+pmem_memmove(int flags, void *pmemdest, const void *src, size_t len)
+{
+	LOG(15, "flags 0x%x pmemdest %p src %p len %zu", flags, pmemdest, src,
+			len);
+
+	if ((flags & PMEM_MEM_CACHE_MASK) == PMEM_MEM_CACHE)
+		Func_memmove_nodrain_cache(pmemdest, src, len);
+	else if ((flags & PMEM_MEM_CACHE_MASK) == PMEM_MEM_NOCACHE)
+		Func_memmove_nodrain_nocache(pmemdest, src, len);
+	else /* both are set or none are set */
+		pmem_memmove_nodrain(pmemdest, src, len);
+
+	if ((flags & PMEM_MEM_NODRAIN) == 0)
+		pmem_drain();
+
+	return pmemdest;
+}
+
+void *
+pmem_memcpy(int flags, void *pmemdest, const void *src, size_t len)
+{
+	return pmem_memmove(flags, pmemdest, src, len);
+}
+
+void *
+pmem_memset(int flags, void *pmemdest, int c, size_t len)
+{
+	LOG(15, "flags 0x%x pmemdest %p c 0x%x len %zu", flags, pmemdest, c,
+			len);
+
+	if ((flags & PMEM_MEM_CACHE_MASK) == PMEM_MEM_CACHE)
+		Func_memset_nodrain_cache(pmemdest, c, len);
+	else if ((flags & PMEM_MEM_CACHE_MASK) == PMEM_MEM_NOCACHE)
+		Func_memset_nodrain_nocache(pmemdest, c, len);
+	else /* both are set or none are set */
+		pmem_memset_nodrain(pmemdest, c, len);
+
+	if ((flags & PMEM_MEM_NODRAIN) == 0)
+		pmem_drain();
+
+	return pmemdest;
+}
 
 /*
  * pmem_log_cpuinfo -- log the results of cpu dispatching decisions,
@@ -919,27 +969,45 @@ static void
 use_sse2_memcpy_memset(void)
 {
 #if SSE2_AVAILABLE
-	if (Func_flush == flush_clflush)
+	if (Func_flush == flush_clflush) {
 		Func_memmove_nodrain = memmove_nodrain_sse2_clflush;
-	else if (Func_flush == flush_clflushopt)
+		Func_memmove_nodrain_nocache = memmove_movnt_sse2_clflush;
+		Func_memmove_nodrain_cache = memmove_mov_sse2_clflush;
+	} else if (Func_flush == flush_clflushopt) {
 		Func_memmove_nodrain = memmove_nodrain_sse2_clflushopt;
-	else if (Func_flush == flush_clwb)
+		Func_memmove_nodrain_nocache = memmove_movnt_sse2_clflushopt;
+		Func_memmove_nodrain_cache = memmove_mov_sse2_clflushopt;
+	} else if (Func_flush == flush_clwb) {
 		Func_memmove_nodrain = memmove_nodrain_sse2_clwb;
-	else if (Func_flush == flush_empty)
+		Func_memmove_nodrain_nocache = memmove_movnt_sse2_clwb;
+		Func_memmove_nodrain_cache = memmove_mov_sse2_clwb;
+	} else if (Func_flush == flush_empty) {
 		Func_memmove_nodrain = memmove_nodrain_sse2_empty;
-	else
+		Func_memmove_nodrain_nocache = memmove_movnt_sse2_empty;
+		Func_memmove_nodrain_cache = memmove_mov_sse2_empty;
+	} else {
 		ASSERT(0);
+	}
 
-	if (Func_flush == flush_clflush)
+	if (Func_flush == flush_clflush) {
 		Func_memset_nodrain = memset_nodrain_sse2_clflush;
-	else if (Func_flush == flush_clflushopt)
+		Func_memset_nodrain_nocache = memset_movnt_sse2_clflush;
+		Func_memset_nodrain_cache = memset_mov_sse2_clflush;
+	} else if (Func_flush == flush_clflushopt) {
 		Func_memset_nodrain = memset_nodrain_sse2_clflushopt;
-	else if (Func_flush == flush_clwb)
+		Func_memset_nodrain_nocache = memset_movnt_sse2_clflushopt;
+		Func_memset_nodrain_cache = memset_mov_sse2_clflushopt;
+	} else if (Func_flush == flush_clwb) {
 		Func_memset_nodrain = memset_nodrain_sse2_clwb;
-	else if (Func_flush == flush_empty)
+		Func_memset_nodrain_nocache = memset_movnt_sse2_clwb;
+		Func_memset_nodrain_cache = memset_mov_sse2_clwb;
+	} else if (Func_flush == flush_empty) {
 		Func_memset_nodrain = memset_nodrain_sse2_empty;
-	else
+		Func_memset_nodrain_nocache = memset_movnt_sse2_empty;
+		Func_memset_nodrain_cache = memset_mov_sse2_empty;
+	} else {
 		ASSERT(0);
+	}
 #else
 	LOG(3, "sse2 disabled at build time");
 #endif
@@ -960,27 +1028,45 @@ use_avx_memcpy_memset(void)
 
 	LOG(3, "PMEM_AVX enabled");
 
-	if (Func_flush == flush_clflush)
+	if (Func_flush == flush_clflush) {
 		Func_memmove_nodrain = memmove_nodrain_avx_clflush;
-	else if (Func_flush == flush_clflushopt)
+		Func_memmove_nodrain_nocache = memmove_movnt_avx_clflush;
+		Func_memmove_nodrain_cache = memmove_mov_avx_clflush;
+	} else if (Func_flush == flush_clflushopt) {
 		Func_memmove_nodrain = memmove_nodrain_avx_clflushopt;
-	else if (Func_flush == flush_clwb)
+		Func_memmove_nodrain_nocache = memmove_movnt_avx_clflushopt;
+		Func_memmove_nodrain_cache = memmove_mov_avx_clflushopt;
+	} else if (Func_flush == flush_clwb) {
 		Func_memmove_nodrain = memmove_nodrain_avx_clwb;
-	else if (Func_flush == flush_empty)
+		Func_memmove_nodrain_nocache = memmove_movnt_avx_clwb;
+		Func_memmove_nodrain_cache = memmove_mov_avx_clwb;
+	} else if (Func_flush == flush_empty) {
 		Func_memmove_nodrain = memmove_nodrain_avx_empty;
-	else
+		Func_memmove_nodrain_nocache = memmove_movnt_avx_empty;
+		Func_memmove_nodrain_cache = memmove_mov_avx_empty;
+	} else {
 		ASSERT(0);
+	}
 
-	if (Func_flush == flush_clflush)
+	if (Func_flush == flush_clflush) {
 		Func_memset_nodrain = memset_nodrain_avx_clflush;
-	else if (Func_flush == flush_clflushopt)
+		Func_memset_nodrain_nocache = memset_movnt_avx_clflush;
+		Func_memset_nodrain_cache = memset_mov_avx_clflush;
+	} else if (Func_flush == flush_clflushopt) {
 		Func_memset_nodrain = memset_nodrain_avx_clflushopt;
-	else if (Func_flush == flush_clwb)
+		Func_memset_nodrain_nocache = memset_movnt_avx_clflushopt;
+		Func_memset_nodrain_cache = memset_mov_avx_clflushopt;
+	} else if (Func_flush == flush_clwb) {
 		Func_memset_nodrain = memset_nodrain_avx_clwb;
-	else if (Func_flush == flush_empty)
+		Func_memset_nodrain_nocache = memset_movnt_avx_clwb;
+		Func_memset_nodrain_cache = memset_mov_avx_clwb;
+	} else if (Func_flush == flush_empty) {
 		Func_memset_nodrain = memset_nodrain_avx_empty;
-	else
+		Func_memset_nodrain_nocache = memset_movnt_avx_empty;
+		Func_memset_nodrain_cache = memset_mov_avx_empty;
+	} else {
 		ASSERT(0);
+	}
 #else
 	LOG(3, "avx supported, but disabled at build time");
 #endif
@@ -1000,27 +1086,45 @@ use_avx512f_memcpy_memset(void)
 
 	LOG(3, "PMEM_AVX512F enabled");
 
-	if (Func_flush == flush_clflush)
+	if (Func_flush == flush_clflush) {
 		Func_memmove_nodrain = memmove_nodrain_avx512f_clflush;
-	else if (Func_flush == flush_clflushopt)
+		Func_memmove_nodrain_nocache = memmove_movnt_avx512f_clflush;
+		Func_memmove_nodrain_cache = memmove_mov_avx512f_clflush;
+	} else if (Func_flush == flush_clflushopt) {
 		Func_memmove_nodrain = memmove_nodrain_avx512f_clflushopt;
-	else if (Func_flush == flush_clwb)
+		Func_memmove_nodrain_nocache = memmove_movnt_avx512f_clflushopt;
+		Func_memmove_nodrain_cache = memmove_mov_avx512f_clflushopt;
+	} else if (Func_flush == flush_clwb) {
 		Func_memmove_nodrain = memmove_nodrain_avx512f_clwb;
-	else if (Func_flush == flush_empty)
+		Func_memmove_nodrain_nocache = memmove_movnt_avx512f_clwb;
+		Func_memmove_nodrain_cache = memmove_mov_avx512f_clwb;
+	} else if (Func_flush == flush_empty) {
 		Func_memmove_nodrain = memmove_nodrain_avx512f_empty;
-	else
+		Func_memmove_nodrain_nocache = memmove_movnt_avx512f_empty;
+		Func_memmove_nodrain_cache = memmove_mov_avx512f_empty;
+	} else {
 		ASSERT(0);
+	}
 
-	if (Func_flush == flush_clflush)
+	if (Func_flush == flush_clflush) {
 		Func_memset_nodrain = memset_nodrain_avx512f_clflush;
-	else if (Func_flush == flush_clflushopt)
+		Func_memset_nodrain_nocache = memset_movnt_avx512f_clflush;
+		Func_memset_nodrain_cache = memset_mov_avx512f_clflush;
+	} else if (Func_flush == flush_clflushopt) {
 		Func_memset_nodrain = memset_nodrain_avx512f_clflushopt;
-	else if (Func_flush == flush_clwb)
+		Func_memset_nodrain_nocache = memset_movnt_avx512f_clflushopt;
+		Func_memset_nodrain_cache = memset_mov_avx512f_clflushopt;
+	} else if (Func_flush == flush_clwb) {
 		Func_memset_nodrain = memset_nodrain_avx512f_clwb;
-	else if (Func_flush == flush_empty)
+		Func_memset_nodrain_nocache = memset_movnt_avx512f_clwb;
+		Func_memset_nodrain_cache = memset_mov_avx512f_clwb;
+	} else if (Func_flush == flush_empty) {
 		Func_memset_nodrain = memset_nodrain_avx512f_empty;
-	else
+		Func_memset_nodrain_nocache = memset_movnt_avx512f_empty;
+		Func_memset_nodrain_cache = memset_mov_avx512f_empty;
+	} else {
 		ASSERT(0);
+	}
 #else
 	LOG(3, "avx512f supported, but disabled at build time");
 #endif

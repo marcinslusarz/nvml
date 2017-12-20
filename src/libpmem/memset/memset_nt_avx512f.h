@@ -185,9 +185,10 @@ memset_movnt1x4b(char *dest, __m256i ymm)
 	VALGRIND_DO_FLUSH(dest, 4);
 }
 
-void
+void *
 EXPORTED_SYMBOL(char *dest, int c, size_t len)
 {
+	char *orig_dest = dest;
 	__m512i zmm = _mm512_set1_epi8((char)c);
 	/*
 	 * Can't use _mm512_extracti64x4_epi64, because some versions of gcc
@@ -270,4 +271,6 @@ end:
 	avx_zeroupper();
 	/* serialize non-temporal store instructions */
 	_mm_sfence();
+
+	return orig_dest;
 }

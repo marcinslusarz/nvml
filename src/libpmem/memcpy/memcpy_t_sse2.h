@@ -206,11 +206,13 @@ memmove_mov_sse_bw(char *dest, const char *src, size_t len)
 		memmove_small_sse2(dest - len, src - len, len);
 }
 
-void
+void *
 EXPORTED_SYMBOL(char *dest, const char *src, size_t len)
 {
 	if ((uintptr_t)dest - (uintptr_t)src >= len)
 		memmove_mov_sse_fw(dest, src, len);
 	else
 		memmove_mov_sse_bw(dest, src, len);
+
+	return dest;
 }

@@ -291,7 +291,7 @@ nonnt:
 	memmove_small_sse2(dest, src, len);
 }
 
-void
+void *
 EXPORTED_SYMBOL(char *dest, const char *src, size_t len)
 {
 	if ((uintptr_t)dest - (uintptr_t)src >= len)
@@ -301,4 +301,5 @@ EXPORTED_SYMBOL(char *dest, const char *src, size_t len)
 
 	/* serialize non-temporal store instructions */
 	_mm_sfence();
+	return dest;
 }

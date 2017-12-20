@@ -126,9 +126,10 @@ memset_movnt1x4b(char *dest, __m128i xmm)
 	VALGRIND_DO_FLUSH(dest, 4);
 }
 
-void
+void *
 EXPORTED_SYMBOL(char *dest, int c, size_t len)
 {
+	char *orig_dest = dest;
 	__m128i xmm = _mm_set1_epi8((char)c);
 
 	size_t cnt = (uint64_t)dest & 63;
@@ -187,4 +188,6 @@ nonnt:
 end:
 	/* serialize non-temporal store instructions */
 	_mm_sfence();
+
+	return orig_dest;
 }
