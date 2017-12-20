@@ -595,7 +595,7 @@ pmem_memmove_nodrain(void *pmemdest, const void *src, size_t len)
 {
 	LOG(15, "pmemdest %p src %p len %zu", pmemdest, src, len);
 
-	return Funcs.memmove_nodrain(pmemdest, src, len);
+	return Funcs.memmove_nodrain(pmemdest, src, len, 0);
 }
 
 /*
@@ -643,7 +643,7 @@ pmem_memset_nodrain(void *pmemdest, int c, size_t len)
 {
 	LOG(15, "pmemdest %p c 0x%x len %zu", pmemdest, c, len);
 
-	return Funcs.memset_nodrain(pmemdest, c, len);
+	return Funcs.memset_nodrain(pmemdest, c, len, 0);
 }
 
 /*
@@ -656,6 +656,40 @@ pmem_memset_persist(void *pmemdest, int c, size_t len)
 
 	pmem_memset_nodrain(pmemdest, c, len);
 	pmem_drain();
+	return pmemdest;
+}
+
+void *
+pmem_memmove(void *pmemdest, const void *src, size_t len, int flags)
+{
+	LOG(15, "flags 0x%x pmemdest %p src %p len %zu flags 0x%x",
+			flags, pmemdest, src, len, flags);
+
+	Funcs.memmove_nodrain(pmemdest, src, len, flags);
+
+	if ((flags & PMEM_MEM_NODRAIN) == 0)
+		pmem_drain();
+
+	return pmemdest;
+}
+
+void *
+pmem_memcpy(void *pmemdest, const void *src, size_t len, int flags)
+{
+	return pmem_memmove(pmemdest, src, len, flags);
+}
+
+void *
+pmem_memset(void *pmemdest, int c, size_t len, int flags)
+{
+	LOG(15, "flags 0x%x pmemdest %p c 0x%x len %zu flags 0x%x",
+			flags, pmemdest, c, len, flags);
+
+	Funcs.memset_nodrain(pmemdest, c, len, flags);
+
+	if ((flags & PMEM_MEM_NODRAIN) == 0)
+		pmem_drain();
+
 	return pmemdest;
 }
 

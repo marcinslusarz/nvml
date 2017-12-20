@@ -98,12 +98,21 @@ int pmem_deep_drain(const void *addr, size_t len);
 int pmem_deep_persist(const void *addr, size_t len);
 void pmem_drain(void);
 int pmem_has_hw_drain(void);
+
 void *pmem_memmove_persist(void *pmemdest, const void *src, size_t len);
 void *pmem_memcpy_persist(void *pmemdest, const void *src, size_t len);
 void *pmem_memset_persist(void *pmemdest, int c, size_t len);
 void *pmem_memmove_nodrain(void *pmemdest, const void *src, size_t len);
 void *pmem_memcpy_nodrain(void *pmemdest, const void *src, size_t len);
 void *pmem_memset_nodrain(void *pmemdest, int c, size_t len);
+
+#define PMEM_MEM_NODRAIN	(1 << 0)
+#define PMEM_MEM_CACHE		(1 << 1)
+#define PMEM_MEM_NOCACHE	(1 << 2)
+#define PMEM_MEM_WC		(1 << 3)
+void *pmem_memmove(void *pmemdest, const void *src, size_t len, int flags);
+void *pmem_memcpy(void *pmemdest, const void *src, size_t len, int flags);
+void *pmem_memset(void *pmemdest, int c, size_t len, int flags);
 
 /*
  * PMEM_MAJOR_VERSION and PMEM_MINOR_VERSION provide the current version of the
