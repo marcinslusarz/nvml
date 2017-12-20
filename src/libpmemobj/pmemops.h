@@ -40,8 +40,14 @@
 typedef void (*persist_fn)(void *base, const void *, size_t);
 typedef void (*flush_fn)(void *base, const void *, size_t);
 typedef void (*drain_fn)(void *base);
-typedef void *(*memcpy_fn)(void *base, void *dest, const void *src, size_t len);
-typedef void *(*memset_fn)(void *base, void *dest, int c, size_t len);
+typedef void *(*memcpy_persist_fn)(void *base, void *dest, const void *src,
+		size_t len);
+typedef void *(*memset_persist_fn)(void *base, void *dest, int c, size_t len);
+
+typedef void *(*memcpy_fn)(void *base, void *dest, const void *src, size_t len,
+		int flags);
+typedef void *(*memset_fn)(void *base, void *dest, int c, size_t len,
+		int flags);
 
 typedef int (*remote_read_fn)(void *ctx, uintptr_t base, void *dest, void *addr,
 		size_t length);
@@ -51,8 +57,10 @@ struct pmem_ops {
 	persist_fn persist;	/* persist function */
 	flush_fn flush;		/* flush function */
 	drain_fn drain;		/* drain function */
-	memcpy_fn memcpy_persist; /* persistent memcpy function */
-	memset_fn memset_persist; /* persistent memset function */
+	memcpy_persist_fn memcpy_persist; /* persistent memcpy function */
+	memset_persist_fn memset_persist; /* persistent memset function */
+	memcpy_fn memcpy; /* persistent memcpy function */
+	memset_fn memset; /* persistent memset function */
 	void *base;
 
 	struct remote_ops {
@@ -93,6 +101,20 @@ pmemops_memset_persist(const struct pmem_ops *p_ops, void *dest, int c,
 		size_t len)
 {
 	return p_ops->memset_persist(p_ops->base, dest, c, len);
+}
+
+static force_inline void *
+pmemops_memcpy(const struct pmem_ops *p_ops, void *dest,
+		const void *src, size_t len, int flags)
+{
+	return p_ops->memcpy(p_ops->base, dest, src, len, flags);
+}
+
+static force_inline void *
+pmemops_memset(const struct pmem_ops *p_ops, void *dest, int c,
+		size_t len, int flags)
+{
+	return p_ops->memset(p_ops->base, dest, c, len, flags);
 }
 
 #endif
