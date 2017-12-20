@@ -38,6 +38,7 @@
 
 #include <emmintrin.h>
 #include <stdint.h>
+#include "util.h"
 
 #define PMEM_LOG_PREFIX "libpmem"
 #define PMEM_LOG_LEVEL_VAR "PMEM_LOG_LEVEL"
@@ -150,7 +151,7 @@ extern PQVM Func_qvmi;
 
 #endif /* _MSC_VER */
 
-static inline void
+static force_inline void
 noflush(const char *addr)
 {
 }
@@ -158,7 +159,7 @@ noflush(const char *addr)
 /*
  * flush_clflush_nolog -- (internal) flush the CPU cache, using clflush
  */
-static inline void
+static force_inline void
 flush_clflush_nolog(const void *addr, size_t len)
 {
 	uintptr_t uptr;
@@ -175,7 +176,7 @@ flush_clflush_nolog(const void *addr, size_t len)
 /*
  * flush_clwb_nolog -- (internal) flush the CPU cache, using clwb
  */
-static inline void
+static force_inline void
 flush_clwb_nolog(const void *addr, size_t len)
 {
 	uintptr_t uptr;
@@ -193,7 +194,7 @@ flush_clwb_nolog(const void *addr, size_t len)
 /*
  * flush_clflushopt_nolog -- (internal) flush the CPU cache, using clflushopt
  */
-static inline void
+static force_inline void
 flush_clflushopt_nolog(const void *addr, size_t len)
 {
 	uintptr_t uptr;
@@ -211,7 +212,7 @@ flush_clflushopt_nolog(const void *addr, size_t len)
 /*
  * flush_empty_nolog -- (internal) do not flush the CPU cache
  */
-static inline void
+static force_inline void
 flush_empty_nolog(const void *addr, size_t len)
 {
 	/* NOP */
