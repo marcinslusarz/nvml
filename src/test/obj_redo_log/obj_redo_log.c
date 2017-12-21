@@ -111,16 +111,30 @@ redo_log_check_offset(void *ctx, uint64_t offset)
 }
 
 static void *
-obj_memcpy(void *ctx, void *dest, const void *src, size_t len)
+obj_memcpy_persist(void *ctx, void *dest, const void *src, size_t len)
 {
 	pmem_memcpy_persist(dest, src, len);
 	return dest;
 }
 
 static void *
-obj_memset(void *ctx, void *ptr, int c, size_t sz)
+obj_memset_persist(void *ctx, void *ptr, int c, size_t sz)
 {
 	pmem_memset_persist(ptr, c, sz);
+	return ptr;
+}
+
+static void *
+obj_memcpy(void *ctx, void *dest, const void *src, size_t len, int flags)
+{
+	pmem_memcpy(dest, src, len, flags);
+	return dest;
+}
+
+static void *
+obj_memset(void *ctx, void *ptr, int c, size_t sz, int flags)
+{
+	pmem_memset(ptr, c, sz, flags);
 	return ptr;
 }
 
@@ -159,8 +173,10 @@ pmemobj_open_mock(const char *fname, size_t redo_size)
 	pop->memset_persist_local = pmem_memset_persist;
 
 	memset(&pop->p_ops, 0, sizeof(pop->p_ops));
-	pop->p_ops.memcpy_persist = obj_memcpy;
-	pop->p_ops.memset_persist = obj_memset;
+	pop->p_ops.memcpy_persist = obj_memcpy_persist;
+	pop->p_ops.memset_persist = obj_memset_persist;
+	pop->p_ops.memcpy = obj_memcpy;
+	pop->p_ops.memset = obj_memset;
 
 	pop->p_ops.persist = obj_persist;
 	pop->p_ops.flush = obj_flush;

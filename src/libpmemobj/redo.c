@@ -35,6 +35,7 @@
  */
 
 #include <inttypes.h>
+#include <string.h>
 
 #include "redo.h"
 #include "out.h"
@@ -46,6 +47,17 @@
  */
 #define REDO_FINISH_FLAG	((uint64_t)1<<0)
 #define REDO_FLAG_MASK		(~REDO_FINISH_FLAG)
+
+/*
+ * assert_addr_cl_aligned -- verify that address is cache-line aligned
+ *
+ * If it's not algorithm is still correct, but is not optimal.
+ */
+static inline void
+assert_addr_cl_aligned(void *addr)
+{
+	ASSERTeq(((uintptr_t)addr) & 63, 0);
+}
 
 struct redo_ctx {
 	void *base;
@@ -187,8 +199,12 @@ redo_log_persist(struct redo_log_state *redo_state, size_t size)
 	redo_log_calc_csum(vmem_redo, size, &vmem_redo[0].offset,
 			&vmem_redo[0].value);
 
-	pmemops_memcpy_persist(p_ops, pmem_redo, vmem_redo,
-			(size + 1) * sizeof(struct redo_log));
+	assert_addr_cl_aligned(pmem_redo);
+	size_t dsz =  (size + 1) * sizeof(struct redo_log);
+	size_t sz = roundup(dsz, 64U);
+	if (sz != dsz)
+		memset(((char *)vmem_redo) + dsz, 0xff, sz - dsz);
+	pmemops_memcpy(p_ops, pmem_redo, vmem_redo, sz, PMEM_MEM_WC);
 }
 
 /*
@@ -272,7 +288,8 @@ redo_log_process(struct redo_log_state *redo_state, size_t nentries)
 
 	pmemops_persist(p_ops, val, sizeof(uint64_t));
 
-	pmemops_memset_persist(p_ops, redo_state->pmem_data, 0, 64);
+	assert_addr_cl_aligned(redo_state->pmem_data);
+	pmemops_memset(p_ops, redo_state->pmem_data, 0, 64, PMEM_MEM_WC);
 }
 
 /*
@@ -323,7 +340,8 @@ redo_log_recover(struct redo_log_state *redo_state, size_t nentries)
 		return;
 
 	if (r == -1) {
-		pmemops_memset_persist(p_ops, redo, 0, 64);
+		assert_addr_cl_aligned(redo);
+		pmemops_memset(p_ops, redo, 0, 64, PMEM_MEM_WC);
 		return;
 	}
 

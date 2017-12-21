@@ -70,7 +70,7 @@ cl_flushed(const void *addr, size_t len, uintptr_t alignment)
 }
 
 static int
-bulk_cl_changed(const void *addr, size_t len)
+bulk_cl_changed(const void *addr, size_t len, int flags)
 {
 	uintptr_t start = (uintptr_t)addr & ~(FLUSH_ALIGN - 1);
 	uintptr_t end = ((uintptr_t)addr + len + FLUSH_ALIGN - 1) &
@@ -78,18 +78,27 @@ bulk_cl_changed(const void *addr, size_t len)
 
 	int cl_changed = (int)(end - start) / FLUSH_ALIGN;
 
+	int wc; /* write combining */
+	if (flags & (PMEM_MEM_NOCACHE | PMEM_MEM_WC))
+		wc = 1;
+	else if (flags & PMEM_MEM_CACHE)
+		wc = 0;
+	else if (len < MOVNT_THRESHOLD)
+		wc = 0;
+	else
+		wc = 1;
+
 	/* count number of potential cache misses */
-	if (len < MOVNT_THRESHOLD) {
+	if (!wc) {
 		/*
-		 * Below threshold we use normal memcpy/memset, which means all
+		 * When we don't use write combining, it means all
 		 * cache lines may be missing.
 		 */
 		ops_counter.n_pot_cache_misses += cl_changed;
 	} else {
 		/*
-		 * Above threshold we use NT stores which will not generate
-		 * cache misses, with an exception of unaligned beginning
-		 * or end.
+		 * When we use write combining there won't be any cache misses,
+		 * with an exception of unaligned beginning or end.
 		 */
 		if (start != (uintptr_t)addr)
 			ops_counter.n_pot_cache_misses++;
@@ -154,17 +163,17 @@ FUNC_MOCK(pmem_drain, void, void)
 FUNC_MOCK_END
 
 static void
-memcpy_nodrain_count(void *dest, const void *src, size_t len)
+memcpy_nodrain_count(void *dest, const void *src, size_t len, int flags)
 {
-	int cl_stores = bulk_cl_changed(dest, len);
+	int cl_stores = bulk_cl_changed(dest, len, flags);
 	ops_counter.n_flush_from_pmem_memcpy += cl_stores;
 	ops_counter.n_cl_stores += cl_stores;
 }
 
 static void
-memcpy_persist_count(void *dest, const void *src, size_t len)
+memcpy_persist_count(void *dest, const void *src, size_t len, int flags)
 {
-	memcpy_nodrain_count(dest, src, len);
+	memcpy_nodrain_count(dest, src, len, flags);
 
 	ops_counter.n_drain_from_pmem_memcpy++;
 	ops_counter.n_drain++;
@@ -172,7 +181,7 @@ memcpy_persist_count(void *dest, const void *src, size_t len)
 
 FUNC_MOCK(pmem_memcpy_persist, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		memcpy_persist_count(dest, src, len);
+		memcpy_persist_count(dest, src, len, 0);
 
 		return _FUNC_REAL(pmem_memcpy_persist)(dest, src, len);
 	}
@@ -180,15 +189,27 @@ FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memcpy_nodrain, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		memcpy_nodrain_count(dest, src, len);
+		memcpy_nodrain_count(dest, src, len, 0);
 
 		return _FUNC_REAL(pmem_memcpy_nodrain)(dest, src, len);
 	}
 FUNC_MOCK_END
 
+FUNC_MOCK(pmem_memcpy, void *, void *dest, const void *src, size_t len,
+		int flags)
+	FUNC_MOCK_RUN_DEFAULT {
+		if (flags & PMEM_MEM_NODRAIN)
+			memcpy_nodrain_count(dest, src, len, flags);
+		else
+			memcpy_persist_count(dest, src, len, flags);
+
+		return _FUNC_REAL(pmem_memcpy)(dest, src, len, flags);
+	}
+FUNC_MOCK_END
+
 FUNC_MOCK(pmem_memmove_persist, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		memcpy_persist_count(dest, src, len);
+		memcpy_persist_count(dest, src, len, 0);
 
 		return _FUNC_REAL(pmem_memmove_persist)(dest, src, len);
 	}
@@ -196,24 +217,36 @@ FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memmove_nodrain, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		memcpy_nodrain_count(dest, src, len);
+		memcpy_nodrain_count(dest, src, len, 0);
 
 		return _FUNC_REAL(pmem_memmove_nodrain)(dest, src, len);
 	}
 FUNC_MOCK_END
 
+FUNC_MOCK(pmem_memmove, void *, void *dest, const void *src, size_t len,
+		int flags)
+	FUNC_MOCK_RUN_DEFAULT {
+		if (flags & PMEM_MEM_NODRAIN)
+			memcpy_nodrain_count(dest, src, len, flags);
+		else
+			memcpy_persist_count(dest, src, len, flags);
+
+		return _FUNC_REAL(pmem_memmove)(dest, src, len, flags);
+	}
+FUNC_MOCK_END
+
 static void
-memset_nodrain_count(void *dest, size_t len)
+memset_nodrain_count(void *dest, size_t len, int flags)
 {
-	int cl_set = bulk_cl_changed(dest, len);
+	int cl_set = bulk_cl_changed(dest, len, flags);
 	ops_counter.n_flush_from_pmem_memset += cl_set;
 	ops_counter.n_cl_stores += cl_set;
 }
 
 static void
-memset_persist_count(void *dest, size_t len)
+memset_persist_count(void *dest, size_t len, int flags)
 {
-	memset_nodrain_count(dest, len);
+	memset_nodrain_count(dest, len, flags);
 
 	ops_counter.n_drain_from_pmem_memset++;
 	ops_counter.n_drain++;
@@ -221,7 +254,7 @@ memset_persist_count(void *dest, size_t len)
 
 FUNC_MOCK(pmem_memset_persist, void *, void *dest, int c, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		memset_persist_count(dest, len);
+		memset_persist_count(dest, len, 0);
 
 		return _FUNC_REAL(pmem_memset_persist)(dest, c, len);
 	}
@@ -229,9 +262,20 @@ FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memset_nodrain, void *, void *dest, int c, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		memset_nodrain_count(dest, len);
+		memset_nodrain_count(dest, len, 0);
 
 		return _FUNC_REAL(pmem_memset_nodrain)(dest, c, len);
+	}
+FUNC_MOCK_END
+
+FUNC_MOCK(pmem_memset, void *, void *dest, int c, size_t len, int flags)
+	FUNC_MOCK_RUN_DEFAULT {
+		if (flags & PMEM_MEM_NODRAIN)
+			memset_nodrain_count(dest, len, flags);
+		else
+			memset_persist_count(dest, len, flags);
+
+		return _FUNC_REAL(pmem_memset)(dest, c, len, flags);
 	}
 FUNC_MOCK_END
 
