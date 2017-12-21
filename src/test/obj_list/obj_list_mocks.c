@@ -85,7 +85,7 @@ static uint64_t
 linear_alloc(uint64_t *cur_offset, size_t size)
 {
 	uint64_t ret = *cur_offset;
-	*cur_offset += roundup(size, sizeof(uint64_t));
+	*cur_offset += roundup(size, 64);
 	return ret;
 }
 
@@ -111,7 +111,7 @@ obj_memcpy(void *ctx, void *dest, const void *src, size_t len, unsigned flags)
 static void *
 obj_memset(void *ctx, void *ptr, int c, size_t sz, unsigned flags)
 {
-	pmem_memset(ptr, c, sz, 0);
+	pmem_memset(ptr, c, sz, flags);
 	return ptr;
 }
 
