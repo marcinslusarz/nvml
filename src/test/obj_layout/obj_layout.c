@@ -197,8 +197,8 @@ main(int argc, char *argv[])
 	UT_COMPILE_ERROR_ON(sizeof(struct list_head) != SIZEOF_LIST_HEAD_V3);
 
 	ASSERT_ALIGNED_BEGIN(struct lane_list_layout);
-	ASSERT_ALIGNED_FIELD(struct lane_list_layout, obj_offset);
 	ASSERT_ALIGNED_FIELD(struct lane_list_layout, redo);
+	ASSERT_ALIGNED_FIELD(struct lane_list_layout, obj_offset);
 	ASSERT_ALIGNED_CHECK(struct lane_list_layout);
 	UT_COMPILE_ERROR_ON(sizeof(struct lane_list_layout) >
 		sizeof(struct lane_section_layout));
