@@ -102,17 +102,37 @@ obj_drain(void *ctx)
 }
 
 /*
+ * obj_memcpy_persist -- pmemobj version of memcpy w/o replication
+ */
+static void *
+obj_memcpy_persist(void *ctx, void *dest, const void *src, size_t len)
+{
+	memcpy(dest, src, len);
+	UT_ASSERTeq(pmem_msync(dest, len), 0);
+	return dest;
+}
+
+/*
  * obj_memcpy -- pmemobj version of memcpy w/o replication
  */
 static void *
-obj_memcpy(void *ctx, void *dest, const void *src, size_t len)
+obj_memcpy(void *ctx, int flags, void *dest, const void *src, size_t len)
 {
 	memcpy(dest, src, len);
+	UT_ASSERTeq(pmem_msync(dest, len), 0);
 	return dest;
 }
 
 static void *
-obj_memset(void *ctx, void *ptr, int c, size_t sz)
+obj_memset_persist(void *ctx, void *ptr, int c, size_t sz)
+{
+	memset(ptr, c, sz);
+	UT_ASSERTeq(pmem_msync(ptr, sz), 0);
+	return ptr;
+}
+
+static void *
+obj_memset(void *ctx, int flags, void *ptr, int c, size_t sz)
 {
 	memset(ptr, c, sz);
 	UT_ASSERTeq(pmem_msync(ptr, sz), 0);
@@ -303,8 +323,10 @@ test_mock_pool_allocs(void)
 	mock_pop->p_ops.persist = obj_persist;
 	mock_pop->p_ops.flush = obj_flush;
 	mock_pop->p_ops.drain = obj_drain;
-	mock_pop->p_ops.memcpy_persist = obj_memcpy;
-	mock_pop->p_ops.memset_persist = obj_memset;
+	mock_pop->p_ops.memcpy_persist = obj_memcpy_persist;
+	mock_pop->p_ops.memset_persist = obj_memset_persist;
+	mock_pop->p_ops.memcpy = obj_memcpy;
+	mock_pop->p_ops.memset = obj_memset;
 	mock_pop->p_ops.base = mock_pop;
 	mock_pop->p_ops.pool_size = mock_pop->size;
 

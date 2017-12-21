@@ -78,11 +78,11 @@ FUNC_MOCK(pmem_drain, void, void)
 	}
 FUNC_MOCK_END
 
-_FUNC_REAL_DECL(pmem_memmove_persist, void *, void *dest, const void *src,
+_FUNC_REAL_DECL(pmem_memmove, void *, int flags, void *dest, const void *src,
 		size_t len);
 
 static void *
-mocked_memmove_persist(void *dest, const void *src, size_t len)
+mocked_memmove(int flags, void *dest, const void *src, size_t len)
 {
 	size_t orig_len = len;
 	size_t cnt = (uint64_t)dest & 63;
@@ -96,38 +96,53 @@ mocked_memmove_persist(void *dest, const void *src, size_t len)
 	}
 	ops_counter.n_flush_memcpy += (len + 63) / 64;
 
-	ops_counter.n_drain_memcpy++;
-	return _FUNC_REAL(pmem_memmove_persist)(dest, src, orig_len);
+	if (!(flags & PMEM_MEM_NODRAIN))
+		ops_counter.n_drain_memcpy++;
+	return _FUNC_REAL(pmem_memmove)(flags, dest, src, orig_len);
 }
 
 FUNC_MOCK(pmem_memcpy_persist, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove_persist(dest, src, len);
+		return mocked_memmove(0, dest, src, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memcpy_nodrain, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove_persist(dest, src, len);
+		return mocked_memmove(PMEM_MEM_NODRAIN, dest, src, len);
+	}
+FUNC_MOCK_END
+
+FUNC_MOCK(pmem_memcpy, void *, int flags, void *dest, const void *src,
+		size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memmove(flags, dest, src, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memmove_persist, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove_persist(dest, src, len);
+		return mocked_memmove(0, dest, src, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memmove_nodrain, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove_persist(dest, src, len);
+		return mocked_memmove(PMEM_MEM_NODRAIN, dest, src, len);
 	}
 FUNC_MOCK_END
 
-_FUNC_REAL_DECL(pmem_memset_persist, void *, void *dest, int c, size_t len);
+FUNC_MOCK(pmem_memmove, void *, int flags, void *dest, const void *src,
+		size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memmove(flags, dest, src, len);
+	}
+FUNC_MOCK_END
+
+_FUNC_REAL_DECL(pmem_memset, void *, int flags, void *dest, int c, size_t len);
 
 static void *
-mocked_memset_persist(void *dest, int c, size_t len)
+mocked_memset(int flags, void *dest, int c, size_t len)
 {
 	size_t orig_len = len;
 	size_t cnt = (uint64_t)dest & 63;
@@ -141,19 +156,26 @@ mocked_memset_persist(void *dest, int c, size_t len)
 	}
 	ops_counter.n_flush_memset += (len + 63) / 64;
 
-	ops_counter.n_drain_memset++;
-	return _FUNC_REAL(pmem_memset_persist)(dest, c, orig_len);
+	if (!(flags & PMEM_MEM_NODRAIN))
+		ops_counter.n_drain_memset++;
+	return _FUNC_REAL(pmem_memset)(flags, dest, c, orig_len);
 }
 
 FUNC_MOCK(pmem_memset_persist, void *, void *dest, int c, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memset_persist(dest, c, len);
+		return mocked_memset(0, dest, c, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memset_nodrain, void *, void *dest, int c, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memset_persist(dest, c, len);
+		return mocked_memset(PMEM_MEM_NODRAIN, dest, c, len);
+	}
+FUNC_MOCK_END
+
+FUNC_MOCK(pmem_memset, void *, int flags, void *dest, int c, size_t len)
+	FUNC_MOCK_RUN_DEFAULT {
+		return mocked_memset(flags, dest, c, len);
 	}
 FUNC_MOCK_END
 

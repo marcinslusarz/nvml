@@ -35,6 +35,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "libpmem.h"
 #include "util.h"
 
 typedef void (*persist_fn)(void *base, const void *, size_t);
