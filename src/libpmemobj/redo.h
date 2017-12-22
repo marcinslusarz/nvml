@@ -57,6 +57,7 @@ struct redo_log_state {
 	struct redo_log *pmem_data;
 	struct redo_log *vmem_data;
 	size_t size;
+	enum { SYNCHRONIZED, PMEM_NEWER, VMEM_NEWER } sync;
 };
 
 typedef int (*redo_check_offset_fn)(void *ctx, uint64_t offset);

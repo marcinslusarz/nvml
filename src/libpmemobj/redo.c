@@ -120,12 +120,16 @@ redo_log_state_new(struct redo_ctx *ctx, struct redo_log *redo, size_t size)
 	state->size = size;
 	state->ctx = ctx;
 
+	memcpy(state->vmem_data, state->pmem_data, size);
+	state->sync = SYNCHRONIZED;
+
 	return state;
 }
 
 void
 redo_log_state_delete(struct redo_log_state *state)
 {
+	ASSERTeq(state->sync, SYNCHRONIZED);
 	Free(state->vmem_data);
 	Free(state);
 }
@@ -169,9 +173,12 @@ redo_log_store(struct redo_log_state *redo_state, size_t index,
 	LOG(15, "redo %p index %zu offset %" PRIu64 " value %" PRIu64,
 			pmem_redo, index, offset, value);
 
+	ASSERTne(redo_state->sync, PMEM_NEWER);
+
 	ASSERTeq(offset & REDO_FINISH_FLAG, 0);
 	ASSERT(index < ctx->redo_num_entries);
 
+	redo_state->sync = VMEM_NEWER;
 	vmem_redo[index + 1].offset = offset;
 	vmem_redo[index + 1].value = value;
 }
@@ -196,6 +203,8 @@ redo_log_persist(struct redo_log_state *redo_state, size_t size)
 	struct redo_log *vmem_redo = redo_state->vmem_data;
 	const struct pmem_ops *p_ops = &redo_state->ctx->p_ops;
 
+	ASSERTeq(redo_state->sync, VMEM_NEWER);
+
 	redo_log_calc_csum(vmem_redo, size, &vmem_redo[0].offset,
 			&vmem_redo[0].value);
 
@@ -205,6 +214,7 @@ redo_log_persist(struct redo_log_state *redo_state, size_t size)
 	if (sz != dsz)
 		memset(((char *)vmem_redo) + dsz, 0xff, sz - dsz);
 	pmemops_memcpy(p_ops, pmem_redo, vmem_redo, sz, PMEM_MEM_WC);
+	redo_state->sync = SYNCHRONIZED;
 }
 
 /*
@@ -221,11 +231,13 @@ redo_log_store_last(struct redo_log_state *redo_state,
 	LOG(15, "redo %p index %zu offset %" PRIu64 " value %" PRIu64,
 			pmem_redo, index, offset, value);
 
+	ASSERTne(redo_state->sync, PMEM_NEWER);
 	ASSERTeq(offset & REDO_FINISH_FLAG, 0);
 	ASSERT(index + 1 < ctx->redo_num_entries);
 
 	vmem_redo[index + 1].offset = offset | REDO_FINISH_FLAG;
 	vmem_redo[index + 1].value = value;
+	redo_state->sync = VMEM_NEWER;
 
 	redo_log_persist(redo_state, index + 1);
 }
@@ -243,10 +255,12 @@ redo_log_set_last(struct redo_log_state *redo_state,
 
 	LOG(15, "redo %p index %zu", pmem_redo, index);
 
+	ASSERTne(redo_state->sync, PMEM_NEWER);
 	ASSERT(index < ctx->redo_num_entries);
 
 	/* set finish flag of last entry and persist */
 	vmem_redo[index + 1].offset |= REDO_FINISH_FLAG;
+	redo_state->sync = VMEM_NEWER;
 
 	redo_log_persist(redo_state, index + 1);
 }
@@ -258,38 +272,48 @@ void
 redo_log_process(struct redo_log_state *redo_state, size_t nentries)
 {
 	const struct redo_ctx *ctx = redo_state->ctx;
-	struct redo_log *redo = &redo_state->pmem_data[1];
+	struct redo_log *pmem_redo = redo_state->pmem_data;
+	struct redo_log *vmem_redo = redo_state->vmem_data;
 	const struct pmem_ops *p_ops = &ctx->p_ops;
 
-	LOG(15, "redo %p nentries %zu", redo, nentries);
+	LOG(15, "redo %p nentries %zu", pmem_redo, nentries);
+
+	if (redo_state->sync == PMEM_NEWER) {
+		memcpy(vmem_redo, pmem_redo,
+				(nentries + 1) * sizeof(*pmem_redo));
+		redo_state->sync = SYNCHRONIZED;
+	}
+
+	ASSERTeq(redo_state->sync, SYNCHRONIZED);
 
 #ifdef DEBUG
 	if (redo_log_check(redo_state, nentries) != 0)
 		ASSERTeq(redo_log_check(redo_state, nentries), 0);
 #endif
 
+	vmem_redo++;
 	uint64_t *val;
-	while ((redo->offset & REDO_FINISH_FLAG) == 0) {
-		val = (uint64_t *)((uintptr_t)ctx->base + redo->offset);
+	while ((vmem_redo->offset & REDO_FINISH_FLAG) == 0) {
+		val = (uint64_t *)((uintptr_t)ctx->base + vmem_redo->offset);
 		VALGRIND_ADD_TO_TX(val, sizeof(*val));
-		*val = redo->value;
+		*val = vmem_redo->value;
 		VALGRIND_REMOVE_FROM_TX(val, sizeof(*val));
 
 		pmemops_flush(p_ops, val, sizeof(uint64_t));
 
-		redo++;
+		vmem_redo++;
 	}
 
-	uint64_t offset = redo->offset & REDO_FLAG_MASK;
+	uint64_t offset = vmem_redo->offset & REDO_FLAG_MASK;
 	val = (uint64_t *)((uintptr_t)ctx->base + offset);
 	VALGRIND_ADD_TO_TX(val, sizeof(*val));
-	*val = redo->value;
+	*val = vmem_redo->value;
 	VALGRIND_REMOVE_FROM_TX(val, sizeof(*val));
 
 	pmemops_persist(p_ops, val, sizeof(uint64_t));
 
 	assert_addr_cl_aligned(redo_state->pmem_data);
-	pmemops_memset(p_ops, redo_state->pmem_data, 0, 64, PMEM_MEM_WC);
+	pmemops_memset(p_ops, pmem_redo, 0, 64, PMEM_MEM_WC);
 }
 
 /*
@@ -342,6 +366,8 @@ redo_log_recover(struct redo_log_state *redo_state, size_t nentries)
 	if (r == -1) {
 		assert_addr_cl_aligned(redo);
 		pmemops_memset(p_ops, redo, 0, 64, PMEM_MEM_WC);
+		memset(redo_state->vmem_data, 0, 64);
+		redo_state->sync = SYNCHRONIZED;
 		return;
 	}
 
