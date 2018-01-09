@@ -67,7 +67,7 @@
 #define SIZEOF_REDO_LOG_V3 (16)
 #define SIZEOF_LANE_LIST_LAYOUT_V3 (1024 - 8)
 #define SIZEOF_LANE_ALLOC_LAYOUT_V3 (1024 - 16)
-#define SIZEOF_LANE_TX_LAYOUT_V3 (8 + (4 * SIZEOF_PVECTOR_V3))
+#define SIZEOF_LANE_TX_LAYOUT_V4 (64 + (4 * SIZEOF_PVECTOR_V3))
 
 POBJ_LAYOUT_BEGIN(layout);
 POBJ_LAYOUT_ROOT(layout, struct foo);
@@ -220,7 +220,7 @@ main(int argc, char *argv[])
 	UT_COMPILE_ERROR_ON(sizeof(struct lane_tx_layout) >
 		sizeof(struct lane_section_layout));
 	UT_COMPILE_ERROR_ON(sizeof(struct lane_tx_layout) !=
-		SIZEOF_LANE_TX_LAYOUT_V3);
+		SIZEOF_LANE_TX_LAYOUT_V4);
 
 	ASSERT_ALIGNED_BEGIN(struct lane_layout);
 	ASSERT_ALIGNED_FIELD(struct lane_layout, sections);
