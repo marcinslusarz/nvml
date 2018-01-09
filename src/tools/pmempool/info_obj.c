@@ -126,7 +126,7 @@ lane_need_recovery_tx(struct pmem_info *pip,
 	 * if state is not committed and
 	 * any undo log not empty
 	 */
-	return section->state == TX_STATE_NONE &&
+	return section->state.state == TX_STATE_NONE &&
 		(!PVECTOR_EMPTY(section->undo_log[UNDO_ALLOC]) ||
 		!PVECTOR_EMPTY(section->undo_log[UNDO_FREE]) ||
 		!PVECTOR_EMPTY(section->undo_log[UNDO_SET]) ||
@@ -410,7 +410,8 @@ info_obj_lane_tx(struct pmem_info *pip, int v,
 {
 	struct lane_tx_layout *section = (struct lane_tx_layout *)layout;
 
-	outv_field(v, "State", "%s", out_get_tx_state_str(section->state));
+	outv_field(v, "State", "%s",
+			out_get_tx_state_str(section->state.state));
 
 	int vobj = v && (pip->args.obj.valloc || pip->args.obj.voobhdr);
 	info_obj_pvector(pip, v, vobj, &section->undo_log[UNDO_ALLOC],

@@ -54,7 +54,7 @@
 
 /* attributes of the obj memory pool format for the pool header */
 #define OBJ_HDR_SIG "PMEMOBJ"	/* must be 8 bytes including '\0' */
-#define OBJ_FORMAT_MAJOR 6
+#define OBJ_FORMAT_MAJOR 7
 
 #define OBJ_FORMAT_COMPAT_DEFAULT 0x0000
 #define OBJ_FORMAT_INCOMPAT_DEFAULT 0x000

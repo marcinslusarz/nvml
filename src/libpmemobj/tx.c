@@ -284,8 +284,9 @@ constructor_tx_add_range(void *ctx, void *ptr, size_t usable_size, void *arg)
 static inline void
 tx_set_state(PMEMobjpool *pop, struct lane_tx_layout *layout, uint64_t state)
 {
-	layout->state = state;
-	pmemops_persist(&pop->p_ops, &layout->state, sizeof(layout->state));
+	struct lane_tx_state s = { state, {0, }, };
+
+	pmemops_memcpy_persist(&pop->p_ops, &layout->state, &s, sizeof(s));
 }
 
 /*
@@ -2248,7 +2249,7 @@ lane_transaction_recovery(PMEMobjpool *pop, void *data, unsigned length)
 	int ret = 0;
 	ASSERT(sizeof(*layout) <= length);
 
-	if (layout->state == TX_STATE_COMMITTED) {
+	if (layout->state.state == TX_STATE_COMMITTED) {
 		/*
 		 * The transaction has been committed so we have to
 		 * process the undo log, do the post commit phase
@@ -2274,8 +2275,8 @@ lane_transaction_check(PMEMobjpool *pop, void *data, unsigned length)
 
 	struct lane_tx_layout *tx_sec = data;
 
-	if (tx_sec->state != TX_STATE_NONE &&
-		tx_sec->state != TX_STATE_COMMITTED) {
+	if (tx_sec->state.state != TX_STATE_NONE &&
+		tx_sec->state.state != TX_STATE_COMMITTED) {
 		ERR("tx lane: invalid transaction state");
 		return -1;
 	}
