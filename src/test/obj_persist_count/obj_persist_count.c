@@ -194,7 +194,7 @@ reset_counters(void)
 static void
 print_reset_counters(const char *task)
 {
-	UT_OUT("%d\t;%d\t;%d\t;%d\t;%d\t\t;%d\t;%d\t;%d\t;%s",
+	UT_OUT("%d\t;%d\t;%d\t;%d\t;%d\t\t;%d\t\t;%d\t;%d\t\t;%s",
 		ops_counter.n_persist, ops_counter.n_msync,
 		ops_counter.n_flush, ops_counter.n_drain,
 		ops_counter.n_flush_memcpy, ops_counter.n_drain_memcpy,
@@ -226,8 +226,8 @@ main(int argc, char *argv[])
 			PMEMOBJ_MIN_POOL, S_IWUSR | S_IRUSR)) == NULL)
 		UT_FATAL("!pmemobj_create: %s", path);
 
-	UT_OUT("persist\t;msync\t;flush\t;drain\t;cl_copied\t;memcpy"
-			"\t;cl_set\t;memset\t;task");
+	UT_OUT("persist\t;msync\t;flush\t;drain\t;cl_copied\t;drain(memcpy)"
+			"\t;cl_set\t;drain(memset)\t;task");
 
 	print_reset_counters("pool_create");
 
@@ -248,6 +248,10 @@ main(int argc, char *argv[])
 	print_reset_counters("atomic_free");
 
 	struct foo *f = pmemobj_direct(root);
+
+	TX_BEGIN(pop) {
+	} TX_END
+	print_reset_counters("tx_begin_end");
 
 	TX_BEGIN(pop) {
 		f->bar = pmemobj_tx_alloc(sizeof(struct foo), 0);
