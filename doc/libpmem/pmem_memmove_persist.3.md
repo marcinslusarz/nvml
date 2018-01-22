@@ -7,7 +7,7 @@ header: NVM Library
 date: pmem API version 1.0
 ...
 
-[comment]: <> (Copyright 2017, Intel Corporation)
+[comment]: <> (Copyright 2017-2018, Intel Corporation)
 
 [comment]: <> (Redistribution and use in source and binary forms, with or without)
 [comment]: <> (modification, are permitted provided that the following conditions)
@@ -123,6 +123,15 @@ The **pmem_memmove_persist**(), **pmem_memcpy_persist**(), **pmem_memset_persist
 **pmem_memmove_nodrain**(), **pmem_memcpy_nodrain**() and **pmem_memset_nodrain**()
 functions return the address of the destination.
 
+
+# CAVEATS #
+After calling any of the \_nodrain functions (**pmem_memmove_nodrain**(),
+**pmem_memcpy_nodrain**() or **pmem_memset_nodrain**()) you should not expect
+memory to be visible to other threads before calling pmem_drain or any of the
+*persist* functions. This is because those functions may use non-temporal store
+instructions, which are weakly ordered. See "Intel 64 and IA-32 Architectures
+Software Developer's Manual", Volume 1, "Caching of Temporal vs. Non-Temporal
+Data" section for details.
 
 # SEE ALSO #
 

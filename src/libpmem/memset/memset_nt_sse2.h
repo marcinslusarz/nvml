@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, Intel Corporation
+ * Copyright 2017-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -186,8 +186,7 @@ EXPORTED_SYMBOL(char *dest, int c, size_t len)
 nonnt:
 	memset_small_sse2(dest, xmm, len);
 end:
-	/* serialize non-temporal store instructions */
-	_mm_sfence();
+	maybe_barrier();
 
 	return orig_dest;
 }
