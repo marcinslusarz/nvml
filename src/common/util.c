@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017, Intel Corporation
+ * Copyright 2014-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -135,6 +135,31 @@ util_checksum(void *addr, size_t len, uint64_t *csump, int insert)
 	}
 
 	return *csump == htole64(csum);
+}
+
+/*
+ * util_checksum_seq -- compute sequential Fletcher64 checksum
+ *
+ * Merges checksum from the old buffer with checksum for current buffer.
+ */
+uint64_t
+util_checksum_seq(const void *addr, size_t len, uint64_t csum)
+{
+	if (len % 4 != 0)
+		abort();
+
+	const uint32_t *p32 = addr;
+	const uint32_t *p32end = (const uint32_t *)((const char *)addr + len);
+	uint32_t lo32 = (uint32_t)csum;
+	uint32_t hi32 = (uint32_t)(csum >> 32);
+
+	while (p32 < p32end) {
+		lo32 += le32toh(*p32);
+		++p32;
+		hi32 += lo32;
+	}
+
+	return (uint64_t)hi32 << 32 | lo32;
 }
 
 /*
