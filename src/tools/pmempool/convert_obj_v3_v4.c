@@ -188,7 +188,7 @@ obj_root_restore_size(void *psf, struct pmemobjpool *pop)
 		sizeof(pop->root_size));
 }
 
-#define CONVERSION_FLAG_OLD_SET_CACHE ((1ULL) << 0)
+#define CONVERSION_FLAG_V1_SET_CACHE ((1ULL) << 0)
 
 int
 convert_v3_v4(void *psf, void *addr)
@@ -197,7 +197,7 @@ convert_v3_v4(void *psf, void *addr)
 
 	assert(sizeof(struct pmemobjpool) == 8192);
 
-	pop->conversion_flags = CONVERSION_FLAG_OLD_SET_CACHE;
+	pop->conversion_flags = CONVERSION_FLAG_V1_SET_CACHE;
 	pmempool_convert_persist(psf, &pop->conversion_flags,
 		sizeof(pop->conversion_flags));
 
