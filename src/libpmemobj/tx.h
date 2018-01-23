@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2017, Intel Corporation
+ * Copyright 2016-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,8 +43,9 @@
 #define TX_DEFAULT_RANGE_CACHE_SIZE (1 << 15)
 #define TX_DEFAULT_RANGE_CACHE_THRESHOLD (1 << 12)
 
-#define TX_RANGE_MASK (8ULL - 1)
-#define TX_RANGE_MASK_LEGACY (32ULL - 1)
+#define TX_RANGE_MASK (64ULL - 1)
+#define TX_RANGE_MASK_V2 (8ULL - 1)
+#define TX_RANGE_MASK_V1 (32ULL - 1)
 
 #define TX_ALIGN_SIZE(s, amask) (((s) + (amask)) & ~(amask))
 
