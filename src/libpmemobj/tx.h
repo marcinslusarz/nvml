@@ -91,5 +91,7 @@ void tx_ctl_register(PMEMobjpool *pop);
 
 struct tx_parameters *tx_params_new(void);
 void tx_params_delete(struct tx_parameters *tx_params);
+int tx_params_create_alloc_class(PMEMobjpool *pop,
+		struct tx_parameters *tx_params);
 
 #endif

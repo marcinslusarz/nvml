@@ -1242,6 +1242,9 @@ obj_runtime_init(PMEMobjpool *pop, int rdonly, int boot, unsigned nlanes)
 		goto err_ctl;
 	}
 
+	if (boot && tx_params_create_alloc_class(pop, pop->tx_params))
+		goto err_alloc_class;
+
 	/*
 	 * If possible, turn off all permissions on the pool header page.
 	 *
@@ -1253,6 +1256,8 @@ obj_runtime_init(PMEMobjpool *pop, int rdonly, int boot, unsigned nlanes)
 	return 0;
 
 	struct ravl_node *n;
+err_alloc_class:
+	ctl_delete(pop->ctl);
 err_ctl:
 	n = ravl_find(pools_tree, pop, RAVL_PREDICATE_EQUAL);
 	ASSERTne(n, NULL);
