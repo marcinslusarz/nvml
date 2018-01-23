@@ -591,11 +591,23 @@ tx_foreach_set(PMEMobjpool *pop, struct tx *tx, struct tx_undo_runtime *tx_rt,
 
 			cb(pop, tx, range);
 
-			size_t amask = pop->conversion_flags &
-				CONVERSION_FLAG_OLD_SET_CACHE ?
-				TX_RANGE_MASK_LEGACY : TX_RANGE_MASK;
-			cache_offset += TX_ALIGN_SIZE(range->size, amask) +
-				sizeof(struct tx_range);
+			size_t off;
+			if (pop->conversion_flags &
+					CONVERSION_FLAG_V1_SET_CACHE) {
+				off = TX_ALIGN_SIZE(range->size,
+						TX_RANGE_MASK_V1) +
+						sizeof(struct tx_range);
+			} else if (pop->conversion_flags &
+					CONVERSION_FLAG_V2_SET_CACHE) {
+				off = TX_ALIGN_SIZE(range->size,
+						TX_RANGE_MASK_V2) +
+						sizeof(struct tx_range);
+			} else {
+				off = TX_ALIGN_SIZE(sizeof(struct tx_range) +
+						range->size, TX_RANGE_MASK);
+			}
+
+			cache_offset += off;
 		}
 	}
 }
@@ -1715,6 +1727,87 @@ pmemobj_tx_get_range_cache(PMEMobjpool *pop, struct tx *tx,
 	return cache;
 }
 
+static void
+tx_add_small_flushing(const struct pmem_ops *p_ops, char *pmem_range,
+		const char *src, uint64_t data_offset, uint64_t data_size)
+{
+	/* this isn't transactional so we have to keep the order */
+	uint64_t remaining_size = data_size;
+
+	char dram_cl[64];
+	struct tx_range *dram_range = (struct tx_range *)dram_cl;
+	/* the range is only valid if both size and offset are != 0 */
+	dram_range->offset = 0;
+	dram_range->size = 0;
+
+	uint64_t copied;
+	if (data_size > 48) {
+		copied = 48;
+		memcpy(dram_range->data, src, copied);
+	} else {
+		copied = data_size;
+		memcpy(dram_range->data, src, copied);
+		memset(dram_range->data + copied, 0, 48 - copied);
+	}
+	remaining_size -= copied;
+
+	uint64_t dst_off = 16 + copied;
+	uint64_t src_off = copied;
+
+	pmemops_memcpy(p_ops, pmem_range, dram_range, 64,
+			PMEM_MEM_WC | PMEM_MEM_NODRAIN);
+
+	if (remaining_size) {
+		copied = remaining_size & ~63ULL;
+		if (copied) {
+			pmemops_memcpy(p_ops,
+					pmem_range + dst_off,
+					src + src_off,
+					copied,
+					PMEM_MEM_WC | PMEM_MEM_NODRAIN);
+
+			remaining_size -= copied;
+			dst_off += copied;
+			src_off += copied;
+		}
+		ASSERTeq(copied & 63, 0);
+	}
+
+	if (remaining_size) {
+		ASSERT(remaining_size < 64);
+		copied = remaining_size;
+
+		char dram_remaining[64];
+		memcpy(dram_remaining, src + src_off, copied);
+		memset(dram_remaining + copied, 0, 64 - copied);
+
+		pmemops_memcpy(p_ops,
+				pmem_range + dst_off,
+				dram_remaining,
+				64,
+				PMEM_MEM_WC | PMEM_MEM_NODRAIN);
+	}
+	pmemops_drain(p_ops);
+
+	dram_range->size = data_size;
+	dram_range->offset = data_offset;
+	/* Now without PMEM_MEM_NODRAIN. */
+	pmemops_memcpy(p_ops, pmem_range, dram_range, 64, PMEM_MEM_WC);
+
+}
+
+static void
+tx_add_small_noflushing(const struct pmem_ops *p_ops, char *pmem,
+		const char *src, uint64_t data_offset, uint64_t data_size)
+{
+	struct tx_range *pmem_range = (struct tx_range *)pmem;
+	pmemops_memcpy(p_ops, pmem_range->data, src, data_size, 0);
+	pmem_range->size = data_size;
+	pmem_range->offset = data_offset;
+	/* for replication */
+	pmemops_persist(p_ops, pmem_range, sizeof(struct tx_range));
+}
+
 /*
  * pmemobj_tx_add_small -- (internal) adds small memory range to undo log cache
  */
@@ -1735,14 +1828,14 @@ pmemobj_tx_add_small(struct tx *tx, struct tx_range_def *args)
 		return 1;
 	}
 
-	/* those structures are binary compatible */
-	struct tx_range *range =
-		(struct tx_range *)((char *)cache + runtime->cache_offset);
+	char *range = (char *)cache + runtime->cache_offset;
+
+	ASSERTeq((uintptr_t)range & 63, 0);
 
 	uint64_t data_offset = args->offset;
 	uint64_t data_size = args->size;
-	uint64_t range_size = TX_ALIGN_SIZE(args->size, TX_RANGE_MASK) +
-		sizeof(struct tx_range);
+	uint64_t range_size = TX_ALIGN_SIZE(sizeof(struct tx_range) + data_size,
+						TX_RANGE_MASK);
 
 	if (remaining_space < range_size) {
 		ASSERT(remaining_space > sizeof(struct tx_range));
@@ -1759,16 +1852,15 @@ pmemobj_tx_add_small(struct tx *tx, struct tx_range_def *args)
 
 	VALGRIND_ADD_TO_TX(range, range_size);
 
-	/* this isn't transactional so we have to keep the order */
 	void *src = OBJ_OFF_TO_PTR(pop, data_offset);
 	VALGRIND_ADD_TO_TX(src, data_size);
 
-	pmemops_memcpy(p_ops, range->data, src, data_size, 0);
-
-	/* the range is only valid if both size and offset are != 0 */
-	range->size = data_size;
-	range->offset = data_offset;
-	pmemops_persist(p_ops, range, sizeof(struct tx_range));
+	if (1) /* pmem_flush is not empty */
+		tx_add_small_flushing(p_ops, range, src, data_offset,
+				data_size);
+	else
+		tx_add_small_noflushing(p_ops, range, src, data_offset,
+				data_size);
 
 	VALGRIND_REMOVE_FROM_TX(range, range_size);
 
