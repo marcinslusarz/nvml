@@ -116,7 +116,8 @@ typedef void *(*persist_remote_fn)(PMEMobjpool *pop, const void *addr,
 
 typedef uint64_t type_num_t;
 
-#define CONVERSION_FLAG_OLD_SET_CACHE ((1ULL) << 0)
+#define CONVERSION_FLAG_V1_SET_CACHE ((1ULL) << 0)
+#define CONVERSION_FLAG_V2_SET_CACHE ((1ULL) << 1)
 
 struct pmemobjpool {
 	struct pool_hdr hdr;	/* memory pool header */
