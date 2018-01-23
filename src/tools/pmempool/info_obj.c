@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017, Intel Corporation
+ * Copyright 2014-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -393,7 +393,8 @@ set_entry_cache_cb(struct pmem_info *pip, int v, int vid,
 			range->offset, out_get_size_str(range->size,
 					pip->args.human));
 
-		cache_offset += TX_ALIGN_SIZE(range->size, TX_RANGE_MASK) +
+		cache_offset += // XXX
+			TX_ALIGN_SIZE(range->size, TX_RANGE_MASK_V2) +
 			sizeof(struct tx_range);
 	}
 
