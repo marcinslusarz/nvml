@@ -10,8 +10,8 @@ persist	;msync	;flush	;drain	;cl_copied	;drain(memcpy)	;cl_set	;drain(memset)	;t
 3	;0	;2	;2	;2		;2		;0	;0		;tx_alloc_next
 3	;0	;1	;2	;3		;3		;1	;1		;tx_free
 2	;0	;1	;2	;3		;3		;1	;1		;tx_free_next
-10	;0	;3	;2	;4		;4		;519	;3		;tx_add
-1	;0	;1	;1	;3		;3		;2	;1		;tx_add_next
+10	;0	;2	;2	;4		;4		;514	;3		;tx_add
+1	;0	;1	;1	;3		;3		;1	;1		;tx_add_next
 1	;0	;2	;1	;1		;1		;1	;1		;pmalloc
 1	;0	;1	;1	;1		;1		;1	;1		;pfree
 1	;0	;1	;1	;0		;0		;0	;0		;pmalloc_stack

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017, Intel Corporation
+ * Copyright 2014-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1275,6 +1275,9 @@ obj_runtime_init(PMEMobjpool *pop, int rdonly, int boot, unsigned nlanes)
 		errno = EINVAL;
 		goto err;
 	}
+
+	if (boot && tx_params_create_alloc_class(pop, pop->tx_params))
+		goto err;
 
 	/*
 	 * If possible, turn off all permissions on the pool header page.

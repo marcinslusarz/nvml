@@ -150,6 +150,7 @@ enum tx_clr_flag {
 struct tx_parameters {
 	size_t cache_size;
 	size_t cache_threshold;
+	uint16_t cache_alloc_class;
 };
 
 /*
@@ -165,8 +166,27 @@ tx_params_new(void)
 
 	tx_params->cache_size = TX_DEFAULT_RANGE_CACHE_SIZE;
 	tx_params->cache_threshold = TX_DEFAULT_RANGE_CACHE_THRESHOLD;
+	tx_params->cache_alloc_class = UINT16_MAX;
 
 	return tx_params;
+}
+
+int
+tx_params_create_alloc_class(PMEMobjpool *pop, struct tx_parameters *tx_params)
+{
+	struct pobj_alloc_class_desc alloc_class;
+	alloc_class.header_type = POBJ_HEADER_NONE;
+	alloc_class.unit_size = tx_params->cache_size;
+	alloc_class.units_per_block = 1;
+	alloc_class.class_id = 0;
+
+	int ret = pmemobj_ctl_set(pop, "heap.alloc_class.new.desc",
+			&alloc_class);
+	if (ret)
+		return ret;
+
+	tx_params->cache_alloc_class = (uint16_t)alloc_class.class_id;
+	return 0;
 }
 
 /*
@@ -1653,10 +1673,13 @@ pmemobj_tx_get_range_cache(PMEMobjpool *pop, struct tx *tx,
 			ERR("cache set undo log too large");
 			return NULL;
 		}
+		ASSERT(pop->tx_params->cache_alloc_class != UINT16_MAX);
+
 		int err = pmalloc_construct(pop, entry,
 			pop->tx_params->cache_size,
 			constructor_tx_range_cache, NULL,
-			0, OBJ_INTERNAL_OBJECT_MASK, 0);
+			0, OBJ_INTERNAL_OBJECT_MASK,
+			pop->tx_params->cache_alloc_class);
 
 		if (err != 0) {
 			pvector_pop_back(undo, NULL);
