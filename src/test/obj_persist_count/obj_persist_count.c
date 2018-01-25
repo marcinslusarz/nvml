@@ -39,7 +39,7 @@
 #include "pmalloc.h"
 #include "unittest.h"
 
-static struct {
+struct ops_counter {
 	int n_cl_stores;
 	int n_drain;
 	int n_pmem_persist;
@@ -50,31 +50,71 @@ static struct {
 	int n_flush_from_pmem_memset;
 	int n_drain_from_pmem_memcpy;
 	int n_drain_from_pmem_memset;
-} ops_counter;
+	int n_pot_cache_misses;
+};
+
+struct ops_counter ops_counter;
+struct ops_counter tx_counter;
 
 #define FLUSH_ALIGN ((uintptr_t)64)
+#define MOVNT_THRESHOLD	256
 
 static int
-length_aligned(const void *addr, size_t len, uintptr_t alignment)
+cl_flushed(const void *addr, size_t len, uintptr_t alignment)
 {
 	uintptr_t start = (uintptr_t)addr & ~(alignment - 1);
 	uintptr_t end = ((uintptr_t)addr + len + alignment - 1) &
 			~(alignment - 1);
-	return end - start;
+
+	return (int)(end - start) / FLUSH_ALIGN;
+}
+
+static int
+bulk_cl_changed(const void *addr, size_t len)
+{
+	uintptr_t start = (uintptr_t)addr & ~(FLUSH_ALIGN - 1);
+	uintptr_t end = ((uintptr_t)addr + len + FLUSH_ALIGN - 1) &
+			~(FLUSH_ALIGN - 1);
+
+	int cl_changed = (int)(end - start) / FLUSH_ALIGN;
+
+	/* count number of potential cache misses */
+	if (len < MOVNT_THRESHOLD) {
+		/*
+		 * Below threshold we use normal memcpy/memset, which means all
+		 * cache lines may be missing.
+		 */
+		ops_counter.n_pot_cache_misses += cl_changed;
+	} else {
+		/*
+		 * Above threshold we use NT stores which will not generate
+		 * cache misses, with an exception of unaligned beginning
+		 * or end.
+		 */
+		if (start != (uintptr_t)addr)
+			ops_counter.n_pot_cache_misses++;
+		if (end != ((uintptr_t)addr + len) &&
+				start + FLUSH_ALIGN != end)
+			ops_counter.n_pot_cache_misses++;
+	}
+
+	return cl_changed;
 }
 
 static void
 flush_cl(const void *addr, size_t len)
 {
-	ops_counter.n_cl_stores +=
-			length_aligned(addr, len, FLUSH_ALIGN) / FLUSH_ALIGN;
+	int flushed = cl_flushed(addr, len, FLUSH_ALIGN);
+	ops_counter.n_cl_stores += flushed;
+	ops_counter.n_pot_cache_misses += flushed;
 }
 
 static void
 flush_msync(const void *addr, size_t len)
 {
-	ops_counter.n_cl_stores +=
-			length_aligned(addr, len, Pagesize) / FLUSH_ALIGN;
+	int flushed = cl_flushed(addr, len, Pagesize);
+	ops_counter.n_cl_stores += flushed;
+	ops_counter.n_pot_cache_misses += flushed;
 }
 
 FUNC_MOCK(pmem_persist, void, const void *addr, size_t len)
@@ -113,116 +153,85 @@ FUNC_MOCK(pmem_drain, void, void)
 	}
 FUNC_MOCK_END
 
-_FUNC_REAL_DECL(pmem_memmove, void *, int flags, void *dest, const void *src,
-		size_t len);
-
-static void *
-mocked_memmove(int flags, void *dest, const void *src, size_t len)
+static void
+memcpy_nodrain_count(void *dest, const void *src, size_t len)
 {
-	size_t orig_len = len;
-	size_t cnt = (uint64_t)dest & 63;
-	if (cnt > 0) {
-		if (cnt > len)
-			cnt = len;
+	int cl_stores = bulk_cl_changed(dest, len);
+	ops_counter.n_flush_from_pmem_memcpy += cl_stores;
+	ops_counter.n_cl_stores += cl_stores;
+}
 
-		len -= cnt;
+static void
+memcpy_persist_count(void *dest, const void *src, size_t len)
+{
+	memcpy_nodrain_count(dest, src, len);
 
-		ops_counter.n_flush_from_pmem_memcpy++;
-		ops_counter.n_cl_stores++;
-	}
-	ops_counter.n_flush_from_pmem_memcpy +=
-				(len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
-	ops_counter.n_cl_stores += (len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
-
-	if (!(flags & PMEM_MEM_NODRAIN)) {
-		ops_counter.n_drain_from_pmem_memcpy++;
-		ops_counter.n_drain++;
-	}
-
-	return _FUNC_REAL(pmem_memmove)(flags, dest, src, orig_len);
+	ops_counter.n_drain_from_pmem_memcpy++;
+	ops_counter.n_drain++;
 }
 
 FUNC_MOCK(pmem_memcpy_persist, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove(0, dest, src, len);
+		memcpy_persist_count(dest, src, len);
+
+		return _FUNC_REAL(pmem_memcpy_persist)(dest, src, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memcpy_nodrain, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove(PMEM_MEM_NODRAIN, dest, src, len);
-	}
-FUNC_MOCK_END
+		memcpy_nodrain_count(dest, src, len);
 
-FUNC_MOCK(pmem_memcpy, void *, int flags, void *dest, const void *src,
-		size_t len)
-	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove(flags, dest, src, len);
+		return _FUNC_REAL(pmem_memcpy_nodrain)(dest, src, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memmove_persist, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove(0, dest, src, len);
+		memcpy_persist_count(dest, src, len);
+
+		return _FUNC_REAL(pmem_memmove_persist)(dest, src, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memmove_nodrain, void *, void *dest, const void *src, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove(PMEM_MEM_NODRAIN, dest, src, len);
+		memcpy_nodrain_count(dest, src, len);
+
+		return _FUNC_REAL(pmem_memmove_nodrain)(dest, src, len);
 	}
 FUNC_MOCK_END
 
-FUNC_MOCK(pmem_memmove, void *, int flags, void *dest, const void *src,
-		size_t len)
-	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memmove(flags, dest, src, len);
-	}
-FUNC_MOCK_END
-
-_FUNC_REAL_DECL(pmem_memset, void *, int flags, void *dest, int c, size_t len);
-
-static void *
-mocked_memset(int flags, void *dest, int c, size_t len)
+static void
+memset_nodrain_count(void *dest, size_t len)
 {
-	size_t orig_len = len;
-	size_t cnt = (uint64_t)dest & 63;
-	if (cnt > 0) {
-		if (cnt > len)
-			cnt = len;
+	int cl_set = bulk_cl_changed(dest, len);
+	ops_counter.n_flush_from_pmem_memset += cl_set;
+	ops_counter.n_cl_stores += cl_set;
+}
 
-		len -= cnt;
+static void
+memset_persist_count(void *dest, size_t len)
+{
+	memset_nodrain_count(dest, len);
 
-		ops_counter.n_flush_from_pmem_memset++;
-		ops_counter.n_cl_stores++;
-	}
-	ops_counter.n_flush_from_pmem_memset +=
-				(len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
-	ops_counter.n_cl_stores += (len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
-
-	if (!(flags & PMEM_MEM_NODRAIN)) {
-		ops_counter.n_drain_from_pmem_memset++;
-		ops_counter.n_drain++;
-	}
-
-	return _FUNC_REAL(pmem_memset)(flags, dest, c, orig_len);
+	ops_counter.n_drain_from_pmem_memset++;
+	ops_counter.n_drain++;
 }
 
 FUNC_MOCK(pmem_memset_persist, void *, void *dest, int c, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memset(0, dest, c, len);
+		memset_persist_count(dest, len);
+
+		return _FUNC_REAL(pmem_memset_persist)(dest, c, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_memset_nodrain, void *, void *dest, int c, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memset(PMEM_MEM_NODRAIN, dest, c, len);
-	}
-FUNC_MOCK_END
+		memset_nodrain_count(dest, len);
 
-FUNC_MOCK(pmem_memset, void *, int flags, void *dest, int c, size_t len)
-	FUNC_MOCK_RUN_DEFAULT {
-		return mocked_memset(flags, dest, c, len);
+		return _FUNC_REAL(pmem_memset_nodrain)(dest, c, len);
 	}
 FUNC_MOCK_END
 
@@ -239,22 +248,24 @@ reset_counters(void)
  * print_reset_counters -- print and then zero all counters
  */
 static void
-print_reset_counters(const char *task)
+print_reset_counters(const char *task, int tx)
 {
+#define CNT(name) (ops_counter.name - tx * tx_counter.name)
 	UT_OUT(
-		"%-14s %-7d %-10d %-12d %-10d %-10d %-10d %-15d %-17d %-15d %-15d",
+		"%-14s %-7d %-10d %-12d %-10d %-10d %-10d %-15d %-17d %-15d %-17d %-23d",
 		task,
-		ops_counter.n_cl_stores,
-		ops_counter.n_drain,
-		ops_counter.n_pmem_persist,
-		ops_counter.n_pmem_msync,
-		ops_counter.n_pmem_flush,
-		ops_counter.n_pmem_drain,
-		ops_counter.n_flush_from_pmem_memcpy,
-		ops_counter.n_drain_from_pmem_memcpy,
-		ops_counter.n_flush_from_pmem_memset,
-		ops_counter.n_drain_from_pmem_memset);
-
+		CNT(n_cl_stores),
+		CNT(n_drain),
+		CNT(n_pmem_persist),
+		CNT(n_pmem_msync),
+		CNT(n_pmem_flush),
+		CNT(n_pmem_drain),
+		CNT(n_flush_from_pmem_memcpy),
+		CNT(n_drain_from_pmem_memcpy),
+		CNT(n_flush_from_pmem_memset),
+		CNT(n_drain_from_pmem_memset),
+		CNT(n_pot_cache_misses));
+#undef CNT
 	reset_counters();
 }
 
@@ -282,7 +293,7 @@ main(int argc, char *argv[])
 		UT_FATAL("!pmemobj_create: %s", path);
 
 	UT_OUT(
-		"%-14s %-7s %-10s %-12s %-10s %-10s %-10s %-15s %-17s %-15s %-15s",
+		"%-14s %-7s %-10s %-12s %-10s %-10s %-10s %-15s %-17s %-15s %-17s %-23s",
 		"task",
 		"cl(all)",
 		"drain(all)",
@@ -293,10 +304,11 @@ main(int argc, char *argv[])
 		"pmem_memcpy_cls",
 		"pmem_memcpy_drain",
 		"pmem_memset_cls",
-		"pmem_memset_drain");
+		"pmem_memset_drain",
+		"potential_cache_misses");
 
 
-	print_reset_counters("pool_create");
+	print_reset_counters("pool_create", 0);
 
 	/* allocate one structure to create a run */
 	pmemobj_alloc(pop, NULL, sizeof(struct foo), 0, NULL, NULL);
@@ -304,66 +316,67 @@ main(int argc, char *argv[])
 
 	PMEMoid root = pmemobj_root(pop, sizeof(struct foo));
 	UT_ASSERT(!OID_IS_NULL(root));
-	print_reset_counters("root_alloc");
+	print_reset_counters("root_alloc", 0);
 
 	PMEMoid oid;
 	int ret = pmemobj_alloc(pop, &oid, sizeof(struct foo), 0, NULL, NULL);
 	UT_ASSERTeq(ret, 0);
-	print_reset_counters("atomic_alloc");
+	print_reset_counters("atomic_alloc", 0);
 
 	pmemobj_free(&oid);
-	print_reset_counters("atomic_free");
+	print_reset_counters("atomic_free", 0);
 
 	struct foo *f = pmemobj_direct(root);
 
 	TX_BEGIN(pop) {
 	} TX_END
-	print_reset_counters("tx_begin_end");
+	memcpy(&tx_counter, &ops_counter, sizeof(ops_counter));
+	print_reset_counters("tx_begin_end", 0);
 
 	TX_BEGIN(pop) {
 		f->bar = pmemobj_tx_alloc(sizeof(struct foo), 0);
 		UT_ASSERT(!OID_IS_NULL(f->bar));
 	} TX_END
-	print_reset_counters("tx_alloc");
+	print_reset_counters("tx_alloc", 1);
 
 	TX_BEGIN(pop) {
 		f->bar2 = pmemobj_tx_alloc(sizeof(struct foo), 0);
 		UT_ASSERT(!OID_IS_NULL(f->bar2));
 	} TX_END
-	print_reset_counters("tx_alloc_next");
+	print_reset_counters("tx_alloc_next", 1);
 
 	TX_BEGIN(pop) {
 		pmemobj_tx_free(f->bar);
 	} TX_END
-	print_reset_counters("tx_free");
+	print_reset_counters("tx_free", 1);
 
 	TX_BEGIN(pop) {
 		pmemobj_tx_free(f->bar2);
 	} TX_END
-	print_reset_counters("tx_free_next");
+	print_reset_counters("tx_free_next", 1);
 
 	TX_BEGIN(pop) {
 		pmemobj_tx_add_range_direct(&f->val, sizeof(f->val));
 	} TX_END
-	print_reset_counters("tx_add");
+	print_reset_counters("tx_add", 1);
 
 	TX_BEGIN(pop) {
 		pmemobj_tx_add_range_direct(&f->val, sizeof(f->val));
 	} TX_END
-	print_reset_counters("tx_add_next");
+	print_reset_counters("tx_add_next", 1);
 
 	pmalloc(pop, &f->dest, sizeof(f->val), 0, 0);
-	print_reset_counters("pmalloc");
+	print_reset_counters("pmalloc", 0);
 
 	pfree(pop, &f->dest);
-	print_reset_counters("pfree");
+	print_reset_counters("pfree", 0);
 
 	uint64_t stack_var;
 	pmalloc(pop, &stack_var, sizeof(f->val), 0, 0);
-	print_reset_counters("pmalloc_stack");
+	print_reset_counters("pmalloc_stack", 0);
 
 	pfree(pop, &stack_var);
-	print_reset_counters("pfree_stack");
+	print_reset_counters("pfree_stack", 0);
 
 	pmemobj_close(pop);
 
