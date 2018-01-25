@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2017, Intel Corporation
+ * Copyright 2015-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,39 +40,74 @@
 #include "unittest.h"
 
 static struct {
-	int n_persist;
-	int n_msync;
-	int n_flush;
+	int n_cl_stores;
 	int n_drain;
-	int n_flush_memcpy;
-	int n_flush_memset;
-	int n_drain_memcpy;
-	int n_drain_memset;
+	int n_pmem_persist;
+	int n_pmem_msync;
+	int n_pmem_flush;
+	int n_pmem_drain;
+	int n_flush_from_pmem_memcpy;
+	int n_flush_from_pmem_memset;
+	int n_drain_from_pmem_memcpy;
+	int n_drain_from_pmem_memset;
 } ops_counter;
+
+#define FLUSH_ALIGN ((uintptr_t)64)
+
+static int
+length_aligned(const void *addr, size_t len, uintptr_t alignment)
+{
+	uintptr_t start = (uintptr_t)addr & ~(alignment - 1);
+	uintptr_t end = ((uintptr_t)addr + len + alignment - 1) &
+			~(alignment - 1);
+	return end - start;
+}
+
+static void
+flush_cl(const void *addr, size_t len)
+{
+	ops_counter.n_cl_stores +=
+			length_aligned(addr, len, FLUSH_ALIGN) / FLUSH_ALIGN;
+}
+
+static void
+flush_msync(const void *addr, size_t len)
+{
+	ops_counter.n_cl_stores +=
+			length_aligned(addr, len, Pagesize) / FLUSH_ALIGN;
+}
 
 FUNC_MOCK(pmem_persist, void, const void *addr, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		ops_counter.n_persist++;
+		ops_counter.n_pmem_persist++;
+		flush_cl(addr, len);
+		ops_counter.n_drain++;
+
 		_FUNC_REAL(pmem_persist)(addr, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_msync, int, const void *addr, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		ops_counter.n_msync++;
+		ops_counter.n_pmem_msync++;
+		flush_msync(addr, len);
+		ops_counter.n_drain++;
+
 		return _FUNC_REAL(pmem_msync)(addr, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_flush, void, const void *addr, size_t len)
 	FUNC_MOCK_RUN_DEFAULT {
-		ops_counter.n_flush++;
+		ops_counter.n_pmem_flush++;
+		flush_cl(addr, len);
 		_FUNC_REAL(pmem_flush)(addr, len);
 	}
 FUNC_MOCK_END
 
 FUNC_MOCK(pmem_drain, void, void)
 	FUNC_MOCK_RUN_DEFAULT {
+		ops_counter.n_pmem_drain++;
 		ops_counter.n_drain++;
 		_FUNC_REAL(pmem_drain)();
 	}
@@ -92,12 +127,18 @@ mocked_memmove(int flags, void *dest, const void *src, size_t len)
 
 		len -= cnt;
 
-		ops_counter.n_flush_memcpy++;
+		ops_counter.n_flush_from_pmem_memcpy++;
+		ops_counter.n_cl_stores++;
 	}
-	ops_counter.n_flush_memcpy += (len + 63) / 64;
+	ops_counter.n_flush_from_pmem_memcpy +=
+				(len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
+	ops_counter.n_cl_stores += (len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
 
-	if (!(flags & PMEM_MEM_NODRAIN))
-		ops_counter.n_drain_memcpy++;
+	if (!(flags & PMEM_MEM_NODRAIN)) {
+		ops_counter.n_drain_from_pmem_memcpy++;
+		ops_counter.n_drain++;
+	}
+
 	return _FUNC_REAL(pmem_memmove)(flags, dest, src, orig_len);
 }
 
@@ -152,12 +193,18 @@ mocked_memset(int flags, void *dest, int c, size_t len)
 
 		len -= cnt;
 
-		ops_counter.n_flush_memset++;
+		ops_counter.n_flush_from_pmem_memset++;
+		ops_counter.n_cl_stores++;
 	}
-	ops_counter.n_flush_memset += (len + 63) / 64;
+	ops_counter.n_flush_from_pmem_memset +=
+				(len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
+	ops_counter.n_cl_stores += (len + FLUSH_ALIGN - 1) / FLUSH_ALIGN;
 
-	if (!(flags & PMEM_MEM_NODRAIN))
-		ops_counter.n_drain_memset++;
+	if (!(flags & PMEM_MEM_NODRAIN)) {
+		ops_counter.n_drain_from_pmem_memset++;
+		ops_counter.n_drain++;
+	}
+
 	return _FUNC_REAL(pmem_memset)(flags, dest, c, orig_len);
 }
 
@@ -194,11 +241,19 @@ reset_counters(void)
 static void
 print_reset_counters(const char *task)
 {
-	UT_OUT("%d\t;%d\t;%d\t;%d\t;%d\t\t;%d\t\t;%d\t;%d\t\t;%s",
-		ops_counter.n_persist, ops_counter.n_msync,
-		ops_counter.n_flush, ops_counter.n_drain,
-		ops_counter.n_flush_memcpy, ops_counter.n_drain_memcpy,
-		ops_counter.n_flush_memset, ops_counter.n_drain_memset, task);
+	UT_OUT(
+		"%-14s %-7d %-10d %-12d %-10d %-10d %-10d %-15d %-17d %-15d %-15d",
+		task,
+		ops_counter.n_cl_stores,
+		ops_counter.n_drain,
+		ops_counter.n_pmem_persist,
+		ops_counter.n_pmem_msync,
+		ops_counter.n_pmem_flush,
+		ops_counter.n_pmem_drain,
+		ops_counter.n_flush_from_pmem_memcpy,
+		ops_counter.n_drain_from_pmem_memcpy,
+		ops_counter.n_flush_from_pmem_memset,
+		ops_counter.n_drain_from_pmem_memset);
 
 	reset_counters();
 }
@@ -226,8 +281,20 @@ main(int argc, char *argv[])
 			PMEMOBJ_MIN_POOL, S_IWUSR | S_IRUSR)) == NULL)
 		UT_FATAL("!pmemobj_create: %s", path);
 
-	UT_OUT("persist\t;msync\t;flush\t;drain\t;cl_copied\t;drain(memcpy)"
-			"\t;cl_set\t;drain(memset)\t;task");
+	UT_OUT(
+		"%-14s %-7s %-10s %-12s %-10s %-10s %-10s %-15s %-17s %-15s %-15s",
+		"task",
+		"cl(all)",
+		"drain(all)",
+		"pmem_persist",
+		"pmem_msync",
+		"pmem_flush",
+		"pmem_drain",
+		"pmem_memcpy_cls",
+		"pmem_memcpy_drain",
+		"pmem_memset_cls",
+		"pmem_memset_drain");
+
 
 	print_reset_counters("pool_create");
 
