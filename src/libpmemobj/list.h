@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2017, Intel Corporation
+ * Copyright 2015-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,7 +53,7 @@
  * redo       - redo log
  */
 struct lane_list_layout {
-	struct redo_log redo[REDO_NUM_ENTRIES + 1];
+	struct redo_log redo[REDO_NUM_ENTRIES];
 	uint64_t obj_offset;
 };
 

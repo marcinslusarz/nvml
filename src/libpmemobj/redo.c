@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2017, Intel Corporation
+ * Copyright 2015-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -143,20 +143,22 @@ redo_log_state_acquire(struct redo_log_state *state)
 }
 
 /*
- * redo_log_finish_offset -- (internal) find offset of the finish flag
+ * redo_log_nflags -- (internal) get number of finish flags set
  */
 size_t
-redo_log_finish_offset(const struct redo_log *redo, size_t nentries)
+redo_log_nflags(const struct redo_log *redo, size_t nentries)
 {
-	for (size_t i = 1; i <= nentries; i++) {
-		if (redo[i].offset & REDO_FINISH_FLAG) {
-			LOG(15, "redo %p nentries %zu idx %zu", redo, nentries,
-					i);
-			return i;
-		}
+	size_t ret = 0;
+	size_t i;
+
+	for (i = 0; i < nentries; i++) {
+		if (redo[i].offset & REDO_FINISH_FLAG)
+			ret++;
 	}
 
-	return SIZE_MAX;
+	LOG(15, "redo %p nentries %zu nflags %zu", redo, nentries, ret);
+
+	return ret;
 }
 
 /*
@@ -179,25 +181,12 @@ redo_log_store(struct redo_log_state *redo_state, size_t index,
 	ASSERT(index < ctx->redo_num_entries);
 
 	redo_state->sync = VMEM_NEWER;
-	vmem_redo[index + 1].offset = offset;
-	vmem_redo[index + 1].value = value;
+	vmem_redo[index].offset = offset;
+	vmem_redo[index].value = value;
 }
 
 static void
-redo_log_calc_csum(struct redo_log *redo, size_t size,
-		uint64_t *off, uint64_t *val)
-{
-	uint64_t csum;
-	util_checksum(&redo[1], size * sizeof(*redo), &csum, 1);
-	if (csum == 0)
-		csum = 1;
-
-	*off = csum;
-	*val = csum;
-}
-
-static void
-redo_log_persist(struct redo_log_state *redo_state, size_t size)
+redo_log_persist(struct redo_log_state *redo_state, size_t last_idx)
 {
 	struct redo_log *pmem_redo = redo_state->pmem_data;
 	struct redo_log *vmem_redo = redo_state->vmem_data;
@@ -205,15 +194,19 @@ redo_log_persist(struct redo_log_state *redo_state, size_t size)
 
 	ASSERTeq(redo_state->sync, VMEM_NEWER);
 
-	redo_log_calc_csum(vmem_redo, size, &vmem_redo[0].offset,
-			&vmem_redo[0].value);
-
 	assert_addr_cl_aligned(pmem_redo);
-	size_t dsz =  (size + 1) * sizeof(struct redo_log);
+	size_t dsz =  (last_idx + 1) * sizeof(struct redo_log);
 	size_t sz = roundup(dsz, 64U);
 	if (sz != dsz)
-		memset(((char *)vmem_redo) + dsz, 0xff, sz - dsz);
+		memset(((char *)vmem_redo) + dsz, 0, sz - dsz);
 	pmemops_memcpy(p_ops, PMEM_MEM_NOCACHE, pmem_redo, vmem_redo, sz);
+
+	vmem_redo[last_idx].offset |= REDO_FINISH_FLAG;
+	pmemops_memcpy(p_ops, PMEM_MEM_NOCACHE,
+			(void *)((uintptr_t)pmem_redo + sz - 64),
+			(void *)((uintptr_t)vmem_redo + sz - 64),
+			sz);
+
 	redo_state->sync = SYNCHRONIZED;
 }
 
@@ -233,13 +226,13 @@ redo_log_store_last(struct redo_log_state *redo_state,
 
 	ASSERTne(redo_state->sync, PMEM_NEWER);
 	ASSERTeq(offset & REDO_FINISH_FLAG, 0);
-	ASSERT(index + 1 < ctx->redo_num_entries);
+	ASSERT(index < ctx->redo_num_entries);
 
-	vmem_redo[index + 1].offset = offset | REDO_FINISH_FLAG;
-	vmem_redo[index + 1].value = value;
+	vmem_redo[index].offset = offset;
+	vmem_redo[index].value = value;
 	redo_state->sync = VMEM_NEWER;
 
-	redo_log_persist(redo_state, index + 1);
+	redo_log_persist(redo_state, index);
 }
 
 /*
@@ -251,18 +244,15 @@ redo_log_set_last(struct redo_log_state *redo_state,
 {
 	const struct redo_ctx *ctx = redo_state->ctx;
 	struct redo_log *pmem_redo = redo_state->pmem_data;
-	struct redo_log *vmem_redo = redo_state->vmem_data;
 
 	LOG(15, "redo %p index %zu", pmem_redo, index);
 
 	ASSERTne(redo_state->sync, PMEM_NEWER);
 	ASSERT(index < ctx->redo_num_entries);
 
-	/* set finish flag of last entry and persist */
-	vmem_redo[index + 1].offset |= REDO_FINISH_FLAG;
 	redo_state->sync = VMEM_NEWER;
 
-	redo_log_persist(redo_state, index + 1);
+	redo_log_persist(redo_state, index);
 }
 
 /*
@@ -279,19 +269,16 @@ redo_log_process(struct redo_log_state *redo_state, size_t nentries)
 	LOG(15, "redo %p nentries %zu", pmem_redo, nentries);
 
 	if (redo_state->sync == PMEM_NEWER) {
-		memcpy(vmem_redo, pmem_redo,
-				(nentries + 1) * sizeof(*pmem_redo));
+		memcpy(vmem_redo, pmem_redo, nentries * sizeof(*pmem_redo));
 		redo_state->sync = SYNCHRONIZED;
 	}
 
 	ASSERTeq(redo_state->sync, SYNCHRONIZED);
 
 #ifdef DEBUG
-	if (redo_log_check(redo_state, nentries) != 0)
-		ASSERTeq(redo_log_check(redo_state, nentries), 0);
+	ASSERTeq(redo_log_check(redo_state, nentries), 0);
 #endif
 
-	vmem_redo++;
 	uint64_t *val;
 	while ((vmem_redo->offset & REDO_FINISH_FLAG) == 0) {
 		val = (uint64_t *)((uintptr_t)ctx->base + vmem_redo->offset);
@@ -313,35 +300,17 @@ redo_log_process(struct redo_log_state *redo_state, size_t nentries)
 	pmemops_persist(p_ops, val, sizeof(uint64_t));
 
 	assert_addr_cl_aligned(redo_state->pmem_data);
-	pmemops_memset(p_ops, PMEM_MEM_NOCACHE, pmem_redo, 0, 64);
-}
 
-/*
- * redo_log_verify -- returns 0 when redo log is empty, !0 when it's not empty,
- * -1 when checksum is invalid, 1 when checksum is valid
- */
-static int
-redo_log_verify(struct redo_log *redo, size_t nentries)
-{
-	/* already processed? */
-	if (redo[0].offset == 0 && redo[0].value == 0)
-		return 0;
+	vmem_redo++->offset = 0;
+	size_t sz = roundup((uintptr_t)vmem_redo -
+			(uintptr_t)redo_state->vmem_data, 64U);
 
-	size_t finish_off = redo_log_finish_offset(redo, nentries);
-	/* never used? */
-	if (finish_off == SIZE_MAX)
-		return 0;
+	vmem_redo = redo_state->vmem_data;
 
-	uint64_t off_csum, val_csum;
-	redo_log_calc_csum(redo, finish_off, &off_csum, &val_csum);
-
-	/* partially stored? */
-	if (off_csum != redo[0].offset || val_csum != redo[0].value) {
-		LOG(7, "partially filled redo log %p", redo);
-		return -1;
-	}
-
-	return 1;
+	pmemops_memcpy(p_ops, PMEM_MEM_NOCACHE,
+			(void *)((uintptr_t)pmem_redo + sz - 64),
+			(void *)((uintptr_t)vmem_redo + sz - 64),
+			64);
 }
 
 /*
@@ -354,24 +323,15 @@ redo_log_recover(struct redo_log_state *redo_state, size_t nentries)
 {
 	const struct redo_ctx *ctx = redo_state->ctx;
 	struct redo_log *redo = redo_state->pmem_data;
-	const struct pmem_ops *p_ops = &ctx->p_ops;
 
 	LOG(15, "redo %p nentries %zu", redo, nentries);
 	ASSERTne(ctx, NULL);
 
-	int r = redo_log_verify(redo, nentries);
-	if (r == 0)
-		return;
+	size_t nflags = redo_log_nflags(redo, nentries);
+	ASSERT(nflags < 2);
 
-	if (r == -1) {
-		assert_addr_cl_aligned(redo);
-		pmemops_memset(p_ops, PMEM_MEM_NOCACHE, redo, 0, 64);
-		memset(redo_state->vmem_data, 0, 64);
-		redo_state->sync = SYNCHRONIZED;
-		return;
-	}
-
-	redo_log_process(redo_state, nentries);
+	if (nflags == 1)
+		redo_log_process(redo_state, nentries);
 }
 
 /*
@@ -386,28 +346,31 @@ redo_log_check(struct redo_log_state *redo_state, size_t nentries)
 	LOG(15, "redo %p nentries %zu", redo, nentries);
 	ASSERTne(ctx, NULL);
 
-	int r = redo_log_verify(redo, nentries);
-	if (r != 1)
-		return 0;
+	size_t nflags = redo_log_nflags(redo, nentries);
 
-	redo++;
-
-	void *cctx = ctx->check_offset_ctx;
-
-	while ((redo->offset & REDO_FINISH_FLAG) == 0) {
-		if (!ctx->check_offset(cctx, redo->offset)) {
-			LOG(15, "redo %p invalid offset %" PRIu64,
-					redo, redo->offset);
-			return -1;
-		}
-		redo++;
+	if (nflags > 1) {
+		LOG(15, "redo %p too many finish flags", redo);
+		return -1;
 	}
 
-	uint64_t offset = redo->offset & REDO_FLAG_MASK;
-	if (!ctx->check_offset(cctx, offset)) {
-		LOG(15, "redo %p invalid offset %" PRIu64,
-		    redo, offset);
-		return -1;
+	if (nflags == 1) {
+		void *cctx = ctx->check_offset_ctx;
+
+		while ((redo->offset & REDO_FINISH_FLAG) == 0) {
+			if (!ctx->check_offset(cctx, redo->offset)) {
+				LOG(15, "redo %p invalid offset %" PRIu64,
+						redo, redo->offset);
+				return -1;
+			}
+			redo++;
+		}
+
+		uint64_t offset = redo->offset & REDO_FLAG_MASK;
+		if (!ctx->check_offset(cctx, offset)) {
+			LOG(15, "redo %p invalid offset %" PRIu64,
+			    redo, offset);
+			return -1;
+		}
 	}
 
 	return 0;

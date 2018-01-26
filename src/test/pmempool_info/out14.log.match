@@ -34,8 +34,8 @@ Root offset              : $(*)
 Lane 0:
 
  Lane section             : allocator
-  Redo log entries         : 62
-  Offset checksum: $(*) Value checksum: $(*)
+  Redo log entries         : 63
+  0000000000: Offset: $(*) Value: $(*) Finish flag: 0
   0000000001: Offset: $(*) Value: $(*) Finish flag: 0
   0000000002: Offset: $(*) Value: $(*) Finish flag: 0
   0000000003: Offset: $(*) Value: $(*) Finish flag: 0
@@ -101,8 +101,8 @@ Lane 0:
 
  Lane section             : list
   Object offset            : $(*)
-  Redo log entries         : 62
-  Offset checksum: $(*) Value checksum: $(*)
+  Redo log entries         : 63
+  0000000000: Offset: $(*) Value: $(*) Finish flag: 0
   0000000001: Offset: $(*) Value: $(*) Finish flag: 0
   0000000002: Offset: $(*) Value: $(*) Finish flag: 0
   0000000003: Offset: $(*) Value: $(*) Finish flag: 0
