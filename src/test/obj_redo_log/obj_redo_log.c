@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018, Intel Corporation
+ * Copyright 2015-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -272,7 +272,7 @@ main(int argc, char *argv[])
 			if (sscanf(arg, "e:%zd", &index) != 1)
 				FATAL_USAGE();
 
-			struct redo_log *entry = redo + index;
+			struct redo_log *entry = redo + index + 1;
 
 			int flag = redo_log_is_last(entry);
 			offset = redo_log_offset(entry);
@@ -294,7 +294,7 @@ main(int argc, char *argv[])
 			UT_OUT("C:%d", ret);
 			break;
 		case 'n':
-			UT_OUT("n:%ld", redo_log_nflags(redo, redo_cnt));
+			UT_OUT("n:%ld", redo_log_finish_offset(redo, redo_cnt));
 			break;
 		default:
 			FATAL_USAGE();

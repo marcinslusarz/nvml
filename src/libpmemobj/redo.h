@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018, Intel Corporation
+ * Copyright 2015-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -84,9 +84,9 @@ void redo_log_process(struct redo_log_state *redo, size_t nentries);
 void redo_log_recover(struct redo_log_state *redo, size_t nentries);
 int redo_log_check(struct redo_log_state *redo, size_t nentries);
 
-size_t redo_log_nflags(const struct redo_log *redo, size_t nentries);
 uint64_t redo_log_offset(const struct redo_log *redo);
 int redo_log_is_last(const struct redo_log *redo);
+size_t redo_log_finish_offset(const struct redo_log *redo, size_t nentries);
 
 const struct pmem_ops *redo_get_pmem_ops(const struct redo_ctx *ctx);
 
