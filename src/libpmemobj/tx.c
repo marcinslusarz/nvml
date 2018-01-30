@@ -1922,6 +1922,33 @@ pmemobj_tx_add_small(struct tx *tx, struct tx_add_range_args *args)
 	return 0;
 }
 
+static void
+vg_verify_initialized(const struct tx_add_range_args *args)
+{
+#ifdef USE_VG_MEMCHECK
+	if (!On_valgrind)
+		return;
+
+	VALGRIND_DO_DISABLE_ERROR_REPORTING;
+	char *start = (char *)args->pop + args->offset;
+	char *uninit = (char *)VALGRIND_CHECK_MEM_IS_DEFINED(start, args->size);
+	if (uninit) {
+		VALGRIND_PRINTF(
+			"Snapshotting uninitialized data in range <%p,%p> (<offset:0x%lx,size:0x%lx>)\n",
+			start, start + args->size, args->offset, args->size);
+
+		if (uninit != start)
+			VALGRIND_PRINTF("Uninitialized data starts at: %p\n",
+					uninit);
+
+		VALGRIND_DO_ENABLE_ERROR_REPORTING;
+		VALGRIND_CHECK_MEM_IS_DEFINED(start, args->size);
+	} else {
+		VALGRIND_DO_ENABLE_ERROR_REPORTING;
+	}
+#endif
+}
+
 /*
  * pmemobj_tx_add_common -- (internal) common code for adding persistent memory
  *				into the transaction
@@ -1994,6 +2021,8 @@ pmemobj_tx_add_common(struct tx *tx, struct tx_add_range_args *args)
 
 			break;
 		}
+
+		vg_verify_initialized(&nargs);
 
 		/*
 		 * Depending on the size of the block, either allocate an
