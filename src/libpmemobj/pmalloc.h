@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018, Intel Corporation
+ * Copyright 2015-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@
  */
 #define ALLOC_REDO_LOG_SIZE MAX_MEMOPS_ENTRIES
 struct lane_alloc_layout {
-	struct redo_log redo[ALLOC_REDO_LOG_SIZE];
+	struct redo_log redo[ALLOC_REDO_LOG_SIZE + 1];
 };
 
 int pmalloc_operation(struct palloc_heap *heap,

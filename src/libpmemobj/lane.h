@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018, Intel Corporation
+ * Copyright 2015-2017, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,7 +45,8 @@
 #define LANE_SECTION_LEN 1024
 
 #define REDO_NUM_ENTRIES \
-	((LANE_SECTION_LEN - 2 * sizeof(uint64_t)) / sizeof(struct redo_log))
+	(((LANE_SECTION_LEN - 2 * sizeof(uint64_t)) / sizeof(struct redo_log)) \
+			- 1)
 
 /*
  * Distance between lanes used by threads required to prevent threads from
