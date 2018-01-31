@@ -2587,6 +2587,11 @@ CTL_WRITE_HANDLER(size)(PMEMobjpool *pop,
 	if (pop->tx_params->cache_threshold > argu)
 		pop->tx_params->cache_threshold = argu;
 
+	if (tx_params_create_alloc_class(pop, pop->tx_params)) {
+		ERR("!cannot create new allocation class");
+		return -1;
+	}
+
 	return 0;
 }
 
