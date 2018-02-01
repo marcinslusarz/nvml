@@ -55,7 +55,6 @@ enum tx_state {
 };
 
 struct tx_range {
-	uint64_t checksum;
 	uint64_t offset;
 	uint64_t size;
 	uint8_t data[];

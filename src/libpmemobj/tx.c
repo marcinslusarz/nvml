@@ -35,7 +35,6 @@
  */
 
 #include <inttypes.h>
-#include <stdbool.h>
 #include <wchar.h>
 
 #include "queue.h"
@@ -559,73 +558,6 @@ tx_restore_range(PMEMobjpool *pop, struct tx *tx, struct tx_range *range)
 	}
 }
 
-static inline bool
-range_is_valid(struct tx_range *range, PMEMobjpool *pop, struct tx *tx)
-{
-	/* unused entry or crash during store of offset/size/data? */
-	if (range->checksum == 0)
-		return false;
-
-#define u64f " 0x%" PRIx64
-	/* crash between store to checksum and offset/size? */
-	if (range->offset == 0 || range->size == 0) {
-		LOG(3, "invalid offset or size" u64f u64f,
-				range->offset, range->size);
-		goto invalid;
-	}
-
-	/* invalid size, which may overflow "from heap" check? */
-	if (range->size > pop->heap_size) {
-		LOG(3, "size outside of heap" u64f " >" u64f,
-				range->size, pop->heap_size);
-		goto invalid;
-	}
-
-	/* beginning of data outside of heap? */
-	if (!OBJ_OFF_FROM_HEAP(pop, range->offset)) {
-		LOG(3, "starting offset outside of heap" u64f u64f u64f,
-			range->offset, pop->heap_offset, pop->heap_size);
-		goto invalid;
-	}
-
-	/* end of data outside of heap? */
-	if (!OBJ_OFF_FROM_HEAP(pop, range->offset + range->size - 1)) {
-		LOG(3, "ending offset outside of heap" u64f u64f u64f u64f,
-			range->offset, range->size, pop->heap_offset,
-			pop->heap_size);
-		goto invalid;
-	}
-
-	/* end of data outside of heap? */
-	ASSERT((uintptr_t)&range->data[0] > (uintptr_t)pop);
-	uint64_t data_offset =  (uintptr_t)&range->data[0] - (uintptr_t)pop;
-	if (!OBJ_OFF_FROM_HEAP(pop, data_offset + range->size - 1)) {
-		LOG(3, "end of snapshot outside of heap" u64f u64f u64f u64f,
-				data_offset, range->size,
-				pop->heap_offset, pop->heap_size);
-		goto invalid;
-	}
-
-	uint64_t sz = TX_ALIGN_SIZE(sizeof(struct tx_range) +
-			range->size, TX_RANGE_MASK);
-	uint64_t csum = util_checksum_seq(&range->offset, sz - 8, 0);
-
-	/* is data and metadata consistent? */
-	if (csum != range->checksum) {
-		LOG(3, "invalid checksum" u64f " !=" u64f, csum,
-				range->checksum);
-		goto invalid;
-	}
-#undef u64f
-
-	return true;
-
-invalid:
-	/* */
-	ASSERTeq(tx, NULL);
-	return false;
-}
-
 /*
  * tx_foreach_set -- (internal) iterates over every memory range
  */
@@ -653,7 +585,7 @@ tx_foreach_set(PMEMobjpool *pop, struct tx *tx, struct tx_undo_runtime *tx_rt,
 		for (uint64_t cache_offset = 0; cache_offset < cache_size; ) {
 			range = (struct tx_range *)
 				((char *)cache + cache_offset);
-			if (!range_is_valid(range, pop, tx))
+			if (range->offset == 0 || range->size == 0)
 				break;
 
 			cb(pop, tx, range);
@@ -1782,35 +1714,35 @@ static void
 tx_add_small_flushing(const struct pmem_ops *p_ops, char *pmem_range,
 		const char *src, uint64_t data_offset, uint64_t data_size)
 {
+	/* this isn't transactional so we have to keep the order */
 	uint64_t remaining_size = data_size;
 
 	char dram_cl[64];
 	struct tx_range *dram_range = (struct tx_range *)dram_cl;
 	/* the range is only valid if both size and offset are != 0 */
-	dram_range->offset = data_offset;
-	dram_range->size = data_size;
+	dram_range->offset = 0;
+	dram_range->size = 0;
 
 	uint64_t copied;
-	if (data_size > 64 - 24) {
-		copied = 64 - 24;
+	if (data_size > 48) {
+		copied = 48;
 		memcpy(dram_range->data, src, copied);
 	} else {
 		copied = data_size;
 		memcpy(dram_range->data, src, copied);
-		memset(dram_range->data + copied, 0, 64 - 24 - copied);
+		memset(dram_range->data + copied, 0, 48 - copied);
 	}
-	uint64_t csum = util_checksum_seq(&dram_range->offset, 64 - 8, 0);
-
 	remaining_size -= copied;
 
-	uint64_t dst_off = 24 + copied;
+	uint64_t dst_off = 16 + copied;
 	uint64_t src_off = copied;
+
+	pmemops_memcpy(p_ops, PMEM_MEM_NOCACHE | PMEM_MEM_NODRAIN, pmem_range,
+			dram_range, 64);
 
 	if (remaining_size) {
 		copied = remaining_size & ~63ULL;
 		if (copied) {
-			csum = util_checksum_seq(src + src_off, copied, csum);
-
 			pmemops_memcpy(p_ops,
 					PMEM_MEM_NOCACHE | PMEM_MEM_NODRAIN,
 					pmem_range + dst_off,
@@ -1832,16 +1764,18 @@ tx_add_small_flushing(const struct pmem_ops *p_ops, char *pmem_range,
 		memcpy(dram_remaining, src + src_off, copied);
 		memset(dram_remaining + copied, 0, 64 - copied);
 
-		csum = util_checksum_seq(dram_remaining, 64, csum);
-
 		pmemops_memcpy(p_ops, PMEM_MEM_NOCACHE | PMEM_MEM_NODRAIN,
 				pmem_range + dst_off,
 				dram_remaining,
 				64);
 	}
+	pmemops_drain(p_ops);
 
-	dram_range->checksum = csum;
+	dram_range->size = data_size;
+	dram_range->offset = data_offset;
+	/* Now without PMEM_MEM_NODRAIN. */
 	pmemops_memcpy(p_ops, PMEM_MEM_NOCACHE, pmem_range, dram_range, 64);
+
 }
 
 static void
@@ -1849,13 +1783,9 @@ tx_add_small_noflushing(const struct pmem_ops *p_ops, char *pmem,
 		const char *src, uint64_t data_offset, uint64_t data_size)
 {
 	struct tx_range *pmem_range = (struct tx_range *)pmem;
-	pmemops_memcpy(p_ops, PMEM_MEM_NODRAIN, pmem_range->data, src,
-			data_size);
+	pmemops_memcpy(p_ops, 0, pmem_range->data, src, data_size);
 	pmem_range->size = data_size;
 	pmem_range->offset = data_offset;
-	uint64_t csum = util_checksum_seq(&pmem_range->offset, 16, 0);
-	csum = util_checksum_seq(src, data_size, csum);
-	pmem_range->checksum = csum;
 	/* for replication */
 	pmemops_persist(p_ops, pmem_range, sizeof(struct tx_range));
 }
