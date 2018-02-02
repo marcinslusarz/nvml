@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, Intel Corporation
+ * Copyright 2017-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -186,7 +186,7 @@ obj_root_restore_size(struct pmemobjpool *pop)
 	pop->root_size = hdr->root_size & ~LEGACY_INTERNAL_OBJECT_MASK;
 }
 
-#define CONVERSION_FLAG_OLD_SET_CACHE ((1ULL) << 0)
+#define CONVERSION_FLAG_V1_SET_CACHE ((1ULL) << 0)
 
 int
 convert_v3_v4(void *psf, void *addr)
@@ -195,7 +195,7 @@ convert_v3_v4(void *psf, void *addr)
 
 	assert(sizeof(struct pmemobjpool) == 8192);
 
-	pop->conversion_flags = CONVERSION_FLAG_OLD_SET_CACHE;
+	pop->conversion_flags = CONVERSION_FLAG_V1_SET_CACHE;
 
 	/* zero out the pmem reserved part of the header */
 	memset(pop->pmem_reserved, 0, sizeof(pop->pmem_reserved));

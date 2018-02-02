@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017, Intel Corporation
+ * Copyright 2014-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,8 +64,8 @@ typedef void (*pvector_callback_fn)(struct pmem_info *pip, int v, int vnum,
 static int
 lane_need_recovery_redo(struct redo_log *redo, size_t nentries)
 {
-	/* Needs recovery if checksum is not 0. */
-	return redo[0].offset || redo[0].value;
+	/* Needs recovery if any of redo log entries has finish flag set */
+	return redo_log_nflags(redo, nentries) > 0;
 }
 
 /*
@@ -231,12 +231,7 @@ static void
 info_obj_redo(int v, struct redo_log *redo, size_t nentries)
 {
 	outv_field(v, "Redo log entries", "%lu", nentries);
-	outv(v, "Offset checksum: 0x%016jx "
-		"Value checksum: 0x%016jx\n",
-		redo[0].offset,
-		redo[0].value);
-
-	for (size_t i = 1; i <= nentries; i++) {
+	for (size_t i = 0; i < nentries; i++) {
 		outv(v, "%010zu: "
 			"Offset: 0x%016jx "
 			"Value: 0x%016jx "
@@ -393,7 +388,8 @@ set_entry_cache_cb(struct pmem_info *pip, int v, int vid,
 			range->offset, out_get_size_str(range->size,
 					pip->args.human));
 
-		cache_offset += TX_ALIGN_SIZE(range->size, TX_RANGE_MASK) +
+		cache_offset += // XXX
+			TX_ALIGN_SIZE(range->size, TX_RANGE_MASK_V2) +
 			sizeof(struct tx_range);
 	}
 

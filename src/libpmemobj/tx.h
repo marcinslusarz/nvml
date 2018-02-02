@@ -43,8 +43,9 @@
 #define TX_DEFAULT_RANGE_CACHE_SIZE (1 << 15)
 #define TX_DEFAULT_RANGE_CACHE_THRESHOLD (1 << 12)
 
-#define TX_RANGE_MASK (8ULL - 1)
-#define TX_RANGE_MASK_LEGACY (32ULL - 1)
+#define TX_RANGE_MASK (64ULL - 1)
+#define TX_RANGE_MASK_V2 (8ULL - 1)
+#define TX_RANGE_MASK_V1 (32ULL - 1)
 
 #define TX_ALIGN_SIZE(s, amask) (((s) + (amask)) & ~(amask))
 
@@ -54,6 +55,7 @@ enum tx_state {
 };
 
 struct tx_range {
+	uint64_t checksum;
 	uint64_t offset;
 	uint64_t size;
 	uint8_t data[];
