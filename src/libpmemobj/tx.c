@@ -315,7 +315,7 @@ tx_set_state(PMEMobjpool *pop, struct lane_tx_layout *layout, uint64_t state)
 {
 	struct lane_tx_state s = { state, {0, }, };
 
-	pmemops_memcpy_persist(&pop->p_ops, &layout->state, &s, sizeof(s));
+	pmemops_memcpy(&pop->p_ops, &layout->state, &s, sizeof(s), PMEM_MEM_WC);
 }
 
 /*
