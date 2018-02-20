@@ -40,11 +40,19 @@
 
 #include "queue.h"
 #include "ravl.h"
+#include "ctree.h"
 #include "obj.h"
 #include "out.h"
 #include "pmalloc.h"
 #include "tx.h"
 #include "valgrind_internal.h"
+
+#define RANGE_FLAGS_MIN_BIT 48
+#define RANGE_FLAGS_MASK (0xffffULL << RANGE_FLAGS_MIN_BIT)
+
+#define RANGE_GET_SIZE(val) ((val) & ~RANGE_FLAGS_MASK)
+
+#define RANGE_FLAG_NO_FLUSH (0x1ULL << RANGE_FLAGS_MIN_BIT)
 
 struct tx_data {
 	SLIST_ENTRY(tx_data) tx_entry;
@@ -94,7 +102,7 @@ struct tx_undo_runtime {
 
 struct lane_tx_runtime {
 	unsigned lane_idx;
-	struct ravl *ranges;
+	struct ctree *ranges;
 	uint64_t cache_offset;
 	struct tx_undo_runtime undo;
 	struct pobj_action alloc_actv[MAX_TX_ALLOC_RESERVATIONS];
@@ -144,23 +152,6 @@ struct tx_parameters {
 	size_t cache_threshold;
 	uint16_t cache_alloc_class;
 };
-
-/*
- * tx_range_def_cmp -- compares two snapshot ranges
- */
-static int
-tx_range_def_cmp(const void *lhs, const void *rhs)
-{
-	const struct tx_range_def *l = lhs;
-	const struct tx_range_def *r = rhs;
-
-	if (l->offset > r->offset)
-		return 1;
-	else if (l->offset < r->offset)
-		return -1;
-
-	return 0;
-}
 
 /*
  * tx_params_new -- creates a new transactional parameters instance and fills it
@@ -911,15 +902,15 @@ tx_cancel_reservations(PMEMobjpool *pop, struct lane_tx_runtime *lane)
  * tx_flush_range -- (internal) flush one range
  */
 static void
-tx_flush_range(void *data, void *ctx)
+tx_flush_range(uint64_t offset, uint64_t size_flags, void *ctx)
 {
-	PMEMobjpool *pop = ctx;
-	struct tx_range_def *range = data;
-	if (!(range->flags & POBJ_FLAG_NO_FLUSH)) {
-		pmemops_flush(&pop->p_ops, OBJ_OFF_TO_PTR(pop, range->offset),
-				range->size);
-	}
+ if (size_flags & RANGE_FLAG_NO_FLUSH)
+         return;
+ PMEMobjpool *pop = ctx;
+ pmemops_flush(&pop->p_ops, OBJ_OFF_TO_PTR(pop, offset),
+                 RANGE_GET_SIZE(size_flags));
 }
+
 
 /*
  * tx_pre_commit -- (internal) do pre-commit operations
@@ -934,7 +925,7 @@ tx_pre_commit(PMEMobjpool *pop, struct tx *tx, struct lane_tx_runtime *lane)
 	tx_fulfill_reservations(tx);
 
 	/* Flush all regions and destroy the whole tree. */
-	ravl_delete_cb(lane->ranges, tx_flush_range, pop);
+	ctree_delete_cb(lane->ranges, tx_flush_range, pop);
 	lane->ranges = NULL;
 }
 
@@ -1060,7 +1051,7 @@ tx_abort(PMEMobjpool *pop, struct lane_tx_runtime *lane,
 	} else {
 		tx_cancel_reservations(pop, lane);
 		ASSERTne(lane, NULL);
-		ravl_delete(lane->ranges);
+		ctree_delete(lane->ranges);
 		lane->ranges = NULL;
 	}
 }
@@ -1167,7 +1158,8 @@ tx_lane_ranges_insert_def(struct lane_tx_runtime *lane,
 	LOG(3, "rdef->offset %"PRIu64" rdef->size %"PRIu64,
 		rdef->offset, rdef->size);
 
-	return ravl_emplace_copy(lane->ranges, rdef);
+	return ctree_insert_unlocked(lane->ranges, rdef->offset,
+		rdef->size | rdef->flags);
 }
 
 /*
@@ -1312,8 +1304,7 @@ pmemobj_tx_begin(PMEMobjpool *pop, jmp_buf env, ...)
 		SLIST_INIT(&tx->tx_entries);
 		SLIST_INIT(&tx->tx_locks);
 
-		lane->ranges = ravl_new_sized(tx_range_def_cmp,
-			sizeof(struct tx_range_def));
+		lane->ranges = ctree_new();
 		lane->cache_offset = 0;
 		lane->lane_idx = idx;
 
@@ -1941,39 +1932,6 @@ pmemobj_tx_add_small(struct tx *tx, struct tx_range_def *args)
 }
 
 /*
- * vg_verify_initialized -- when executed under Valgrind verifies that
- *   the buffer has been initialized; explicit check at snapshotting time,
- *   because Valgrind may find it much later when it's impossible to tell
- *   for which snapshot it triggered
- */
-static void
-vg_verify_initialized(PMEMobjpool *pop, const struct tx_range_def *def)
-{
-#if VG_MEMCHECK_ENABLED
-	if (!On_valgrind)
-		return;
-
-	VALGRIND_DO_DISABLE_ERROR_REPORTING;
-	char *start = (char *)pop + def->offset;
-	char *uninit = (char *)VALGRIND_CHECK_MEM_IS_DEFINED(start, def->size);
-	if (uninit) {
-		VALGRIND_PRINTF(
-			"Snapshotting uninitialized data in range <%p,%p> (<offset:0x%lx,size:0x%lx>)\n",
-			start, start + def->size, def->offset, def->size);
-
-		if (uninit != start)
-			VALGRIND_PRINTF("Uninitialized data starts at: %p\n",
-					uninit);
-
-		VALGRIND_DO_ENABLE_ERROR_REPORTING;
-		VALGRIND_CHECK_MEM_IS_DEFINED(start, def->size);
-	} else {
-		VALGRIND_DO_ENABLE_ERROR_REPORTING;
-	}
-#endif
-}
-
-/*
  * pmemobj_tx_add_common -- (internal) common code for adding persistent memory
  *				into the transaction
  */
@@ -1987,95 +1945,67 @@ pmemobj_tx_add_common(struct tx *tx, struct tx_range_def *args)
 		return obj_tx_abort_err(EINVAL);
 	}
 
-	if (args->offset < tx->pop->heap_offset ||
-		(args->offset + args->size) >
-		(tx->pop->heap_offset + tx->pop->heap_size)) {
-		ERR("object outside of heap");
-		return obj_tx_abort_err(EINVAL);
-	}
-
-	int ret = 0;
 	struct lane_tx_runtime *runtime = tx->section->runtime;
 
-	struct tx_range_def r = *args;
-	/* there can only ever be one range overlapping on the left edge */
-	struct ravl_node *n = ravl_find(runtime->ranges, &r,
-		RAVL_PREDICATE_LESS);
-	struct tx_range_def *f = n ? ravl_data(n) : NULL;
-	if (f != NULL && f->offset + f->size > r.offset) {
-		size_t fend = f->offset + f->size;
-		size_t rend = r.offset + r.size;
-		if (fend >= rend) /* earlier snapshot covers this one */
-			return 0;
-		r.offset = fend;
-		r.size = rend - fend;
-	}
+	/* starting from the end, search for all overlapping ranges */
+	uint64_t spoint = args->offset + args->size - 1; /* start point */
+	uint64_t apoint = 0; /* add point */
+	int ret = 0;
+	uint64_t range_flags = (args->flags & POBJ_FLAG_NO_FLUSH) ?
+			RANGE_FLAG_NO_FLUSH : 0;
 
-	/*
-	 * We need to handle the following cases:
-	 *	1. no range found or the found range exceeds the
-	 *	snapshot, in this case we can just snapshot the
-	 *	entire range.
-	 *	2. the found range starts at the same offset.
-	 *		a) the found range contains the entire snapshot,
-	 *		we can just end the search.
-	 *		b) the found range only partially contains the
-	 *		snapshot, we have to loop around and search from
-	 *		the end of the found range.
-	 *	3. The found range starts at an offset in the middle of
-	 *	the snapshot, in this case we must create a partial
-	 *	snapshot and resume the search from the end of the found
-	 *	offset.
-	 */
-	while (r.size != 0) {
-		n = ravl_find(runtime->ranges, &r,
-			RAVL_PREDICATE_GREATER_EQUAL);
-		f = n ? ravl_data(n) : NULL;
-		uint64_t offd = f ? f->offset - r.offset : r.size;
-		if (offd == 0) {
-			ASSERTne(f, NULL);
-			if (f->size >= r.size)
-				return 0;
-			r.offset += f->size;
-			r.size -= f->size;
-			continue;
+	while (spoint >= args->offset) {
+		apoint = spoint + 1;
+		/* find range less than starting point */
+		uint64_t size_flags = ctree_find_le_unlocked(runtime->ranges,
+				&spoint);
+		uint64_t size = RANGE_GET_SIZE(size_flags);
+		struct tx_range_def nargs;
+
+		if (spoint < args->offset) { /* the found offset is earlier */
+			nargs.size = apoint - args->offset;
+			/* overlap on the left edge */
+			if (spoint + size > args->offset) {
+				nargs.offset = spoint + size;
+				if (nargs.size <= nargs.offset - args->offset)
+					break;
+				nargs.size -= nargs.offset - args->offset;
+			} else {
+				nargs.offset = args->offset;
+			}
+
+			if (args->size == 0)
+				break;
+
+			spoint = 0; /* this is the end of our search */
+		} else { /* found offset is equal or greater than offset */
+			nargs.offset = spoint + size;
+			spoint -= 1;
+			if (nargs.offset >= apoint)
+				continue;
+
+			nargs.size = apoint - nargs.offset;
 		}
-		r.size = offd <= r.size ? offd : r.size;
 
-		ret = tx_lane_ranges_insert_def(runtime, &r);
+		ret = ctree_insert_unlocked(runtime->ranges, nargs.offset,
+				nargs.size | range_flags);
 		if (ret != 0) {
 			if (ret == EEXIST)
 				FATAL("invalid state of ranges tree");
+
 			break;
 		}
-
-		vg_verify_initialized(tx->pop, &r);
-
-		/* need to make a copy because the range def arg isn't const */
-		struct tx_range_def ndef = r;
 
 		/*
 		 * Depending on the size of the block, either allocate an
 		 * entire new object or use cache.
 		 */
-		ret = ndef.size > tx->pop->tx_params->cache_threshold ?
-			pmemobj_tx_add_large(tx, &ndef) :
-			pmemobj_tx_add_small(tx, &ndef);
+		ret = nargs.size > tx->pop->tx_params->cache_threshold ?
+			pmemobj_tx_add_large(tx, &nargs) :
+			pmemobj_tx_add_small(tx, &nargs);
+
 		if (ret != 0)
 			break;
-
-		/*
-		 * The next potential offset to snapshot is AFTER the found
-		 * range...
-		 */
-		r.offset = f ? f->offset + f->size : r.offset + r.size;
-		offd = r.offset - args->offset;
-
-		/*
-		 * ...and if that happens to exceed the snapshot range, we can
-		 * finish...
-		 */
-		r.size = offd < args->size ? args->size - offd : 0;
 	}
 
 	if (ret != 0) {

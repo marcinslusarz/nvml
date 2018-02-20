@@ -62,7 +62,8 @@ SOURCE +=\
 	ringbuf.c\
 	sync.c\
 	tx.c\
-	stats.c
+	stats.c\
+	ctree.c
 
 include ../Makefile.inc
 
