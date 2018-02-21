@@ -1829,24 +1829,36 @@ pmemobj_tx_add_common(struct tx *tx, struct tx_range_def *args)
 	int ret = 0;
 	struct lane_tx_runtime *runtime = tx->section->runtime;
 
+	/*
+	 * Search existing ranges backwards starting from the end of the
+	 * snapshot.
+	 */
 	struct tx_range_def r = *args;
 	struct tx_range_def search = {0, 0, 0};
+	enum ravl_predicate p = RAVL_PREDICATE_LESS_EQUAL;
 	struct ravl_node *nprev = NULL;
 	while (r.size != 0) {
 		search.offset = r.offset + r.size;
-		struct ravl_node *n = ravl_find(runtime->ranges, &search,
-			RAVL_PREDICATE_LESS);
+		struct ravl_node *n = ravl_find(runtime->ranges, &search, p);
+		p = RAVL_PREDICATE_LESS_EQUAL;
 		struct tx_range_def *f = n ? ravl_data(n) : NULL;
 
 		size_t fend = f == NULL ? 0: f->offset + f->size;
 		size_t rend = r.offset + r.size;
 		if (fend == 0 || fend < r.offset) {
-			tx_lane_ranges_insert_def(runtime, &r);
-			pmemobj_tx_add_snapshot(tx, &r);
+			if (nprev != NULL) {
+				struct tx_range_def *fprev = ravl_data(nprev);
+				ASSERTeq(rend, fprev->offset);
+				fprev->offset -= r.size;
+				fprev->size += r.size;
+			} else {
+				ret = tx_lane_ranges_insert_def(runtime, &r);
+				if (ret != 0)
+					break;
+			}
+			ret = pmemobj_tx_add_snapshot(tx, &r);
 			break;
-		}
-
-		if (fend <= rend) {
+		} else if (fend <= rend) {
 			struct tx_range_def snapshot = *args;
 			snapshot.offset = fend;
 			snapshot.size = rend - fend;
@@ -1855,17 +1867,27 @@ pmemobj_tx_add_common(struct tx *tx, struct tx_range_def *args)
 			r.size -= gap + snapshot.size;
 			f->size += snapshot.size;
 
-			if (snapshot.size != 0)
-				pmemobj_tx_add_snapshot(tx, &snapshot);
+			if (snapshot.size != 0) {
+				ret = pmemobj_tx_add_snapshot(tx, &snapshot);
+				if (ret != 0)
+					break;
+			}
 
-			continue;
-		}
+			p = RAVL_PREDICATE_LESS;
 
-		if (fend >= r.offset) {
+			if (nprev != NULL) {
+				struct tx_range_def *fprev = ravl_data(nprev);
+				ASSERTeq(rend, fprev->offset);
+				f->size += fprev->size;
+				ravl_remove(runtime->ranges, nprev);
+			}
+		} else if (fend >= r.offset) {
 			size_t overlap = rend - MAX(f->offset, r.offset);
 			r.size -= overlap;
 
-			continue;
+			p = RAVL_PREDICATE_LESS;
+		} else {
+			ASSERT(0);
 		}
 
 		nprev = n;
