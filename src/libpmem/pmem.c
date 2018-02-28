@@ -594,7 +594,8 @@ pmem_unmap(void *addr, size_t len)
 				PMEM_MEM_NOCACHE | \
 				PMEM_MEM_CACHE | \
 				PMEM_MEM_WC | \
-				PMEM_MEM_WB)
+				PMEM_MEM_WB | \
+				PMEM_MEM_NOFLUSH)
 #endif
 
 /*
@@ -613,7 +614,7 @@ pmem_memmove(void *pmemdest, const void *src, size_t len, unsigned flags)
 
 	Funcs.memmove_nodrain(pmemdest, src, len, flags & ~PMEM_MEM_NODRAIN);
 
-	if ((flags & PMEM_MEM_NODRAIN) == 0)
+	if ((flags & (PMEM_MEM_NODRAIN | PMEM_MEM_NOFLUSH)) == 0)
 		pmem_drain();
 
 	return pmemdest;
@@ -644,7 +645,7 @@ pmem_memset(void *pmemdest, int c, size_t len, unsigned flags)
 
 	Funcs.memset_nodrain(pmemdest, c, len, flags & ~PMEM_MEM_NODRAIN);
 
-	if ((flags & PMEM_MEM_NODRAIN) == 0)
+	if ((flags & (PMEM_MEM_NODRAIN | PMEM_MEM_NOFLUSH)) == 0)
 		pmem_drain();
 
 	return pmemdest;
