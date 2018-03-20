@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018, Intel Corporation
+ * Copyright 2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,55 +31,74 @@
  */
 
 /*
- * util_map_proc.c -- unit test for util_map() /proc parsing
- *
- * usage: util_map_proc maps_file len [len]...
+ * obj_ctl_alignment.c -- tests for the alloc class alignment
  */
 
-#define _GNU_SOURCE
-
-#include <dlfcn.h>
 #include "unittest.h"
-#include "util.h"
-#include "mmap.h"
 
-#define GIGABYTE ((uintptr_t)1 << 30)
-#define TERABYTE ((uintptr_t)1 << 40)
+#define LAYOUT "obj_ctl_alignment"
+
+PMEMobjpool *pop;
+
+static void
+test_fail(void)
+{
+	struct pobj_alloc_class_desc ac;
+	ac.header_type = POBJ_HEADER_NONE;
+	ac.unit_size = 1024 - 1;
+	ac.units_per_block = 100;
+	ac.alignment = 512;
+
+	int ret = pmemobj_ctl_set(pop, "heap.alloc_class.new.desc", &ac);
+	UT_ASSERTeq(ret, -1);
+}
+
+static void
+test_aligned_allocs(size_t size, size_t alignment, enum pobj_header_type htype)
+{
+	struct pobj_alloc_class_desc ac;
+	ac.header_type = htype;
+	ac.unit_size = size;
+	ac.units_per_block = 100;
+	ac.alignment = alignment;
+
+	int ret = pmemobj_ctl_set(pop, "heap.alloc_class.new.desc", &ac);
+	UT_ASSERTeq(ret, 0);
+
+	PMEMoid oid;
+	ret = pmemobj_xalloc(pop, &oid, 1, 0,
+		POBJ_CLASS_ID(ac.class_id), NULL, NULL);
+	UT_ASSERTeq(ret, 0);
+	UT_ASSERTeq(oid.off % alignment, 0);
+	UT_ASSERTeq((uintptr_t)pmemobj_direct(oid) % alignment, 0);
+
+	ret = pmemobj_xalloc(pop, &oid, 1, 0,
+		POBJ_CLASS_ID(ac.class_id), NULL, NULL);
+	UT_ASSERTeq(ret, 0);
+	UT_ASSERTeq(oid.off % alignment, 0);
+	UT_ASSERTeq((uintptr_t)pmemobj_direct(oid) % alignment, 0);
+}
 
 int
 main(int argc, char *argv[])
 {
-	START(argc, argv, "util_map_proc");
+	START(argc, argv, "obj_ctl_alignment");
 
-	util_init();
-	util_mmap_init();
+	if (argc != 2)
+		UT_FATAL("usage: %s file-name", argv[0]);
 
-	if (argc < 3)
-		UT_FATAL("usage: %s maps_file len [len]...", argv[0]);
+	const char *path = argv[1];
 
-	Mmap_mapfile = argv[1];
-	UT_OUT("redirecting " OS_MAPFILE " to %s", Mmap_mapfile);
+	if ((pop = pmemobj_create(path, LAYOUT, PMEMOBJ_MIN_POOL * 10,
+			S_IWUSR | S_IRUSR)) == NULL)
+			UT_FATAL("!pmemobj_create: %s", path);
 
-	for (int arg = 2; arg < argc; arg++) {
-		size_t len = (size_t)strtoull(argv[arg], NULL, 0);
+	test_fail();
+	test_aligned_allocs(1024, 512, POBJ_HEADER_NONE);
+	test_aligned_allocs(1024, 512, POBJ_HEADER_COMPACT);
+	test_aligned_allocs(64, 64, POBJ_HEADER_COMPACT);
 
-		size_t align = GIGABYTE;
+	pmemobj_close(pop);
 
-		void *h1 =
-			util_map_hint_unused((void *)TERABYTE, len, GIGABYTE);
-		void *h2 = util_map_hint(len, 0);
-		if (h1 != MAP_FAILED && h1 != NULL)
-			UT_ASSERTeq((uintptr_t)h1 & (GIGABYTE - 1), 0);
-		if (h2 != MAP_FAILED && h2 != NULL)
-			UT_ASSERTeq((uintptr_t)h2 & (align - 1), 0);
-		if (h1 == NULL) /* XXX portability */
-			UT_OUT("len %zu: (nil) %p", len, h2);
-		else if (h2 == NULL)
-			UT_OUT("len %zu: %p (nil)", len, h1);
-		else
-			UT_OUT("len %zu: %p %p", len, h1, h2);
-	}
-
-	util_mmap_fini();
 	DONE(NULL);
 }
