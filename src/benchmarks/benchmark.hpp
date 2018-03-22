@@ -342,6 +342,10 @@ void pmembench_set_priv(struct benchmark *bench, void *priv);
 struct benchmark_info *pmembench_get_info(struct benchmark *bench);
 int pmembench_register(struct benchmark_info *bench_info);
 
+void pmembench_threaded_memset(void *pmemdest, int c, size_t len);
+void pmembench_threaded_memset_msync(void *pmemdest, int c, size_t len);
+void pmembench_threaded_pmem_memset_persist(void *pmemdest, int c, size_t len);
+
 #define REGISTER_BENCHMARK(bench)                                              \
 	if (pmembench_register(&bench)) {                                      \
 		fprintf(stderr, "Unable to register benchmark '%s'\n",         \

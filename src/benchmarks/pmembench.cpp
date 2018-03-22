@@ -55,6 +55,7 @@
 #include "clo_vec.hpp"
 #include "config_reader.hpp"
 #include "file.h"
+#include "libpmem.h"
 #include "libpmempool.h"
 #include "mmap.h"
 #include "os.h"
@@ -1540,6 +1541,95 @@ out_scenarios:
 out:
 	config_reader_free(cr);
 	return ret;
+}
+
+struct memset_args {
+	void *pmemdest;
+	int c;
+	size_t len;
+};
+
+static void *
+pmem_memset_worker(void *arg)
+{
+	struct memset_args *margs = (struct memset_args *)arg;
+	pmem_memset_persist(margs->pmemdest, margs->c, margs->len);
+	return NULL;
+}
+
+static void *
+memset_worker(void *arg)
+{
+	struct memset_args *margs = (struct memset_args *)arg;
+	memset(margs->pmemdest, margs->c, margs->len);
+	return NULL;
+}
+
+static void *
+memset_msync_worker(void *arg)
+{
+	struct memset_args *margs = (struct memset_args *)arg;
+	memset(margs->pmemdest, margs->c, margs->len);
+	if (pmem_msync(margs->pmemdest, margs->len)) {
+		perror("pmem_msync");
+		abort();
+	}
+	return NULL;
+}
+
+#define LEN (1 << 27)
+static void
+threaded_memset(void *pmemdest, int c, size_t len, void *(*worker)(void *))
+{
+	if (len < LEN) {
+		memset_args args = {pmemdest, c, len};
+		worker(&args);
+		return;
+	}
+
+	size_t nthreads = (len + LEN - 1) / LEN;
+	os_thread_t *threads = new os_thread_t[nthreads];
+	memset_args *args = new memset_args[nthreads];
+	size_t remaining = len;
+
+	for (size_t i = 0; i < nthreads; ++i) {
+		args[i].pmemdest = (char *)pmemdest + i * LEN;
+		args[i].c = c;
+		args[i].len = LEN < remaining ? LEN : remaining;
+		remaining -= LEN;
+		if (os_thread_create(&threads[i], NULL, worker, &args[i])) {
+			perror("os_thread_create");
+			abort();
+		}
+	}
+
+	for (size_t i = 0; i < nthreads; ++i) {
+		if (os_thread_join(&threads[i], NULL)) {
+			perror("os_thread_join");
+			abort();
+		}
+	}
+
+	delete[] args;
+	delete[] threads;
+}
+
+void
+pmembench_threaded_memset(void *pmemdest, int c, size_t len)
+{
+	threaded_memset(pmemdest, c, len, memset_worker);
+}
+
+void
+pmembench_threaded_memset_msync(void *pmemdest, int c, size_t len)
+{
+	threaded_memset(pmemdest, c, len, memset_msync_worker);
+}
+
+void
+pmembench_threaded_pmem_memset_persist(void *pmemdest, int c, size_t len)
+{
+	threaded_memset(pmemdest, c, len, pmem_memset_worker);
 }
 
 int

@@ -477,8 +477,9 @@ pmem_memcpy_init(struct benchmark *bench, struct benchmark_args *args)
 	}
 
 	if (!pmb->pargs->no_warmup) {
-		memset(pmb->buf, 0, pmb->bsize);
-		pmem_memset_persist(pmb->pmem_addr, 0, pmb->fsize);
+		pmembench_threaded_memset(pmb->buf, 0, pmb->bsize);
+		pmembench_threaded_pmem_memset_persist(pmb->pmem_addr, 0,
+						       pmb->fsize);
 	}
 
 	pmembench_set_priv(bench, pmb);

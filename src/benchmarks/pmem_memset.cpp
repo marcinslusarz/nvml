@@ -216,34 +216,6 @@ libc_memset(void *dest, int c, size_t len)
 }
 
 /*
- * warmup_persist -- does the warmup by writing the whole pool area
- */
-static int
-warmup_persist(struct memset_bench *mb)
-{
-	void *dest = mb->pmem_addr;
-	int c = mb->const_b;
-	size_t len = mb->fsize;
-
-	pmem_memset_persist(dest, c, len);
-
-	return 0;
-}
-
-/*
- * warmup_msync -- does the warmup by writing the whole pool area
- */
-static int
-warmup_msync(struct memset_bench *mb)
-{
-	void *dest = mb->pmem_addr;
-	int c = mb->const_b;
-	size_t len = mb->fsize;
-
-	return libc_memset_msync(dest, c, len);
-}
-
-/*
  * memset_op -- actual benchmark operation. It can have one of the four
  * functions assigned:
  *              libc_memset,
@@ -287,8 +259,8 @@ memset_init(struct benchmark *bench, struct benchmark_args *args)
 	size_t little;
 	size_t file_size = 0;
 	int flags = 0;
+	int use_msync = 0;
 
-	int (*warmup_func)(struct memset_bench *) = warmup_persist;
 	struct memset_bench *mb =
 		(struct memset_bench *)malloc(sizeof(struct memset_bench));
 	if (!mb) {
@@ -348,7 +320,7 @@ memset_init(struct benchmark *bench, struct benchmark_args *args)
 			mb->func_op = libc_memset_persist;
 		} else if (mb->pargs->msync) {
 			mb->func_op = libc_memset_msync;
-			warmup_func = warmup_msync;
+			use_msync = 1;
 		} else {
 			mb->func_op = libc_memset;
 		}
@@ -358,11 +330,12 @@ memset_init(struct benchmark *bench, struct benchmark_args *args)
 	}
 
 	if (!mb->pargs->no_warmup && !util_file_is_device_dax(args->fname)) {
-		ret = warmup_func(mb);
-		if (ret) {
-			perror("Pool warmup failed");
-			goto err_free_offsets;
-		}
+		if (use_msync)
+			pmembench_threaded_memset_msync(mb->pmem_addr,
+							mb->const_b, mb->fsize);
+		else
+			pmembench_threaded_pmem_memset_persist(
+				mb->pmem_addr, mb->const_b, mb->fsize);
 	}
 
 	pmembench_set_priv(bench, mb);
