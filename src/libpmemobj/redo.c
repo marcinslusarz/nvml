@@ -36,6 +36,7 @@
 
 #include <inttypes.h>
 
+#include "libpmem.h"
 #include "redo.h"
 #include "out.h"
 #include "util.h"
@@ -241,7 +242,7 @@ redo_log_store(const struct redo_ctx *ctx, struct redo_log *dest,
 			redo->entries,
 			src->entries + offset,
 			sizeof(struct redo_log_entry) * ncopy,
-			0);
+			PMEM_MEM_WC);
 		offset += ncopy;
 	}
 
@@ -252,7 +253,8 @@ redo_log_store(const struct redo_ctx *ctx, struct redo_log *dest,
 	src->next = dest->next;
 	redo_log_checksum(src, nentries, 1);
 
-	pmemops_memcpy(&ctx->p_ops, dest, src, SIZEOF_REDO_LOG(dest_ncopy), 0);
+	pmemops_memcpy(&ctx->p_ops, dest, src, SIZEOF_REDO_LOG(dest_ncopy),
+			PMEM_MEM_WC);
 }
 
 /*
