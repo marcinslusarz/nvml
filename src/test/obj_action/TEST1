@@ -40,6 +40,7 @@
 
 require_build_type debug
 require_test_type medium
+require_build_type debug
 configure_valgrind memcheck force-enable
 
 setup

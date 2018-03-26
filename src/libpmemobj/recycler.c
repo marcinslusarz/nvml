@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018, Intel Corporation
+ * Copyright 2016-2018, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -319,7 +319,9 @@ recycler_recalc(struct recycler *r, int force)
 
 	uint64_t units = r->unaccounted_units;
 
-	if (r->recalc_inprogress || (!force && units < (r->recalc_threshold)))
+	if (r->recalc_inprogress ||
+	    units == 0 ||
+	    (!force && units < (r->recalc_threshold)))
 		return runs;
 
 	if (!util_bool_compare_and_swap32(&r->recalc_inprogress, 0, 1))
