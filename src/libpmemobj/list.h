@@ -47,7 +47,7 @@
 #include "redo.h"
 
 
-#define LIST_REDO_LOG_SIZE 59 /* (lane size - redo log - 16) / entry size */
+#define LIST_REDO_LOG_SIZE 61 /* (lane size - redo log - 16) / entry size */
 
 /*
  * lane_list_layout -- structure of list section in lane

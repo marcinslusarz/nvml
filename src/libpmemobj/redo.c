@@ -40,7 +40,6 @@
 #include "libpmem.h"
 #include "redo.h"
 #include "out.h"
-#include "util.h"
 #include "valgrind_internal.h"
 
 /*
@@ -50,8 +49,6 @@
 #define REDO_OPERATION_MASK		((((uint64_t)1 << 2) - 1) << 1)
 #define REDO_OPERATION_FROM_FLAG(flag)	((flag) >> 1 & (((1ULL) << 2) - 1))
 #define REDO_FLAG_MASK			(~(REDO_OPERATION_MASK))
-
-#define CACHELINE_ALIGN(size) ALIGN_UP(size, 64U)
 
 struct redo_ctx {
 	void *base;
@@ -362,7 +359,8 @@ redo_log_clobber(const struct redo_ctx *ctx, struct redo_log *dest,
 	else
 		empty.next = dest->next;
 
-	pmemops_memcpy(&ctx->p_ops, dest, &empty, sizeof(empty), PMEM_MEM_WC);
+	pmemops_memcpy(&ctx->p_ops, dest, &empty, SIZEOF_REDO_LOG(0),
+			PMEM_MEM_WC);
 }
 
 /*

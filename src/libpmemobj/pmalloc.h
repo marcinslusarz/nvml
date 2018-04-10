@@ -50,8 +50,8 @@
  * location and the second for applying the chunk metadata modifications.
  * These two values should be divisible by 8 to maintain cacheline alignment.
  */
-#define ALLOC_REDO_EXTERNAL_SIZE 48
-#define ALLOC_REDO_INTERNAL_SIZE 8
+#define ALLOC_REDO_EXTERNAL_SIZE 50
+#define ALLOC_REDO_INTERNAL_SIZE 10
 
 struct lane_alloc_layout {
 	struct REDO_LOG(ALLOC_REDO_EXTERNAL_SIZE) external;

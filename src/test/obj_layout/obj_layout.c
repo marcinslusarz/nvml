@@ -64,7 +64,7 @@
 #define SIZEOF_LANE_V3 (3 * SIZEOF_LANE_SECTION_V3)
 #define SIZEOF_PVECTOR_V3 (224)
 #define SIZEOF_TX_RANGE_META_V4 (24)
-#define SIZEOF_REDO_LOG_V4 (64)
+#define SIZEOF_REDO_LOG_V4 (32)
 #define SIZEOF_REDO_LOG_ENTRY_V4 (16)
 #define SIZEOF_LANE_LIST_LAYOUT_V4 (1024 - 8)
 #define SIZEOF_LANE_ALLOC_LAYOUT_V4 (1024)
@@ -158,7 +158,6 @@ main(int argc, char *argv[])
 	ASSERT_ALIGNED_FIELD(struct redo_log, nentries);
 	ASSERT_ALIGNED_FIELD(struct redo_log, next);
 	ASSERT_ALIGNED_FIELD(struct redo_log, capacity);
-	ASSERT_ALIGNED_FIELD(struct redo_log, unused);
 	ASSERT_ALIGNED_CHECK(struct redo_log);
 	UT_COMPILE_ERROR_ON(sizeof(struct redo_log) !=
 		SIZEOF_REDO_LOG_V4);

@@ -239,7 +239,7 @@ alloc_redo_constructor(void *base, void *ptr, size_t usable_size, void *arg)
 	redo->capacity = PMALLOC_REDO_LOG_EXTEND_SIZE;
 	redo->checksum = 0;
 	redo->next = 0;
-	memset(redo->unused, 0, sizeof(redo->unused));
+	// memset(redo->unused, 0, sizeof(redo->unused));
 
 	pmemops_flush(p_ops, redo, sizeof(*redo));
 
