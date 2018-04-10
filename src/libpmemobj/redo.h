@@ -42,7 +42,6 @@
 
 #include "vec.h"
 #include "pmemops.h"
-#include "util.h"
 
 struct redo_ctx;
 
@@ -59,14 +58,12 @@ struct redo_log_entry {
 	uint64_t nentries;\
 	uint64_t next;\
 	uint64_t capacity;\
+	uint64_t unused[4];\
 	struct redo_log_entry entries[base_capacity];\
 }\
 
-#define CACHELINE_ALIGN(size) ALIGN_UP(size, 64U)
-
 #define SIZEOF_REDO_LOG(base_capacity)\
-CACHELINE_ALIGN(sizeof(struct redo_log) + sizeof(struct redo_log_entry) * \
-		(base_capacity))
+(sizeof(struct redo_log) + sizeof(struct redo_log_entry) * (base_capacity))
 
 struct redo_log REDO_LOG(0);
 

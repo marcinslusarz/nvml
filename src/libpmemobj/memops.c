@@ -87,7 +87,7 @@ operation_new(void *base, const struct redo_ctx *redo_ctx,
 			goto error_redo_alloc;
 
 		src->capacity = redo_base_capacity;
-		// memset(src->unused, 0, sizeof(src->unused));
+		memset(src->unused, 0, sizeof(src->unused));
 
 		ctx->logs[i].redo = src;
 	}
