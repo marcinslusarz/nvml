@@ -357,8 +357,10 @@ redo_log_clobber(const struct redo_ctx *ctx, struct redo_log *dest,
 	struct redo_log empty;
 	memset(&empty, 0, sizeof(empty));
 
-	empty.next = next && VEC_SIZE(next) != 0 ?
-		VEC_FRONT(next) : dest->next;
+	if (next)
+		empty.next = VEC_SIZE(next) == 0 ? 0 : VEC_FRONT(next);
+	else
+		empty.next = dest->next;
 
 	pmemops_memcpy(&ctx->p_ops, dest, &empty, sizeof(empty), PMEM_MEM_WC);
 }
