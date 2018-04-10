@@ -37,6 +37,7 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include "libpmem.h"
 #include "redo.h"
 #include "out.h"
 #include "util.h"
@@ -240,6 +241,8 @@ redo_log_store(const struct redo_ctx *ctx, struct redo_log *dest,
 	size_t dest_ncopy = MIN(nentries, redo_capacity);
 	size_t next_entries = nentries - dest_ncopy;
 	size_t nlog = 0;
+	int stored = 0;
+
 	while (next_entries > 0) {
 		redo = redo_log_next_by_offset(ctx, VEC_ARR(next)[nlog++]);
 		ASSERTne(redo, NULL);
@@ -251,9 +254,13 @@ redo_log_store(const struct redo_ctx *ctx, struct redo_log *dest,
 			redo->entries,
 			src->entries + offset,
 			CACHELINE_ALIGN(sizeof(struct redo_log_entry) * ncopy),
-			0);
+			PMEM_MEM_WC | PMEM_MEM_NODRAIN);
 		offset += ncopy;
+		stored = 1;
 	}
+
+	if (stored)
+		pmemops_drain(&ctx->p_ops);
 
 	/*
 	 * Then, calculate the checksum and store the first part of the
@@ -264,7 +271,7 @@ redo_log_store(const struct redo_ctx *ctx, struct redo_log *dest,
 	redo_log_checksum(src, dest_ncopy, 1);
 
 	pmemops_memcpy(&ctx->p_ops, dest, src,
-		CACHELINE_ALIGN(SIZEOF_REDO_LOG(dest_ncopy)), 0);
+		CACHELINE_ALIGN(SIZEOF_REDO_LOG(dest_ncopy)), PMEM_MEM_WC);
 }
 
 /*
@@ -353,7 +360,7 @@ redo_log_clobber(const struct redo_ctx *ctx, struct redo_log *dest,
 	empty.next = next && VEC_SIZE(next) != 0 ?
 		VEC_FRONT(next) : dest->next;
 
-	pmemops_memcpy(&ctx->p_ops, dest, &empty, sizeof(empty), 0);
+	pmemops_memcpy(&ctx->p_ops, dest, &empty, sizeof(empty), PMEM_MEM_WC);
 }
 
 /*
