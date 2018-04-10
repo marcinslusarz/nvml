@@ -252,6 +252,8 @@ operation_init(struct operation_context *ctx)
 		(sizeof(struct redo_log_entry) * plog->capacity));
 	tlog->size = 0;
 	plog->size = 0;
+	memset(&plog->redo->entries, 0, sizeof(struct redo_log_entry) *
+		plog->capacity);
 }
 
 /*

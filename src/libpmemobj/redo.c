@@ -259,12 +259,12 @@ redo_log_store(const struct redo_ctx *ctx, struct redo_log *dest,
 	 * Then, calculate the checksum and store the first part of the
 	 * redo log.
 	 */
-	src->next = dest->next;
+	src->next = VEC_SIZE(next) == 0 ? 0 : VEC_FRONT(next);
 	src->nentries = nentries;
 	redo_log_checksum(src, dest_ncopy, 1);
 
 	pmemops_memcpy(&ctx->p_ops, dest, src,
-		SIZEOF_REDO_LOG(dest_ncopy), 0);
+		CACHELINE_ALIGN(SIZEOF_REDO_LOG(dest_ncopy)), 0);
 }
 
 /*
