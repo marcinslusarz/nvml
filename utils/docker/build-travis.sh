@@ -65,6 +65,12 @@ if [[ -z "$HOST_WORKDIR" ]]; then
 	exit 1
 fi
 
+if [[ $SIMPLE_CHECKERS -eq 1 ]]; then
+	make check-license -C ../..
+	make cstyle -C ../..
+	exit 0
+fi
+
 if [[ -z "$TEST_BUILD" ]]; then
 	TEST_BUILD=all
 fi
