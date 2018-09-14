@@ -42,67 +42,6 @@
 #include "win_mmap.h"
 #include "sys/mman.h"
 
-#if (NTDDI_VERSION >= NTDDI_WIN10_RS1)
-typedef BOOL (WINAPI *PQVM)(
-		HANDLE, const void *,
-		enum WIN32_MEMORY_INFORMATION_CLASS, PVOID,
-		SIZE_T, PSIZE_T);
-
-static PQVM Func_qvmi = NULL;
-#endif
-
-/*
- * is_direct_mapped -- (internal) for each page in the given region
- * checks with MM, if it's direct mapped.
- */
-static int
-is_direct_mapped(const void *begin, const void *end)
-{
-	LOG(3, "begin %p end %p", begin, end);
-
-#if (NTDDI_VERSION >= NTDDI_WIN10_RS1)
-	int retval = 1;
-	WIN32_MEMORY_REGION_INFORMATION region_info;
-	SIZE_T bytes_returned;
-
-	if (Func_qvmi == NULL) {
-		LOG(4, "QueryVirtualMemoryInformation not supported, "
-			"assuming non-DAX.");
-		return 0;
-	}
-
-	const void *begin_aligned = (const void *)rounddown((intptr_t)begin,
-					Pagesize);
-	const void *end_aligned = (const void *)roundup((intptr_t)end,
-					Pagesize);
-
-	for (const void *page = begin_aligned;
-			page < end_aligned;
-			page = (const void *)((char *)page + Pagesize)) {
-		if (Func_qvmi(GetCurrentProcess(), page,
-				MemoryRegionInfo, &region_info,
-				sizeof(region_info), &bytes_returned)) {
-			retval = region_info.DirectMapped;
-		} else {
-			LOG(4, "QueryVirtualMemoryInformation failed, assuming "
-				"non-DAX.  Last error: %08x", GetLastError());
-			retval = 0;
-		}
-
-		if (retval == 0) {
-			LOG(4, "page %p is not direct mapped", page);
-			break;
-		}
-	}
-
-	return retval;
-#else
-	/* if the MM API is not available the safest answer is NO */
-	return 0;
-#endif /* NTDDI_VERSION >= NTDDI_WIN10_RS1 */
-
-}
-
 /*
  * is_pmem_detect -- implement pmem_is_pmem()
  *
@@ -151,12 +90,10 @@ is_pmem_detect(const void *addr, size_t len)
 		/*
 		 * If there is a gap between the given region that we process
 		 * currently and the mapped region in our tracking list, we
-		 * need to process the gap by taking the long route of asking
-		 * MM for each page in that range.
+		 * assume it's not pmem.
 		 */
-		if (begin < mt->BaseAddress &&
-		    !is_direct_mapped(begin, mt->BaseAddress)) {
-			LOG(4, "untracked range [%p, %p) is not direct mapped",
+		if (begin < mt->BaseAddress) {
+			LOG(4, "untracked range [%p, %p)",
 				begin, mt->BaseAddress);
 			retval = 0;
 			break;
@@ -167,11 +104,10 @@ is_pmem_detect(const void *addr, size_t len)
 	}
 
 	/*
-	 * If we still have a range to verify, check with MM if the entire
-	 * region is direct mapped.
+	 * If we still have a range to verify, assume it's not pmem.
 	 */
-	if (begin < end && !is_direct_mapped(begin, end)) {
-		LOG(4, "untracked end range [%p, %p) is not direct mapped",
+	if (begin < end) {
+		LOG(4, "untracked end range [%p, %p)",
 			begin, end);
 		retval = 0;
 	}
@@ -201,9 +137,4 @@ void
 pmem_os_init(void)
 {
 	LOG(3, NULL);
-#if NTDDI_VERSION >= NTDDI_WIN10_RS1
-	Func_qvmi = (PQVM)GetProcAddress(
-			GetModuleHandle(TEXT("KernelBase.dll")),
-			"QueryVirtualMemoryInformation");
-#endif
 }
