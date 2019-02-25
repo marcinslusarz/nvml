@@ -69,7 +69,7 @@ if [[ -z "$TEST_BUILD" ]]; then
 	TEST_BUILD=all
 fi
 
-imageName=pmem/pmdk:1.5-${OS}-${OS_VER}
+imageName=${DOCKERHUB_REPO}:1.5-${OS}-${OS_VER}
 containerName=pmdk-${OS}-${OS_VER}
 
 if [[ $MAKE_PKG -eq 0 ]] ; then command="./run-build.sh"; fi
@@ -85,7 +85,7 @@ if [ -n "$DNS_SERVER" ]; then DNS_SETTING=" --dns=$DNS_SERVER "; fi
 if [[ $SKIP_CHECK -eq 1 ]]; then BUILD_PACKAGE_CHECK=n; else BUILD_PACKAGE_CHECK=y; fi
 if [ -z "$NDCTL_ENABLE" ]; then ndctl_enable=; else ndctl_enable="--env NDCTL_ENABLE=$NDCTL_ENABLE"; fi
 
-# Only run doc update on pmem/pmdk master or stable branch
+# Only run doc update on $GITHUB_REPO master or stable branch
 VALID_BRANCHES=("master" "stable-1.5")
 if [[ ! "${VALID_BRANCHES[@]}" =~ "${TRAVIS_BRANCH}" || "$TRAVIS_PULL_REQUEST" != "false" || "$TRAVIS_REPO_SLUG" != "${GITHUB_REPO}" ]]; then
 	AUTO_DOC_UPDATE=0
