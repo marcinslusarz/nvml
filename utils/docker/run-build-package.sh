@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2016-2018, Intel Corporation
+# Copyright 2016-2019, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ git tag -a 1.4.99 -m "1.4" HEAD~1
 # Build all and run tests
 cd $WORKDIR
 export PCHECK_OPTS=-j2
-make -j2 $PACKAGE_MANAGER
+make -j2 $PACKAGE_MANAGER BUILD_PACKAGE_CHECK=n
 
 # Install packages
 if [[ "$PACKAGE_MANAGER" == "dpkg" ]]; then
