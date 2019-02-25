@@ -124,6 +124,7 @@ docker run --rm --privileged=true --name=$containerName -ti \
 	--env GITHUB_TOKEN=$GITHUB_TOKEN \
 	--env COVERITY_SCAN_TOKEN=$COVERITY_SCAN_TOKEN \
 	--env COVERITY_SCAN_NOTIFICATION_EMAIL=$COVERITY_SCAN_NOTIFICATION_EMAIL \
+	--env GITHUB_REPO=$GITHUB_REPO \
 	$ndctl_enable \
 	-v $HOST_WORKDIR:$WORKDIR \
 	-v /etc/localtime:/etc/localtime \
