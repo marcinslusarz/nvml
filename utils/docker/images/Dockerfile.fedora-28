@@ -83,16 +83,16 @@ RUN dnf update -y \
  && dnf clean all
 
 # Install libndctl
-COPY install-libndctl.sh install-libndctl.sh
-RUN ./install-libndctl.sh fedora
+#COPY install-libndctl.sh install-libndctl.sh
+#RUN ./install-libndctl.sh fedora
 
 # Install valgrind
-COPY install-valgrind.sh install-valgrind.sh
-RUN ./install-valgrind.sh
+#COPY install-valgrind.sh install-valgrind.sh
+#RUN ./install-valgrind.sh
 
 # Install libfabric
-COPY install-libfabric.sh install-libfabric.sh
-RUN ./install-libfabric.sh fedora
+#COPY install-libfabric.sh install-libfabric.sh
+#RUN ./install-libfabric.sh fedora
 
 # Add user
 ENV USER pmdkuser
