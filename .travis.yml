@@ -19,6 +19,7 @@ env:
     - PMDK_CXX=g++
     - REMOTE_TESTS=1
     - VALGRIND=1
+    - NDCTL_ENABLE=n
   matrix:
 #    - COVERAGE=1 TEST_BUILD=debug
 #    - TEST_BUILD=debug
