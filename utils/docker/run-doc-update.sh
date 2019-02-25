@@ -33,7 +33,7 @@
 set -e
 
 BOT_NAME="pmem-bot"
-USER_NAME="pmem"
+USER_NAME="marcinslusarz"
 REPO_NAME="pmdk"
 
 ORIGIN="https://${GITHUB_TOKEN}@github.com/${BOT_NAME}/${REPO_NAME}"
