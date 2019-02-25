@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2019, Intel Corporation
+# Copyright 2018-2019, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
 
 set -e
 
-BOT_NAME="pmdk-bot"
+BOT_NAME="pmem-bot"
 USER_NAME="pmem"
 REPO_NAME="pmdk"
 
