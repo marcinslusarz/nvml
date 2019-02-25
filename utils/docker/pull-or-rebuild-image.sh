@@ -77,7 +77,7 @@ fi
 
 # TRAVIS_COMMIT_RANGE is usually invalid for force pushes - ignore such values
 # when used with non-upstream repository
-if [ -n "$TRAVIS_COMMIT_RANGE" -a $TRAVIS_REPO_SLUG != $GITHUB_REPO ]; then
+if [ -n "$TRAVIS_COMMIT_RANGE" -a $TRAVIS_REPO_SLUG != "${GITHUB_REPO}x" ]; then
 	if ! git rev-list $TRAVIS_COMMIT_RANGE; then
 		TRAVIS_COMMIT_RANGE=
 	fi
