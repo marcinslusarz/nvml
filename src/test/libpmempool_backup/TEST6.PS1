@@ -34,6 +34,7 @@
 # or almost all parts already exist
 #
 
+# run this test as ".\RUNTESTS.PS1 -i libpmempool_backup -s TEST6 -b debug -f pmem -o 1d" from src\test dir
 . ..\unittest\unittest.ps1
 
 require_test_type medium
@@ -45,25 +46,13 @@ setup
 . ./common.PS1
 
 for ($i=0; $i -lt $POOL_TYPES.Count; $i++ ) {
-	backup_cleanup
+	cp pools\* $DIR\
 
-	# prepare poolset files
-	create_poolset_variation 1
-	create_poolset_variation 1 $BACKUP
+	truncate -s 20M $DIR\pool.part1_backup
+	truncate -s 20M $DIR\pool.part2_backup
+	truncate -s 20M $DIR\pool.part3_backup
+	truncate -s 20M $DIR\pool.part4_backup
 
-	# create source poolset parts
-	expect_normal_exit $PMEMPOOL create $POOL_TYPES[$i] `
-		$POOL_CREATE_PARAMS[$i] $POOLSET
-
-	# create backup poolset parts
-	for ($j=1; $j -lt 5; $j++ ) {
-		truncate -s 20M $POOL_PART$j$BACKUP
-	}
-
-	backup_and_compare $POOLSET $POOL_TYPES[$i]
-
-	# one of parts is too small
-	truncate -s 10M ${POOL_PART}3${BACKUP}
 	backup_and_compare $POOLSET $POOL_TYPES[$i]
 
 	# one of parts does not exist
@@ -74,6 +63,7 @@ for ($i=0; $i -lt $POOL_TYPES.Count; $i++ ) {
 rm $OUT -Force -ea si
 mv $OUT_TEMP $OUT
 
-check
+#check
 
+# comment out if you want $DIR to not disappear after success
 pass

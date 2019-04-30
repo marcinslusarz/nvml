@@ -44,7 +44,8 @@ rm $DIFF, $OUT_TEMP -Force -ea si
 touch $DIFF $OUT_TEMP
 
 # params for blk, log and obj pools
-$POOL_TYPES=@( "blk", "log", "obj" )
+$POOL_TYPES=@( "blk" )
+#$POOL_TYPES=@( "blk", "log", "obj" )
 $POOL_CREATE_PARAMS=@( @("--write-layout", "512"), "", @("--layout", "test_layout"))
 $POOL_CHECK_PARAMS=@( "-smgB", "-s", @("-soOaAbZH", "-l", "-C"))
 $POOL_OBJ=2

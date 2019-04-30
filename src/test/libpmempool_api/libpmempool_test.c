@@ -182,6 +182,7 @@ main(int argc, char *argv[])
 	if (optind < argc) {
 		args.path = argv[optind];
 	}
+//	Sleep(30000);
 
 	check_pool((struct pmempool_check_args *)&args, args_size);
 

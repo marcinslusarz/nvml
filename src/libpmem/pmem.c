@@ -420,7 +420,7 @@ pmem_map_fileU(const char *path, size_t len, int flags,
 
 	int oerrno;
 	int fd;
-	int open_flags = O_RDWR;
+	int open_flags = O_RDWR/* | O_BINARY*/;
 	int delete_on_err = 0;
 	int file_type = util_file_get_type(path);
 
