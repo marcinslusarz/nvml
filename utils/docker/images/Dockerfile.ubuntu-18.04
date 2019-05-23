@@ -58,14 +58,6 @@ ENV NDCTL_DEPS "asciidoctor \
 	systemd \
 	uuid-dev"
 
-# libfabric (optional if libfabric-dev >= 1.4.2 is installed)
-ENV FABRIC_DEPS "autoconf \
-	automake \
-	build-essential \
-	libtool \
-	unzip \
-	wget"
-
 ENV VALGRIND_DEPS "autoconf \
 	automake \
 	build-essential \
@@ -112,13 +104,13 @@ ENV COVERITY_DEPS ruby gcc-6 g++-6 wget
 # misc
 ENV MISC_DEPS "clang \
 	clang-format \
+	libfabric-dev \
 	flake8 \
 	sudo \
 	whois"
 
 RUN apt-get install -y --no-install-recommends \
 	$NDCTL_DEPS \
-	$FABRIC_DEPS \
 	$VALGRIND_DEPS \
 	$BASE_DEPS \
 	$JEMALLOC_DEPS \
@@ -134,10 +126,6 @@ RUN apt-get install -y --no-install-recommends \
 # Install valgrind
 COPY install-valgrind.sh install-valgrind.sh
 RUN ./install-valgrind.sh
-
-# Install libfabric
-COPY install-libfabric.sh install-libfabric.sh
-RUN ./install-libfabric.sh
 
 # Install libndctl
 COPY install-libndctl.sh install-libndctl.sh

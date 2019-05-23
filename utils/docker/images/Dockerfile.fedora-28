@@ -62,6 +62,7 @@ RUN dnf install -y \
 	keyutils-libs-devel \
 	kmod-devel \
 	lbzip2 \
+	libfabric-devel \
 	libtool \
 	libudev-devel \
 	libunwind-devel \
@@ -93,10 +94,6 @@ RUN ./install-libndctl.sh tags/v64.1 fedora
 # Install valgrind
 COPY install-valgrind.sh install-valgrind.sh
 RUN ./install-valgrind.sh
-
-# Install libfabric
-COPY install-libfabric.sh install-libfabric.sh
-RUN ./install-libfabric.sh fedora
 
 # Add user
 ENV USER pmdkuser

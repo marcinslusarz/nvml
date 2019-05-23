@@ -53,6 +53,7 @@ RUN apt-get update \
 	gdb \
 	git \
 	libc6-dbg \
+	libfabric-dev \
 	libfuse-dev \
 	libglib2.0-dev \
 	libjson-c-dev \
@@ -71,7 +72,6 @@ RUN apt-get update \
 	systemd \
 	unzip \
 	uuid-dev \
-	wget \
 	whois \
 	xmlto
 
@@ -82,10 +82,6 @@ RUN rm -rf /var/lib/apt/lists/*
 # Install valgrind
 COPY install-valgrind.sh install-valgrind.sh
 RUN ./install-valgrind.sh
-
-# Install libfabric
-COPY install-libfabric.sh install-libfabric.sh
-RUN ./install-libfabric.sh
 
 # Install libndctl
 COPY install-libndctl.sh install-libndctl.sh
