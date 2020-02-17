@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/* Copyright 2015-2019, Intel Corporation */
+/* Copyright 2015-2020, Intel Corporation */
 
 /*
  * pmembench.cpp -- main source file for benchmark framework
@@ -1394,6 +1394,15 @@ pmembench_run(struct pmembench *pb, struct benchmark *bench)
 						"invalid size of device dax\n");
 					goto out;
 				}
+			}
+		}
+
+		if (bench->info->pre_repeat_init) {
+			if (bench->info->pre_repeat_init(bench, args)) {
+				warn("%s: pre-repeat-init failed",
+						bench->info->name);
+				ret = -1;
+				goto out;
 			}
 		}
 

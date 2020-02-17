@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/* Copyright 2015-2019, Intel Corporation */
+/* Copyright 2015-2020, Intel Corporation */
 
 /*
  * benchmark.hpp -- This file contains interface for creating benchmarks to the
@@ -290,6 +290,7 @@ struct benchmark_info {
 	size_t opts_size;
 	void (*print_help)(struct benchmark *bench);
 	int (*pre_init)(struct benchmark *bench);
+	int (*pre_repeat_init)(struct benchmark *bench, struct benchmark_args *args);
 	int (*init)(struct benchmark *bench, struct benchmark_args *args);
 	int (*exit)(struct benchmark *bench, struct benchmark_args *args);
 	int (*init_worker)(struct benchmark *bench, struct benchmark_args *args,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/* Copyright 2015-2019, Intel Corporation */
+/* Copyright 2015-2020, Intel Corporation */
 
 /*
  * pmem_memcpy.cpp -- benchmark implementation for pmem_memcpy
@@ -83,6 +83,9 @@ struct pmem_args {
 
 	/* do not do warmup */
 	bool no_warmup;
+
+	/* amount of space per thread */
+	size_t data_per_thread;
 };
 
 /*
@@ -348,6 +351,31 @@ assign_size(struct pmem_bench *pmb, struct benchmark_args *args,
 	return 0;
 }
 
+static int
+pmem_memcpy_pre_repeat_init(struct benchmark *bench, struct benchmark_args *args)
+{
+	struct pmem_args *pargs = (struct pmem_args *)args->opts;
+
+	if (pargs->data_per_thread) {
+		if (args->n_ops_per_thread != 1) {
+			fprintf(stderr,
+				"ops-per-thread and data-per-thread cannot be both set\n");
+			return -1;
+		}
+
+		args->n_ops_per_thread = pargs->data_per_thread / args->dsize;
+		if (args->n_ops_per_thread == 0) {
+			fprintf(stderr,
+				"data-per-thread is lower than minimum value (%zu)\n",
+				args->dsize);
+			return -1;
+		}
+	}
+
+
+	return 0;
+}
+
 /*
  * pmem_memcpy_init -- benchmark initialization
  *
@@ -516,7 +544,7 @@ pmem_memcpy_exit(struct benchmark *bench, struct benchmark_args *args)
 }
 
 /* structure to define command line arguments */
-static struct benchmark_clo pmem_memcpy_clo[8];
+static struct benchmark_clo pmem_memcpy_clo[9];
 
 /* Stores information about benchmark. */
 static struct benchmark_info pmem_memcpy_bench;
@@ -592,11 +620,25 @@ pmem_memcpy_constructor(void)
 	pmem_memcpy_clo[7].type = CLO_TYPE_FLAG;
 	pmem_memcpy_clo[7].off = clo_field_offset(struct pmem_args, no_warmup);
 
+	pmem_memcpy_clo[8].opt_short = 0;
+	pmem_memcpy_clo[8].opt_long = "data-per-thread";
+	pmem_memcpy_clo[8].type = CLO_TYPE_UINT;
+	pmem_memcpy_clo[8].descr = "Amount of space per thread";
+	pmem_memcpy_clo[8].off =
+		clo_field_offset(struct pmem_args, data_per_thread);
+	pmem_memcpy_clo[8].def = "0";
+	pmem_memcpy_clo[8].type_uint.size =
+		clo_field_size(struct pmem_args, data_per_thread);
+	pmem_memcpy_clo[8].type_uint.base = CLO_INT_BASE_DEC;
+	pmem_memcpy_clo[8].type_uint.min = 0;
+	pmem_memcpy_clo[8].type_uint.max = ULLONG_MAX;
+
 	pmem_memcpy_bench.name = "pmem_memcpy";
 	pmem_memcpy_bench.brief = "Benchmark for"
 				  "pmem_memcpy_persist() and "
 				  "pmem_memcpy_nodrain()"
 				  "operations";
+	pmem_memcpy_bench.pre_repeat_init = pmem_memcpy_pre_repeat_init;
 	pmem_memcpy_bench.init = pmem_memcpy_init;
 	pmem_memcpy_bench.exit = pmem_memcpy_exit;
 	pmem_memcpy_bench.multithread = true;
