@@ -3106,7 +3106,7 @@ function init_rpmem_on_node() {
 
 		CMD="$CMD ${NODE_ENV[$slave]}"
 		CMD="$CMD LD_LIBRARY_PATH=${NODE_LD_LIBRARY_PATH[$slave]}:$REMOTE_LD_LIBRARY_PATH"
-		CMD="$CMD $trace ../rpmemd"
+		CMD="$CMD $trace perf record -o /tmp/rpmemd-perf.data -gR ../rpmemd"
 		CMD="$CMD --log-file=$RPMEMD_LOG_FILE"
 		CMD="$CMD --log-level=$RPMEMD_LOG_LEVEL"
 		CMD="$CMD --poolset-dir=$poolset_dir"

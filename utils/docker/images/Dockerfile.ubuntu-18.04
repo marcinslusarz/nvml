@@ -7,7 +7,7 @@
 #
 
 # Pull base image
-FROM ubuntu:19.10
+FROM ubuntu:18.04
 MAINTAINER marcin.slusarz@intel.com
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -28,9 +28,10 @@ ENV VALGRIND_DEPS "autoconf \
 # pmdk base
 ENV BASE_DEPS "build-essential \
 	git \
-	libdaxctl-dev \
-	libndctl-dev \
 	pkg-config"
+
+#	libdaxctl-dev \
+#	libndctl-dev \
 
 # benchmarks (optional)
 ENV BENCH_DEPS libglib2.0-dev
@@ -64,12 +65,27 @@ ENV CODECOV_DEPS curl
 # Coverity
 ENV COVERITY_DEPS ruby gcc g++ wget
 
+# ndctl (optional if libndctl-dev and libdaxctl-dev >= 60.1, 64.1 preferred)
+ENV NDCTL_DEPS "\
+       automake \
+       bash-completion \
+       build-essential \
+       git \
+       libjson-c-dev \
+       libkeyutils-dev \
+       libkmod-dev \
+       libtool \
+       libudev-dev \
+       pkg-config \
+       systemd \
+       uuid-dev"
+
 # misc
 ENV MISC_DEPS "clang \
 	clang-format \
 	flake8 \
 	sudo \
-	whois"
+	whois linux-tools-azure linux-tools-5.0.0-1035-azure ca-certificates"
 
 # Copy install valgrind script
 COPY install-valgrind.sh install-valgrind.sh
@@ -77,11 +93,14 @@ COPY install-valgrind.sh install-valgrind.sh
 # Copy install libfabric script
 COPY install-libfabric.sh install-libfabric.sh
 
+# Copy install libndctl script
+COPY install-libndctl.sh install-libndctl.sh
+
 # Update the Apt cache and install basic tools
 RUN apt-get update && apt-get dist-upgrade -y \
 	&& apt-get install -y --no-install-recommends \
+	$NDCTL_DEPS \
 	$FABRIC_DEPS \
-	$VALGRIND_DEPS \
 	$BASE_DEPS \
 	$BENCH_DEPS \
 	$EXAMPLES_DEPS \
@@ -89,10 +108,9 @@ RUN apt-get update && apt-get dist-upgrade -y \
 	$TESTS_DEPS \
 	$PACKAGING_DEPS \
 	$CODECOV_DEPS \
-	$COVERITY_DEPS \
 	$MISC_DEPS \
-	&& ./install-valgrind.sh ubuntu \
 	&& ./install-libfabric.sh \
+	&& ./install-libndctl.sh tags/v64.1 \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Add user
@@ -105,7 +123,7 @@ USER $USER
 
 # Set required environment variables
 ENV OS ubuntu
-ENV OS_VER 19.10
+ENV OS_VER 18.04
 ENV START_SSH_COMMAND service ssh start
 ENV PACKAGE_MANAGER dpkg
 ENV NOTTY 1

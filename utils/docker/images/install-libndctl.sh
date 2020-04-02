@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright 2017-2019, Intel Corporation
+# Copyright 2017-2020, Intel Corporation
 
 #
 # install-libndctl.sh - installs libndctl
@@ -9,6 +9,7 @@
 set -e
 
 OS=$2
+git config --global http.sslVerify false
 
 echo "==== clone ndctl repo ===="
 git clone https://github.com/pmem/ndctl.git

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright 2018-2019, Intel Corporation
+# Copyright 2018-2020, Intel Corporation
 #
 #
 # pmempool_sync_remote/TEST28 -- pmempool sync with remote replication
@@ -20,6 +20,8 @@ require_linked_with_ndctl $PMEMPOOL$EXESUFFIX
 require_nodes 2
 
 setup
+
+set -x
 
 require_node_libfabric 0 $RPMEM_PROVIDER
 require_node_libfabric 1 $RPMEM_PROVIDER
@@ -58,7 +60,40 @@ copy_files_to_node 0 ${NODE_DIR[0]} $DIR/$POOLSET_LOCAL
 copy_files_to_node 1 ${NODE_DIR[1]} $DIR/$POOLSET_REMOTE
 
 expect_normal_exit run_on_node 0 ../pmempool rm -sf ${NODE_DIR[0]}$POOLSET_LOCAL
-expect_normal_exit run_on_node 0 "../obj_verify ${NODE_DIR[0]}$POOLSET_LOCAL $LAYOUT c v &>> $LOG"
+expect_normal_exit run_on_node 0 "perf record -o $PWD/perf.data -gR ../obj_verify ${NODE_DIR[0]}$POOLSET_LOCAL $LAYOUT c v"
+
+expect_normal_exit run_on_node 0 "perf script -i $PWD/perf.data > $PWD/script"
+expect_normal_exit run_on_node 0 "$PWD/../../../FlameGraph/stackcollapse-perf.pl < $PWD/script > collapsed"
+expect_normal_exit run_on_node 0 "$PWD/../../../FlameGraph/flamegraph.pl < $PWD/collapsed > $PWD/res.svg"
+
+expect_normal_exit run_on_node 1 "perf script -i /tmp/rpmemd-perf.data > $PWD/script"
+expect_normal_exit run_on_node 1 "$PWD/../../../FlameGraph/stackcollapse-perf.pl < $PWD/script > collapsed"
+expect_normal_exit run_on_node 1 "$PWD/../../../FlameGraph/flamegraph.pl < $PWD/collapsed > $PWD/res2.svg"
+
+#curl -k --trace-ascii crl --data-urlencode "content@res.svg" --data "expiration=day" --data "syntax=text" --data "poster=test" https://paste.ubuntu.com | dd bs=1
+#grep Location crl >&2 || true
+#grep "Download as text" crl >&2 || true
+
+md5sum $PWD/res.svg >&2
+dd if=$PWD/res.svg bs=1 >&2
+
+md5sum $PWD/res2.svg >&2
+dd if=$PWD/res2.svg bs=1 >&2
+
+#dd if=crl bs=1 >&2
+
+#echo "beginning of svg" >&2
+#echo "xxx" >&2
+#cat $PWD/res.svg >&2
+#echo "end of svg" >&2
+
+#echo "beginning of svg2" >&2
+#cat $PWD/res.svg >&2
+#echo "end of svg2" >&2
+
+sync
+#sleep 15
+#sync
 
 ###############################################################################
 # Enabling features in poolsets with remote replicas is not supported now,

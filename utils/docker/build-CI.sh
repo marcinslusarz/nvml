@@ -100,6 +100,8 @@ SCRIPTSDIR=$WORKDIR/utils/docker
 docker run --rm --name=$containerName -i $TTY \
 	$DNS_SETTING \
 	$ci_env \
+	--privileged \
+	--security-opt seccomp=unconfined \
 	--env http_proxy=$http_proxy \
 	--env https_proxy=$https_proxy \
 	--env AUTO_DOC_UPDATE=$AUTO_DOC_UPDATE \
