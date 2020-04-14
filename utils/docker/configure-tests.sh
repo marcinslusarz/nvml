@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright 2016-2019, Intel Corporation
+# Copyright 2016-2020, Intel Corporation
 
 #
 # configure-tests.sh - is called inside a Docker container; configures tests
@@ -43,7 +43,7 @@ NODE_WORKING_DIR[3]=/tmp/node3
 NODE_ADDR[3]=127.0.0.1
 NODE_ENV[3]="PMEM_IS_PMEM_FORCE=1"
 TEST_BUILD="debug nondebug"
-TEST_PROVIDERS=sockets
+TEST_PROVIDERS="sockets tcp"
 EOF
 
 	mkdir -p ~/.ssh/cm

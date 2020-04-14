@@ -3140,11 +3140,15 @@ function init_rpmem_on_node() {
 	RPMEM_CMD="\"$RPMEM_CMD\""
 
 	RPMEM_ENABLE_SOCKETS=0
+	RPMEM_ENABLE_TCP=0
 	RPMEM_ENABLE_VERBS=0
 
 	case "$RPMEM_PROVIDER" in
 	sockets)
 		RPMEM_ENABLE_SOCKETS=1
+		;;
+	tcp)
+		RPMEM_ENABLE_TCP=1
 		;;
 	verbs)
 		RPMEM_ENABLE_VERBS=1
@@ -3157,6 +3161,7 @@ function init_rpmem_on_node() {
 
 	export_vars_node $master RPMEM_CMD
 	export_vars_node $master RPMEM_ENABLE_SOCKETS
+	export_vars_node $master RPMEM_ENABLE_TCP
 	export_vars_node $master RPMEM_ENABLE_VERBS
 
 	if [ -n ${UNITTEST_DO_NOT_CHECK_OPEN_FILES+x} ]; then

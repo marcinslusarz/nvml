@@ -236,7 +236,7 @@ TM=1
 
 #
 # Overwrite available providers:
-# verbs, sockets, all (default)
+# verbs, sockets, tcp, all (default)
 #
 #TEST_PROVIDERS=all
 

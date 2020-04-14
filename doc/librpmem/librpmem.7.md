@@ -253,6 +253,11 @@ It is required to disable IPv6 system wide if **RPMEM_ENABLE_SOCKETS** == 1 and
 address after ssh to loopback interface. By default the *sockets* provider is
 disabled.
 
++ **RPMEM_ENABLE_TCP**=0\|1
+
+Setting this variable to 1 enables using **fi_tcp**(7) provider for
+in-band RDMA connection.
+
 * **RPMEM_ENABLE_VERBS**=0\|1
 
 Setting this variable to 0 disables using **fi_verbs**(7) provider for
@@ -450,6 +455,6 @@ recommended by the SNIA NVM Programming Technical Work Group:
 **rpmemd**(1), **ssh**(1), **fork**(2), **dlclose**(3), **dlopen**(3),
 **ibv_fork_init**(3), **rpmem_create**(3), **rpmem_drain**(3), **rpmem_flush**(3),
 **rpmem_open**(3), **rpmem_persist**(3), **strerror**(3), **limits.conf**(5),
-**fabric**(7), **fi_sockets**(7), **fi_verbs**(7), **libpmem**(7), **libpmemblk**(7),
-**libpmemlog**(7), **libpmemobj**(7)
+**fabric**(7), **fi_sockets**(7), **fi_tcp**(7), **fi_verbs**(7), **libpmem**(7),
+**libpmemblk**(7), **libpmemlog**(7), **libpmemobj**(7)
 and **<https://pmem.io>**

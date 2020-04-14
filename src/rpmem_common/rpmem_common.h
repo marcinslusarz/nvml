@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/* Copyright 2016-2019, Intel Corporation */
+/* Copyright 2016-2020, Intel Corporation */
 
 /*
  * rpmem_common.h -- common definitions for librpmem and rpmemd
@@ -17,6 +17,7 @@
 #define RPMEM_DEF_CMD	"rpmemd"
 #define RPMEM_DEF_SSH	"ssh"
 #define RPMEM_PROV_SOCKET_ENV	"RPMEM_ENABLE_SOCKETS"
+#define RPMEM_PROV_TCP_ENV	"RPMEM_ENABLE_TCP"
 #define RPMEM_PROV_VERBS_ENV	"RPMEM_ENABLE_VERBS"
 #define RPMEM_MAX_NLANES_ENV	"RPMEM_MAX_NLANES"
 #define RPMEM_WQ_SIZE_ENV	"RPMEM_WORK_QUEUE_SIZE"
@@ -73,6 +74,7 @@ enum rpmem_provider {
 	RPMEM_PROV_UNKNOWN = 0,
 	RPMEM_PROV_LIBFABRIC_VERBS	= 1,
 	RPMEM_PROV_LIBFABRIC_SOCKETS	= 2,
+	RPMEM_PROV_LIBFABRIC_TCP	= 3,
 
 	MAX_RPMEM_PROV,
 };

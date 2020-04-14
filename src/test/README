@@ -77,7 +77,7 @@ RUNTESTS takes options to limit what it runs.  The usage is:
 		 auto (default, enable/disable based on test requirements),
 		 force-enable (enable when test does not require given valgrind tool,
 		 but obey test's explicit tool disable)
- Providers are: verbs, sockets, all (default)
+ Providers are: verbs, sockets, tcp, all (default)
  Persistency methods are: GPSPM, APM, all (default)
 
 For example:

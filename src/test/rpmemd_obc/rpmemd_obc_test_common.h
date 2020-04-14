@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/* Copyright 2016-2018, Intel Corporation */
+/* Copyright 2016-2020, Intel Corporation */
 
 /*
  * rpmemd_obc_test_common.h -- common declarations for rpmemd_obc test
@@ -46,7 +46,7 @@
 #define POOL_SIZE	0x0001234567abcdef
 #define NLANES		0x123
 #define NLANES_RESP	16
-#define PROVIDER	RPMEM_PROV_LIBFABRIC_SOCKETS
+#define PROVIDER	RPMEM_PROV_LIBFABRIC_TCP
 #define POOL_DESC	"pool.set"
 #define BUFF_SIZE	8192
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright 2014-2019, Intel Corporation
+# Copyright 2014-2020, Intel Corporation
 
 #
 # RUNTESTS -- setup the environment and run each test
@@ -55,7 +55,7 @@ Usage: $0 [ -hnv ] [ -b build-type ] [ -t test-type ] [ -f fs-type ]
 			obey test's explicit drd disable)
 -c			check pool files with pmempool check utility
 -q provider		run test only with specified fabric provider
-			provider: verbs, sockets, all (default)
+			provider: verbs, sockets, tcp, all (default)
 -r persistency-method	run tests only with specified persistency method
 			persistency-method: GPSPM, APM, all (default)
 EOF
@@ -335,7 +335,7 @@ runtest() {
 
 		fss=$(intersection "$fstype" "$req_fstype" "none pmem non-pmem any")
 		builds=$(intersection "$buildtype" "$req_buildtype" "debug nondebug static-debug static-nondebug")
-		provs=$(intersection "$provider" "$req_provider" "verbs sockets")
+		provs=$(intersection "$provider" "$req_provider" "verbs sockets tcp")
 		pmeths=$(intersection "$pmethod" "$req_pmethod" "GPSPM APM")
 
 		# remote tests require both providers and pmethods
@@ -676,7 +676,7 @@ do
 		shift 2
 		case "$provider"
 		in
-		verbs|sockets|all)
+		verbs|sockets|tcp|all)
 			;;
 		*)
 			usage "bad provider: $provider"

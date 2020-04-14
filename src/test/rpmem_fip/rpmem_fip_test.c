@@ -94,6 +94,9 @@ get_provider(const char *target, const char *prov_name,
 				RPMEM_PROV_LIBFABRIC_VERBS))
 			client->provider = RPMEM_PROV_LIBFABRIC_VERBS;
 		else if (rpmem_fip_probe(probe,
+				RPMEM_PROV_LIBFABRIC_TCP))
+			client->provider = RPMEM_PROV_LIBFABRIC_TCP;
+		else if (rpmem_fip_probe(probe,
 				RPMEM_PROV_LIBFABRIC_SOCKETS))
 			client->provider = RPMEM_PROV_LIBFABRIC_SOCKETS;
 		else
@@ -108,7 +111,8 @@ get_provider(const char *target, const char *prov_name,
 	 * Decrease number of lanes for socket provider because
 	 * the test may be too long.
 	 */
-	if (client->provider == RPMEM_PROV_LIBFABRIC_SOCKETS)
+	if (client->provider == RPMEM_PROV_LIBFABRIC_SOCKETS ||
+			client->provider == RPMEM_PROV_LIBFABRIC_TCP)
 		client->nlanes = min(client->nlanes, SOCK_NLANES);
 
 	client->max_wq_size = probe.max_wq_size[client->provider];

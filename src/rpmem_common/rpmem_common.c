@@ -119,6 +119,7 @@ rpmem_persist_method_to_str(enum rpmem_persist_method pm)
 static const char *provider2str[MAX_RPMEM_PROV] = {
 	[RPMEM_PROV_LIBFABRIC_VERBS] = "verbs",
 	[RPMEM_PROV_LIBFABRIC_SOCKETS] = "sockets",
+	[RPMEM_PROV_LIBFABRIC_TCP] = "tcp",
 };
 
 /*

@@ -121,6 +121,18 @@ rpmem_set_provider(RPMEMpool *rpp, const char *node)
 	}
 
 	/*
+	 * The tcp provider can be used only if specified environment
+	 * variable is set to 1.
+	 */
+	if (rpmem_fip_probe(probe, RPMEM_PROV_LIBFABRIC_TCP)) {
+		int enable;
+		ret = env_get_bool(RPMEM_PROV_TCP_ENV, &enable);
+		if (!ret && enable) {
+			prov = RPMEM_PROV_LIBFABRIC_TCP;
+		}
+	}
+
+	/*
 	 * The verbs provider is enabled by default. If appropriate
 	 * environment variable is set to 0, the verbs provider is disabled.
 	 *

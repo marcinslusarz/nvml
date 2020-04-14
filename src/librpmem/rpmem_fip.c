@@ -1551,7 +1551,27 @@ rpmem_fip_ops[MAX_RPMEM_PROV][MAX_RPMEM_PM] = {
 			.lanes_fini = rpmem_fip_fini_lanes_apm,
 			.lanes_post = rpmem_fip_post_lanes_common,
 		},
-	}
+	},
+	[RPMEM_PROV_LIBFABRIC_TCP] = {
+		[RPMEM_PM_GPSPM] = {
+			.flush = rpmem_fip_persist_gpspm_sockets,
+			.drain = rpmem_fip_drain_nop,
+			.persist = rpmem_fip_persist_gpspm_sockets,
+			.lanes_init = rpmem_fip_init_lanes_common,
+			.lanes_init_mem = rpmem_fip_init_mem_lanes_gpspm,
+			.lanes_fini = rpmem_fip_fini_lanes_common,
+			.lanes_post = rpmem_fip_post_lanes_common,
+		},
+		[RPMEM_PM_APM] = {
+			.flush = rpmem_fip_flush_apm,
+			.drain = rpmem_fip_drain_apm,
+			.persist = rpmem_fip_persist_apm_sockets,
+			.lanes_init = rpmem_fip_init_lanes_apm,
+			.lanes_init_mem = rpmem_fip_init_mem_lanes_apm,
+			.lanes_fini = rpmem_fip_fini_lanes_apm,
+			.lanes_post = rpmem_fip_post_lanes_common,
+		},
+	},
 };
 
 /*
