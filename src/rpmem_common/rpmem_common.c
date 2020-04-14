@@ -135,6 +135,9 @@ rpmem_provider_from_str(const char *str)
 			return p;
 	}
 
+	if (strcmp("tcp;ofi_rxm", str) == 0)
+		return RPMEM_PROV_LIBFABRIC_TCP;
+
 	return RPMEM_PROV_UNKNOWN;
 }
 
@@ -146,6 +149,8 @@ rpmem_provider_to_str(enum rpmem_provider provider)
 {
 	if (provider >= MAX_RPMEM_PROV)
 		return NULL;
+	if (provider == RPMEM_PROV_LIBFABRIC_TCP)
+		return "tcp;ofi_rxm";
 
 	return provider2str[provider];
 }
