@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/* Copyright 2016-2019, Intel Corporation */
+/* Copyright 2016-2020, Intel Corporation */
 
 /*
  * memblock.c -- implementation of memory block
@@ -384,13 +384,9 @@ memblock_run_default_nallocs(uint32_t *size_idx, uint16_t flags,
 	return nallocs - (alignment ? 1 : 0);
 }
 
-/*
- * memblock_run_bitmap -- calculate bitmap parameters for given arguments
- */
-void
-memblock_run_bitmap(uint32_t *size_idx, uint16_t flags,
-	uint64_t unit_size, uint64_t alignment, void *content,
-	struct run_bitmap *b)
+static force_inline void
+memblock_run_bitmap_part1(uint32_t *size_idx, uint16_t flags,
+	uint64_t unit_size, struct run_bitmap *b)
 {
 	ASSERTne(*size_idx, 0);
 
@@ -429,7 +425,18 @@ memblock_run_bitmap(uint32_t *size_idx, uint16_t flags,
 		 * padding.
 		 */
 		b->size = b->nvalues * sizeof(*b->values);
+		return;
+	}
 
+	b->size = RUN_DEFAULT_BITMAP_SIZE;
+}
+
+static force_inline void
+memblock_run_bitmap_part2(uint32_t *size_idx, uint16_t flags,
+	uint64_t unit_size, uint64_t alignment, struct run_bitmap *b)
+{
+	if (flags & CHUNK_FLAG_FLEX_BITMAP) {
+		size_t content_size = RUN_CONTENT_SIZE_BYTES(*size_idx);
 		/*
 		 * Calculate the number of allocations again, but this time
 		 * accounting for the bitmap/padding.
@@ -446,20 +453,37 @@ memblock_run_bitmap(uint32_t *size_idx, uint16_t flags,
 		unsigned unused_values = unused_bits / RUN_BITS_PER_VALUE;
 		b->nvalues -= unused_values;
 
-		b->values = (uint64_t *)content;
-
 		return;
 	}
 
-	b->size = RUN_DEFAULT_BITMAP_SIZE;
 	b->nbits = memblock_run_default_nallocs(size_idx, flags,
 		unit_size, alignment);
 
 	unsigned unused_bits = RUN_DEFAULT_BITMAP_NBITS - b->nbits;
 	unsigned unused_values = unused_bits / RUN_BITS_PER_VALUE;
 	b->nvalues = RUN_DEFAULT_BITMAP_VALUES - unused_values;
+}
+
+/*
+ * memblock_run_bitmap -- calculate bitmap parameters for given arguments
+ */
+void
+memblock_run_bitmap(uint32_t *size_idx, uint16_t flags,
+	uint64_t unit_size, uint64_t alignment, void *content,
+	struct run_bitmap *b)
+{
+	memblock_run_bitmap_part1(size_idx, flags, unit_size, b);
+	memblock_run_bitmap_part2(size_idx, flags, unit_size, alignment, b);
 
 	b->values = (uint64_t *)content;
+}
+
+static void
+memblock_run_bitmap_size(uint32_t *size_idx, uint16_t flags,
+	uint64_t unit_size, uint64_t alignment, void *content,
+	struct run_bitmap *b)
+{
+	memblock_run_bitmap_part1(size_idx, flags, unit_size, b);
 }
 
 /*
@@ -475,6 +499,20 @@ run_get_bitmap(const struct memory_block *m, struct run_bitmap *b)
 	memblock_run_bitmap(&size_idx, hdr->flags, run->hdr.block_size,
 		run->hdr.alignment, run->content, b);
 	ASSERTeq(size_idx, hdr->size_idx);
+}
+
+static size_t
+run_get_bitmap_size(const struct memory_block *m)
+{
+	struct chunk_header *hdr = heap_get_chunk_hdr(m->heap, m);
+	struct chunk_run *run = heap_get_chunk_run(m->heap, m);
+
+	uint32_t size_idx = hdr->size_idx;
+	struct run_bitmap b;
+	memblock_run_bitmap_size(&size_idx, hdr->flags, run->hdr.block_size,
+		run->hdr.alignment, run->content, &b);
+	ASSERTeq(size_idx, hdr->size_idx);
+	return b.size;
 }
 
 /*
@@ -518,8 +556,7 @@ run_get_data_start(const struct memory_block *m)
 	struct chunk_header *hdr = heap_get_chunk_hdr(m->heap, m);
 	struct chunk_run *run = heap_get_chunk_run(m->heap, m);
 
-	struct run_bitmap b;
-	run_get_bitmap(m, &b);
+	size_t size = run_get_bitmap_size(m);
 
 	if (hdr->flags & CHUNK_FLAG_ALIGNED) {
 		/*
@@ -528,11 +565,10 @@ run_get_data_start(const struct memory_block *m)
 		 * account when calculating the address.
 		 */
 		uintptr_t hsize = header_type_to_size[m->header_type];
-		uintptr_t base = (uintptr_t)run->content +
-			b.size + hsize;
+		uintptr_t base = (uintptr_t)run->content + size + hsize;
 		return (char *)(ALIGN_UP(base, run->hdr.alignment) - hsize);
 	} else {
-		return (char *)&run->content + b.size;
+		return (char *)&run->content + size;
 	}
 }
 
@@ -1085,8 +1121,7 @@ run_vg_init(const struct memory_block *m, int objects,
 	/* set the run metadata as defined */
 	VALGRIND_DO_MAKE_MEM_DEFINED(run, RUN_BASE_METADATA_SIZE);
 
-	struct run_bitmap b;
-	run_get_bitmap(m, &b);
+	size_t size = run_get_bitmap_size(m);
 
 	/*
 	 * Mark run data headers as defined.
@@ -1102,7 +1137,7 @@ run_vg_init(const struct memory_block *m, int objects,
 	VALGRIND_DO_MAKE_MEM_NOACCESS(run, SIZEOF_RUN(run, m->size_idx));
 
 	/* set the run bitmap as defined */
-	VALGRIND_DO_MAKE_MEM_DEFINED(run, b.size + RUN_BASE_METADATA_SIZE);
+	VALGRIND_DO_MAKE_MEM_DEFINED(run, size + RUN_BASE_METADATA_SIZE);
 
 	if (objects) {
 		if (run_iterate_used(m, cb, arg) != 0)
